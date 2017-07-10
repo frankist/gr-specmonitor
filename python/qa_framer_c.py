@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright 2017 <+YOU OR YOUR COMPANY+>.
+# Copyright 2017 Francisco Paisana.
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,50 +51,51 @@ class qa_framer_c(gr_unittest.TestCase):
     def tearDown(self):
         self.tb = None
 
-    # def test_001_t(self):
-    #     # Generate empty frames with zadoff-chu sequence as preamble
-    #     sample_rate = 10.0e6
-    #     frame_duration = 1.0e-3
-    #     test_duration = frame_duration*100
-    #     samples_per_frame = int(round(frame_duration*sample_rate))
-    #     samples_per_test = int(round(test_duration*sample_rate))
-    #     preamble_seq = zadoffchu(63,1,0)
-    #     empty_frame = np.zeros(samples_per_test, dtype='complex')
+    def test_001_t(self):
+        # Generate empty frames with zadoff-chu sequence as preamble
+        print "***** Start test 002 *****"
+        sample_rate = 10.0e6
+        frame_duration = 1.0e-3
+        test_duration = frame_duration*100
+        samples_per_frame = int(round(frame_duration*sample_rate))
+        samples_per_test = int(round(test_duration*sample_rate))
+        preamble_seq = zadoffchu(63,1,0)
+        empty_frame = np.zeros(samples_per_test, dtype='complex')
 
-    #     print 'This is a TEST with an empty frame'
-    #     print 'Input variables: sample_rate: ', sample_rate, ' frame_duration: ', frame_duration
-    #     print 'Derived variables: samples_per_frame: ', samples_per_frame, ' samples_per_test: ', samples_per_test
-    #     t = 0
-    #     while t < empty_frame.size:
-    #         end_t = min((t+len(preamble_seq)), empty_frame.size)
-    #         empty_frame[t:end_t] = preamble_seq[0:end_t-t]
-    #         t = t + samples_per_frame
+        print 'This is a TEST with an empty frame'
+        print 'Input variables: sample_rate: ', sample_rate, ' frame_duration: ', frame_duration
+        print 'Derived variables: samples_per_frame: ', samples_per_frame, ' samples_per_test: ', samples_per_test
+        t = 0
+        while t < empty_frame.size:
+            end_t = min((t+len(preamble_seq)), empty_frame.size)
+            empty_frame[t:end_t] = preamble_seq[0:end_t-t]
+            t = t + samples_per_frame
 
-    #     framer = specmonitor.framer_c(sample_rate, frame_duration, preamble_seq)
-    #     head = blocks.head(gr.sizeof_gr_complex, samples_per_test)
-    #     dst = blocks.vector_sink_c()
-    #     self.tb.connect(framer,head)
-    #     self.tb.connect(head,dst)
+        framer = specmonitor.framer_c(sample_rate, frame_duration, preamble_seq)
+        head = blocks.head(gr.sizeof_gr_complex, samples_per_test)
+        dst = blocks.vector_sink_c()
+        self.tb.connect(framer,head)
+        self.tb.connect(head,dst)
 
-    #     t1 = time.time()
-    #     self.tb.run()
-    #     t2 = time.time()
-    #     result_data = dst.data()
-    #     print "Block Run Speed [MS/s]: ", samples_per_test/(t2-t1)/1.0e6
-    #     # plt.plot(np.abs(result_data),'gx-')
-    #     # plt.plot(np.abs(empty_frame),'r.-')
-    #     # plt.show()
-    #     self.assertEqual(empty_frame.size, samples_per_test)
-    #     self.assertEqual(len(result_data), samples_per_test)
-    #     self.assertFloatTuplesAlmostEqual(empty_frame, result_data, 6)
+        t1 = time.time()
+        self.tb.run()
+        t2 = time.time()
+        result_data = dst.data()
+        print "Block Run Speed [MS/s]: ", samples_per_test/(t2-t1)/1.0e6
+        # plt.plot(np.abs(result_data),'gx-')
+        # plt.plot(np.abs(empty_frame),'r.-')
+        # plt.show()
+        self.assertEqual(empty_frame.size, samples_per_test)
+        self.assertEqual(len(result_data), samples_per_test)
+        self.assertFloatTuplesAlmostEqual(empty_frame, result_data, 6)
 
     def test_002_t(self):
         # Generate frames with AWGN and test SNR estimation
         sample_rate = 10.0e6
         frame_duration = 1.0e-3
         test_duration = 0.1*frame_duration
-        snr = 1000
-        scale_value = 10.0
+        snr = 10
+        scale_value = 15.0
         samples_per_frame = int(round(frame_duration*sample_rate))
         samples_per_test = int(round(test_duration*sample_rate))
         random_samples_skip = 0#np.random.randint(samples_per_frame)
@@ -109,8 +110,6 @@ class qa_framer_c(gr_unittest.TestCase):
         mag2 = blocks.complex_to_mag_squared()
         mavg = blocks.moving_average_ff(len(preamble_seq),1.0/len(preamble_seq))# i need to divide by the preamble size in case the preamble seq has amplitude 1 (sum of power is len)
         sqrtavg = blocks.transcendental("sqrt")
-        # float2complex = blocks.float_to_complex()
-        # divide = blocks.divide_cc()
 
         # I have to compensate the amplitude of the input signal (scale) either through a feedback normalization loop that computes the scale, or manually (not practical)
         # additionally I have to scale down by the len(preamble)==sum(abs(preamble)^2) because the cross-corr does not divide by the preamble length
@@ -132,25 +131,19 @@ class qa_framer_c(gr_unittest.TestCase):
         self.tb.connect(add,scaler)
         self.tb.connect(scaler,mag2,mavg,sqrtavg)
 
-        # self.tb.connect(sqrtavg,float2complex)
-        # self.tb.connect(scaler,(divide,0))
-        # self.tb.connect(float2complex,(divide,1))
-        # self.tb.connect(divide,scaler2)
-
-        # self.tb.connect(scaler,scaler2)
         self.tb.connect(scaler,corr_est)
         self.tb.connect(corr_est,tag_db)
         self.tb.connect(corr_est,head,dst)
 
         self.tb.connect(sqrtavg,skiphead,debug_vec)
         self.tb.connect(scaler,skiphead2,debug_vec2)
-        # self.tb.connect(scaler2,skiphead3,debug_vec3)
 
         self.tb.run()
         result_data = dst.data()
         debug_vec_data = debug_vec.data()
         debug_vec_data2 = debug_vec2.data()
         debug_vec_data3 = debug_vec3.data()
+
 
         # plt.plot(debug_vec_data)
         # plt.plot(np.abs(debug_vec_data2),'g')

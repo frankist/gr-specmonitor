@@ -28,6 +28,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 list(APPEND specmonitor_sources
     framer_c_impl.cc
     corr_est_norm_cc_impl.cc
+    framer_snr_est_cc_impl.cc
 )
 
 set(specmonitor_sources "${specmonitor_sources}" PARENT_SCOPE)

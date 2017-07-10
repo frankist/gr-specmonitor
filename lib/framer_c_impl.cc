@@ -48,7 +48,7 @@ namespace gr {
               idx_(0)
     {
         samples_per_frame_ = (int)round(frame_duration_*sample_rate_);
-        std::cout << "Samples per frame: " << samples_per_frame_ << std::endl;
+        // std::cout << "Samples per frame: " << samples_per_frame_ << std::endl;
     }
 
     /*

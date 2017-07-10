@@ -23,5 +23,6 @@
 install(FILES
     api.h
     framer_c.h
-    corr_est_norm_cc.h DESTINATION include/specmonitor
+    corr_est_norm_cc.h
+    framer_snr_est_cc.h DESTINATION include/specmonitor
 )

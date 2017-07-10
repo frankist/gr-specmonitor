@@ -30,6 +30,8 @@
 #include <boost/math/special_functions/round.hpp>
 #include <gnuradio/filter/pfb_arb_resampler.h>
 #include <gnuradio/filter/firdes.h>
+#include <cmath>
+#include "utils/prints/print_ranges.h"
 
 namespace gr {
   namespace specmonitor {
@@ -103,7 +105,7 @@ namespace gr {
       set_output_multiple(nsamples);
 
       d_filter2->set_taps(ones_vec);
-      d_filter2->filter(ones_vec.size(), &ones_vec[0], &d_mavg_mag2[0]); // set to ones so we don't divide by zero
+      // d_filter2->filter(ones_vec.size(), &ones_vec[0], &d_mavg_mag2[0]); // set to ones so we don't divide by zero
 
       // It looks like the kernel::fft_filter_ccc stashes a tail between
       // calls, so that contains our filtering history (I think).  The
@@ -271,7 +273,10 @@ namespace gr {
       d_filter2->filter(noutput_items, &d_in_mag2[0], &d_mavg_mag2[0]);
 
       volk_32f_x2_divide_32f(&d_corr_mag_norm[0], &d_corr_mag[0], &d_mavg_mag2[0], noutput_items);
-      assert(std::min_element(&d_mavg_mag2[0],&d_mavg_mag2[noutput_items])>0);
+      for(int i = 0; i < noutput_items; ++i)
+        if(d_mavg_mag2[i]<=0)
+          d_corr_mag_norm[i]=0;
+      // assert(*std::min_element(&d_mavg_mag2[0],&d_mavg_mag2[noutput_items])>0);
 
       // std::cout << "vector [";
       // float detection = 0;
@@ -315,30 +320,23 @@ namespace gr {
         add_item_tag(0, nitems_written(0) + i, pmt::intern("corr_start"),
                      pmt::from_double(d_corr_mag_norm[i]), d_src_id);
 
-#if 0
-        // Use Parabolic interpolation to estimate a fractional
-        // sample delay. There are more accurate methods as
-        // the sample delay estimate using this method is biased.
-        // But this method is simple and fast.
-        // center between [-0.5,0.5] units of samples
-        // Paper Reference: "Discrete Time Techniques for Time Delay
-        // Estimation" G. Jacovitti and G. Scarano
-        double center = 0.0;
-        if( i > 0 && i < (noutput_items - 1 )){
-          double nom = d_corr_mag_norm[i-1]-d_corr_mag_norm[i+1];
-          double denom = 2*(d_corr_mag_norm[i-1]-2*d_corr_mag_norm[i]+d_corr_mag_norm[i+1]);
-          center = nom/denom;
-        }
-#else
-        // Calculates the center of mass between the three points around the peak.
         // Estimate is linear.
         double nom = 0, den = 0;
         nom = d_corr_mag_norm[i-1] + 2*d_corr_mag_norm[i] + 3*d_corr_mag_norm[i+1];
         den = d_corr_mag_norm[i-1] + d_corr_mag_norm[i] + d_corr_mag_norm[i+1];
         double center = nom / den;
         center = (center - 2.0); // adjust for bias in center of mass calculation
-#endif
 
+#ifndef NDEBUG
+        if(isnan(d_corr_mag_norm[i])==true) {
+          std::cout << "ERROR: d_corr_mag_norm[i] is NAN. i: " << i << ",d_corr_mag[i]="
+                    << d_corr_mag[i] << ",d_mavg_mag2[i]=" << d_mavg_mag2[i] << std::endl;
+          std::cout << "d_mavg_mag2: " << container::print(&d_mavg_mag2[0],&d_mavg_mag2[noutput_items]) << std::endl;
+          // std::cout << "in: " << container::print(&in[hist_len], &in[noutput_items]) << std::endl;
+          std::cout << "d_in_mag2: " << container::print(&d_in_mag2[0],&d_in_mag2[noutput_items]) << std::endl;
+          exit(1);
+        }
+#endif
 
         // Estimated scaling factor for the input stream to normalize
         // the output to +/-1.
@@ -380,8 +378,8 @@ namespace gr {
         add_item_tag(0, nitems_written(0) + index, pmt::intern("mag2_est"),
                      pmt::from_double(mag2_est), d_src_id);
 
-        std::cout << "These are the tag details: {" << phase << "," << center
-                  << "," << d_corr_mag_norm[i] << "," << d_scale << "," << mag2_est << "}" << std::endl;
+        // std::cout << "These are the tag details: {" << phase << "," << center
+        //           << "," << d_corr_mag_norm[i] << "," << d_scale << "," << mag2_est << "}" << std::endl;
         // std::cout << "These are other variables {" << d_corr_mag[i] << "," << d_mavg_mag2[i] << ","
         //           << corr_mag << "," << d_stashed_threshold << "}" << std::endl;
 
