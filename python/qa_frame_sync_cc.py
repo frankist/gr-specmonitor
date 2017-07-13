@@ -23,6 +23,12 @@ from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 import specmonitor_swig as specmonitor
 import zadoffchu
+import numpy as np
+import matplotlib.pyplot as plt
+
+def cross_correlate(x,pseq):
+    xcorr = np.correlate(x,pseq)/np.sqrt(np.mean(np.abs(pseq)**2))
+    return xcorr
 
 class qa_frame_sync_cc (gr_unittest.TestCase):
 
@@ -35,16 +41,17 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
     def test_001_t (self):
         N = 1000
         zc_len = 11
-        n_repeats = 4
         toffset = 100
-        zc_seq = zadoffchu.generate_sequence(zc_len, 1, 0)
-        x = np.zeros(N)
-        for r in range(n_repeats):
-            x[toffset+r*zc_len:toffset+(r+1)*zc_len] = zc_seq
+        pseq_list = []
+        pseq_list.append(zadoffchu.generate_sequence(zc_len, 1, 0))
+        n_repeats = [4]
+        x = np.zeros(N,dtype=np.complex128)
+        for r in range(n_repeats[0]):
+            x[toffset+r*zc_len:toffset+(r+1)*zc_len] = pseq_list[0]
 
         vector_source = blocks.vector_source_c(x, True)
         head = blocks.head(gr.sizeof_gr_complex, N)
-        frame_sync = specmonitor.frame_sync_cc(zc_seq,n_repeats,0.8)
+        frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.8)
         dst = blocks.vector_sink_c()
 
         self.tb.connect(vector_source,head)
@@ -56,8 +63,10 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         in_data = dst.data()
 
         xcorr = frame_sync.get_crosscorr0(N)
+        xcorr_true = cross_correlate(in_data,pseq_list[0])
 
         plt.plot(np.abs(xcorr))
+        plt.plot(np.abs(xcorr_true),'r--')
         plt.show()
 
 if __name__ == '__main__':

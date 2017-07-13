@@ -104,6 +104,7 @@ namespace gr {
       //   }
       // }
 
+      memcpy(out, &in[0], sizeof(gr_complex)*noutput_items);
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }

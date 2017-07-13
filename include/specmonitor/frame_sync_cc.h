@@ -49,7 +49,7 @@ namespace gr {
       static sptr make(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres);
 
       // debug internal variables
-      virtual std::vector<gr_complex> get_crosscorr0(int N);
+      virtual std::vector<gr_complex> get_crosscorr0(int N) = 0;
     };
 
   } // namespace specmonitor

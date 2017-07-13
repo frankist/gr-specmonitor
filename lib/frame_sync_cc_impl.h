@@ -51,7 +51,7 @@ namespace gr {
          gr_vector_void_star &output_items);
 
       // debug internal variables
-      std::vector<gr_complex> get_crosscorr0(int N) {
+      virtual std::vector<gr_complex> get_crosscorr0(int N) { 
         return std::vector<gr_complex>(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[N]);
       }
     };

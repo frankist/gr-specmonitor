@@ -21,6 +21,8 @@
 #include <gnuradio/filter/fft_filter.h>
 #include "utils/digital/moving_average.h"
 #include <volk/volk.h>
+#include "utils/math/operation.h"
+#include "utils/math/transform.h"
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
 #define _CROSSCORR_DETECTOR_CC_H_
@@ -85,7 +87,12 @@ namespace gr {
       d_corr = (gr_complex *) volk_malloc(sizeof(gr_complex)*nitems, volk_get_alignment());
       d_corr_mag = (float *) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
       d_smooth_corr = (float *) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
-      d_filter = new gr::filter::kernel::fft_filter_ccc(1, d_pseq);
+      std::vector<gr_complex> pseq_filt = d_pseq;
+      float pwr = utils::mean_mag2(&pseq_filt[0], pseq_filt.size());
+      utils::scale(&pseq_filt[0], 1/pwr, pseq_filt.size());
+      utils::conj(&pseq_filt[0], pseq_filt.size());
+      std::reverse(pseq_filt.begin(), pseq_filt.end());
+      d_filter = new gr::filter::kernel::fft_filter_ccc(1, pseq_filt);
     }
 
     crosscorr_detector_cc::~crosscorr_detector_cc() {
