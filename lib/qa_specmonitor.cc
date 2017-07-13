@@ -27,12 +27,14 @@
 
 #include "qa_specmonitor.h"
 #include "qa_framer_c.h"
+#include "qa_frame_sync_cc.h"
 
 CppUnit::TestSuite *
 qa_specmonitor::suite()
 {
   CppUnit::TestSuite *s = new CppUnit::TestSuite("specmonitor");
   s->addTest(gr::specmonitor::qa_framer_c::suite());
+  s->addTest(gr::specmonitor::qa_frame_sync_cc::suite());
 
   return s;
 }
