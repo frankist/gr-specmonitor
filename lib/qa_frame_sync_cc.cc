@@ -40,9 +40,9 @@ namespace gr {
       int val_size = 10;
       utils::moving_average<float> mavg(size);
       utils::moving_average<float> mavg2(size);
-      float values[val_size] = {0,1,2,3,4,5,6,7,8,9};
+      float values[] = {0,1,2,3,4,5,6,7,8,9};
       float res[val_size], res2[val_size];
-      float expected_results[val_size] = {0,0.2,0.6,1.2,2.0,3.0,4.0,5.0,6.0,7.0};
+      float expected_results[] = {0,0.2,0.6,1.2,2.0,3.0,4.0,5.0,6.0,7.0};
       float diff = 0, diff2 = 0;
 
       mavg.execute(&values[0], &res[0], val_size);

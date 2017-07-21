@@ -14,9 +14,18 @@
 #include <boost/format.hpp>
 #include <sstream>      // std::stringstream
 #include <numeric>
+#include <complex>
 
 #ifndef GENERAL_UTILS_HPP
 #define GENERAL_UTILS_HPP
+
+template<typename T>
+std::string print_complex(std::complex<T> c)
+{
+    std::stringstream os;
+    os << c.real() << "+" << c.imag() << "j";
+    return os.str();
+}
 
 namespace container
 {

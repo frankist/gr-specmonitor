@@ -50,6 +50,7 @@ namespace gr {
 
       // debug internal variables
       virtual std::vector<gr_complex> get_crosscorr0(int N) = 0;
+      virtual std::vector<std::string> get_crosscorr0_peaks() = 0;
     };
 
   } // namespace specmonitor

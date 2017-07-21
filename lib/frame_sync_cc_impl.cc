@@ -56,7 +56,7 @@ namespace gr {
       set_max_noutput_items(nitems);
 
       d_crosscorr0 = new crosscorr_detector_cc(d_preamble_seq[0], d_n_repeats[0], nitems, d_thres);
-
+      
       set_history(d_n_repeats[0]*preamble_seq[0].size()+1);
     }
 
@@ -77,7 +77,7 @@ namespace gr {
       gr_complex *out = (gr_complex *) output_items[0];
 
       // Our correlation filter length
-      unsigned int hist_len = history() - 1;
+      unsigned int hist_len = history()-1;
 
       d_crosscorr0->work(in, noutput_items, hist_len, nitems_read(0), 1);
 
@@ -109,6 +109,11 @@ namespace gr {
       return noutput_items;
     }
 
+
+    // DEBUG
+    std::vector<std::string> get_crosscorr0_peaks() {
+      //FIXME: Write this
+    }
   } /* namespace specmonitor */
 } /* namespace gr */
 

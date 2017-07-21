@@ -23,6 +23,7 @@
 #include <volk/volk.h>
 #include "utils/math/operation.h"
 #include "utils/math/transform.h"
+#include <numeric>
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
 #define _CROSSCORR_DETECTOR_CC_H_
@@ -46,6 +47,7 @@ namespace gr {
       utils::moving_average<gr_complex> schmidl_vals;
       bool valid;
     detection_instance(int siz) : schmidl_vals(siz), valid(false) {}
+      static bool idx_compare(const detection_instance& a, const detection_instance& b) {return a.idx < b.idx;}
     };
 
     class crosscorr_detector_cc {
@@ -87,9 +89,9 @@ namespace gr {
       d_corr = (gr_complex *) volk_malloc(sizeof(gr_complex)*nitems, volk_get_alignment());
       d_corr_mag = (float *) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
       d_smooth_corr = (float *) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
+      float pwr = std::accumulate(&d_pseq[0], &d_pseq[d_pseq.size()], 0.0, utils::OpAccNorm);//utils::mean_mag2(&d_pseq[0], d_pseq.size());
+      utils::scale(&d_pseq[0], 1/sqrt(pwr), d_pseq.size());
       std::vector<gr_complex> pseq_filt = d_pseq;
-      float pwr = utils::mean_mag2(&pseq_filt[0], pseq_filt.size());
-      utils::scale(&pseq_filt[0], 1/pwr, pseq_filt.size());
       utils::conj(&pseq_filt[0], pseq_filt.size());
       std::reverse(pseq_filt.begin(), pseq_filt.end());
       d_filter = new gr::filter::kernel::fft_filter_ccc(1, pseq_filt);
@@ -103,6 +105,7 @@ namespace gr {
     }
 
     void crosscorr_detector_cc::work(const gr_complex* in, int noutput_items, int hist_len, int n_read, float awgn) {
+      long d_corr_toffset = n_read + hist_len - d_seq_len + 1;
       // We first calculate the cross-correlation and mag2 it
       d_filter->filter(noutput_items, &in[hist_len], d_corr);
       volk_32fc_magnitude_squared_32f(&d_corr_mag[0], d_corr, noutput_items);
@@ -114,17 +117,20 @@ namespace gr {
       unsigned short max_i;
       volk_32f_index_max_16u(&max_i, d_smooth_corr, noutput_items);
       if(d_smooth_corr[max_i] > d_thres*awgn) { // d_thres*d_awgn
-        long sample_idx = n_read + max_i;
+        long sample_idx = d_corr_toffset + max_i;
         int p_;
         for(p_ = 0; p_ < peaks.size(); ++p_) {
           if(peaks[p_].idx+d_seq_len == sample_idx) {
             if(peaks[p_].corr_val < d_smooth_corr[max_i]) {
               peaks[p_].idx = sample_idx;
               peaks[p_].corr_val = d_smooth_corr[max_i];
+              std::cout << "DEBUG: Updating peak. New peak position: " << sample_idx << std::endl;
+              std::sort(peaks.begin(),peaks.end(),detection_instance::idx_compare);
             }
             else {
               peaks[p_].valid = true;
-              std::cout << "A peak solution was found at " << peaks[p_].idx << std::endl;
+              std::cout << "A peak solution was found at " << peaks[p_].idx
+                        << ": " << peaks[p_].corr_val << std::endl;
             }
             break;
           }
@@ -142,14 +148,24 @@ namespace gr {
           new_peak.idx = sample_idx;
           new_peak.corr_val = d_smooth_corr[max_i];
           peaks.push_back(new_peak);
+          std::cout << "A peak candidate was found at " << new_peak.idx
+                    << ": " << new_peak.corr_val << std::endl;
         }
-        else if(peaks[p_].valid==false) {
+        else if(peaks[p_].valid==false) { // the peak was updated. Update also its schmidl&cox phase
           int past_idx = std::max((int)max_i-(int)d_seq_len,0);
           gr_complex res;
           volk_32fc_x2_conjugate_dot_prod_32fc(&res,&in[past_idx],&in[max_i], d_seq_len);
           peaks[p_].schmidl_vals.execute(res);
         }
       }
+
+      // check for peaks that are maximal
+      for(int p_ = 0; p_ < peaks.size(); ++p_)
+        if(peaks[p_].idx + d_seq_len <  d_corr_toffset + noutput_items) {
+          peaks[p_].valid = true;
+          std::cout << "A peak solution was found at " << peaks[p_].idx
+                    << ": " << peaks[p_].corr_val << std::endl;
+        }
     }
   }
 }

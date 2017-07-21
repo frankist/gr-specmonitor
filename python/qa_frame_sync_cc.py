@@ -27,7 +27,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def cross_correlate(x,pseq):
-    xcorr = np.correlate(x,pseq)/np.sqrt(np.mean(np.abs(pseq)**2))
+    xcorr = np.correlate(x,pseq)#/np.sqrt(np.mean(np.abs(pseq)**2))
     return xcorr
 
 class qa_frame_sync_cc (gr_unittest.TestCase):
@@ -44,29 +44,35 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         toffset = 100
         pseq_list = []
         pseq_list.append(zadoffchu.generate_sequence(zc_len, 1, 0))
-        n_repeats = [4]
+        pseq0_norm = pseq_list[0]/np.sqrt(np.sum(np.abs(pseq_list[0])**2))
+        n_repeats = [3]
         x = np.zeros(N,dtype=np.complex128)
         for r in range(n_repeats[0]):
-            x[toffset+r*zc_len:toffset+(r+1)*zc_len] = pseq_list[0]
+            x[toffset+r*zc_len:toffset+(r+1)*zc_len] = pseq0_norm
+        hist_len = n_repeats[0]*pseq_list[0].size
+        x_with_history = np.append(np.zeros(hist_len,dtype=np.complex128),x)
+        toffset_with_hist = toffset+hist_len
 
         vector_source = blocks.vector_source_c(x, True)
-        head = blocks.head(gr.sizeof_gr_complex, N)
+        head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
         frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.8)
         dst = blocks.vector_sink_c()
 
         self.tb.connect(vector_source,head)
         self.tb.connect(head,frame_sync)
-        # self.tb.connect(corr_est,tag_db)
         self.tb.connect(frame_sync,dst)
 
         self.tb.run ()
         in_data = dst.data()
+        self.assertFloatTuplesAlmostEqual(in_data,x_with_history) # check the alignment is correct
 
         xcorr = frame_sync.get_crosscorr0(N)
-        xcorr_true = cross_correlate(in_data,pseq_list[0])
+        xcorr_with_history = np.append(np.zeros(hist_len-pseq0_norm.size+1,dtype=np.complex128), xcorr)#[pseq_list[0].size-1::]
+        xcorr_true = cross_correlate(in_data,pseq0_norm)#in_data[hist_len::],pseq0_norm)
+        # self.assertFloatTuplesAlmostEqual(xcorr[0:xcorr_true.size],xcorr_true,6)
 
-        plt.plot(np.abs(xcorr))
-        plt.plot(np.abs(xcorr_true),'r--')
+        plt.plot(np.abs(xcorr_with_history))
+        plt.plot(np.abs(xcorr_true),'r:')
         plt.show()
 
 if __name__ == '__main__':

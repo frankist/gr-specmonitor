@@ -28,4 +28,11 @@ namespace utils {
       sum += std::norm(vec[i]);
     return sum;
   }
+
+  class OpNorm {
+    float operator()(std::complex<float> val) {
+      return std::norm(val);
+    }
+  };
+  float OpAccNorm (float x, std::complex<float> y) {return x+std::norm(y);}
 };

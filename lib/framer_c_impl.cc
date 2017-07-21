@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2017 <+YOU OR YOUR COMPANY+>.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -42,9 +42,9 @@ namespace gr {
       : gr::sync_block("framer_c",
               gr::io_signature::make(0, 0, 0),
                        gr::io_signature::make(1, 1, sizeof(gr_complex))),
-              sample_rate_(sample_rate), 
-              frame_duration_(frame_duration), 
-              preamble_seq_(preamble_seq), 
+              sample_rate_(sample_rate),
+              frame_duration_(frame_duration),
+              preamble_seq_(preamble_seq),
               idx_(0)
     {
         samples_per_frame_ = (int)round(frame_duration_*sample_rate_);
@@ -61,7 +61,7 @@ namespace gr {
     int framer_c_impl::work(int noutput_items,
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
-    {   
+    {
       gr_complex *out = (gr_complex *) output_items[0];
 
       // Do <+signal processing+>
@@ -80,4 +80,3 @@ namespace gr {
 
   } /* namespace specmonitor */
 } /* namespace gr */
-
