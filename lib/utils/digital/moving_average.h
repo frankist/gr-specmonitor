@@ -68,6 +68,10 @@ namespace utils {
       for(int i = 0; i < d_vec.size(); ++i)
         d_sum += d_vec[i];
     }
+
+    inline size_t size() const {
+      return d_vec.size();
+    }
   };
 };
 

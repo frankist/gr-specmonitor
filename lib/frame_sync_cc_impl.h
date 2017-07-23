@@ -54,7 +54,7 @@ namespace gr {
       std::vector<gr_complex> get_crosscorr0(int N) { 
         return std::vector<gr_complex>(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[N]);
       }
-      std::vector<std::string> get_crosscorr0_peaks();
+      std::string get_crosscorr0_peaks();
     };
 
   } // namespace specmonitor

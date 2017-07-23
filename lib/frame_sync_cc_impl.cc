@@ -25,6 +25,11 @@
 #include <gnuradio/io_signature.h>
 #include "frame_sync_cc_impl.h"
 #include <volk/volk.h>
+#include "utils/serialization/rapidjson/stringbuffer.h"
+#include "utils/serialization/rapidjson/prettywriter.h"
+#include "utils/serialization/rapidjson/document.h"
+#include "utils/prints/print_ranges.h"
+
 
 namespace gr {
   namespace specmonitor {
@@ -111,8 +116,39 @@ namespace gr {
 
 
     // DEBUG
-    std::vector<std::string> get_crosscorr0_peaks() {
-      //FIXME: Write this
+    std::string frame_sync_cc_impl::get_crosscorr0_peaks() {
+      using namespace rapidjson;
+
+      rapidjson::StringBuffer s;
+      Document d;
+      rapidjson::PrettyWriter<rapidjson::StringBuffer> w(s);
+      std::vector<std::string> peak_strs(d_crosscorr0->peaks.size());
+
+      // w.StartObject();
+      // w.String("peaks");
+      w.StartArray();
+      for(std::vector<detection_instance>::iterator it = d_crosscorr0->peaks.begin(); it != d_crosscorr0->peaks.end(); ++it) {
+        w.StartObject();
+        w.String("idx");
+        w.Int(it->idx);
+        w.String("corr_val");
+        w.Double(it->corr_val);
+        w.StartArray();
+        for(int i = 0; i < it->schmidl_vals.size(); ++i) {
+          w.String(print_complex(it->schmidl_vals.d_vec[i]).c_str());
+        }
+        w.EndArray();
+        w.String("schmidl_mean");
+        w.String(print_complex(it->schmidl_vals.mean()).c_str());
+        w.String("valid");
+        w.Bool(it->valid);
+        w.EndObject();
+      }
+      w.EndArray();
+
+      std::string st = s.GetString();
+      d.Parse(st.c_str());
+      return st;
     }
   } /* namespace specmonitor */
 } /* namespace gr */
