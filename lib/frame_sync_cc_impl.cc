@@ -36,21 +36,22 @@ namespace gr {
 
     frame_sync_cc::sptr
     frame_sync_cc::make(const std::vector<std::vector<gr_complex> >& preamble_seq,
-                        const std::vector<int>& n_repeats, float thres)
+                        const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len)
     {
       return gnuradio::get_initial_sptr
-        (new frame_sync_cc_impl(preamble_seq, n_repeats, thres));
+        (new frame_sync_cc_impl(preamble_seq, n_repeats, thres, frame_period, awgn_len));
     }
 
     /*
      * The private constructor
      */
     frame_sync_cc_impl::frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq,
-                                           const std::vector<int>& n_repeats, float thres)
+                                           const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len)
       : gr::sync_block("frame_sync_cc",
                        gr::io_signature::make(1, 1, sizeof(gr_complex)),
                        gr::io_signature::make(1, 1, sizeof(gr_complex))),
-        d_preamble_seq(preamble_seq), d_n_repeats(n_repeats), d_thres(thres),
+        d_frame(preamble_seq, n_repeats, frame_period, awgn_len),
+        d_thres(thres),
         d_awgn(0), d_state(0)
     {
       // In order to easily support the optional second output,
@@ -60,9 +61,12 @@ namespace gr {
       const size_t nitems = 24*1024;
       set_max_noutput_items(nitems);
 
-      d_crosscorr0 = new crosscorr_detector_cc(d_preamble_seq[0], d_n_repeats[0], nitems, d_thres);
+      d_crosscorr0 = new crosscorr_detector_cc(&d_frame, nitems, d_thres);
+      d_tracker = new crosscorr_tracker(&d_frame, d_thres);
       
-      set_history(d_n_repeats[0]*preamble_seq[0].size()+1);
+      int hist_len = std::max(d_frame.n_repeats[0]*d_frame.len[0], d_frame.len[1]+2*5);
+      hist_len = std::max(hist_len,(int)d_frame.awgn_len);
+      set_history(hist_len + 1);
     }
 
     /*
@@ -71,6 +75,7 @@ namespace gr {
     frame_sync_cc_impl::~frame_sync_cc_impl()
     {
       delete d_crosscorr0;
+      delete d_tracker;
     }
 
     int
@@ -84,7 +89,35 @@ namespace gr {
       // Our correlation filter length
       unsigned int hist_len = history()-1;
 
+      // if(d_state==1) {
       d_crosscorr0->work(in, noutput_items, hist_len, nitems_read(0), 1);
+      std::vector<detection_instance> &v = d_crosscorr0->peaks;
+      for(int i = 0; i < v.size(); ++i) {
+        if(v[i].valid==true && v[i].tracked==false) {
+          d_tracker->insert_peak(v[i]);
+          v[i].tracked = true;
+        }
+      }
+
+      // track the already detected peaks
+      d_tracker->work(in, noutput_items, hist_len, nitems_read(0), 1);
+
+      if(d_state != 2) {
+        for(int i = 0; i < d_tracker->d_peaks.size(); ++i) {
+          if(d_tracker->d_peaks[i].n_frames_elapsed > 4 && d_tracker->d_peaks[i].peak_amp>0.5) {
+            d_state = 2;
+          }
+        }
+      }
+
+      //   std::vector<sync_hypothesis> &v = &hypothesis_vec[0];
+      //   for(int i = 0; i < v.size(); ++i) {
+      //     pseq2_start = v[i].idx + d_preamble_seq[0].size()*d_n_repeats[0];
+      //     if(pseq2_start >= nitems_read(0) && pseq2_start < nitems_read(0) + noutput_items[0]) {
+            
+      //     }
+      //   }
+      // }
 
       // if(d_state==1) {
       //   d_filter0->filter(noutput_items, &in[hist_len], d_corr0);
@@ -117,39 +150,52 @@ namespace gr {
 
     // DEBUG
     std::string frame_sync_cc_impl::get_crosscorr0_peaks() {
-      using namespace rapidjson;
-
-      rapidjson::StringBuffer s;
-      Document d;
-      rapidjson::PrettyWriter<rapidjson::StringBuffer> w(s);
-      std::vector<std::string> peak_strs(d_crosscorr0->peaks.size());
-
-      // w.StartObject();
-      // w.String("peaks");
-      w.StartArray();
-      for(std::vector<detection_instance>::iterator it = d_crosscorr0->peaks.begin(); it != d_crosscorr0->peaks.end(); ++it) {
-        w.StartObject();
-        w.String("idx");
-        w.Int(it->idx);
-        w.String("corr_val");
-        w.Double(it->corr_val);
-        w.StartArray();
-        for(int i = 0; i < it->schmidl_vals.size(); ++i) {
-          w.String(print_complex(it->schmidl_vals.d_vec[i]).c_str());
-        }
-        w.EndArray();
-        w.String("schmidl_mean");
-        w.String(print_complex(it->schmidl_vals.mean()).c_str());
-        w.String("valid");
-        w.Bool(it->valid);
-        w.EndObject();
-      }
-      w.EndArray();
-
-      std::string st = s.GetString();
-      d.Parse(st.c_str());
-      return st;
+      return d_crosscorr0->peaks_to_json();
     }
+
+    std::string frame_sync_cc_impl::get_peaks_json() {
+        using namespace rapidjson;
+
+        rapidjson::StringBuffer s;
+        Document d;
+
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> w(s);
+        std::string ret_js;
+
+        d_tracker->to_json(w);
+
+        std::string st = s.GetString();
+        d.Parse(st.c_str());
+        return st;
+    }
+
+    // std::string frame_sync_cc_impl::get_hypotheses() {
+    //   using namespace rapidjson;
+
+    //   rapidjson::StringBuffer s;
+    //   Document d;
+
+    //   rapidjson::PrettyWriter<rapidjson::StringBuffer> w(s);
+    //   std::vector<std::string> peak_strs(hypothesis_vec.size());
+
+    //   w.StartArray();
+    //   for(std::vector<detection_instance>::iterator it = hypothesis_vec.begin(); it != hypothesis_vec.end(); ++it) {
+    //     w.StartObject();
+    //     w.String("idx");
+    //     w.Int(it->idx);
+    //     w.String("corr_val");
+    //     w.Double(it->corr_val);
+    //     w.String("cfo");
+    //     w.Double(it->cfo);
+    //     w.EndObject();
+    //   }
+    //   w.EndArray();
+
+    //   std::string st = s.GetString();
+    //   d.Parse(st.c_str());
+    //   return st;
+    // }
+
   } /* namespace specmonitor */
 } /* namespace gr */
 

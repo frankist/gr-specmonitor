@@ -18,33 +18,56 @@
  * Boston, MA 02110-1301, USA.
  */
 
+#include <volk/volk.h>
 #include <vector>
 
-#ifndef MOVING_AVERAGE_H_
-#define MOVING_AVERAGE_H_
+#ifndef VOLK_UTILS_H_
+#define VOLK_UTILS_H_
 
-namespace utils {
+namespace volk_utils {
   template<typename T>
   class moving_average {
   public:
-    std::vector<T> d_vec;
+    T* d_vec;
+    T* d_tmp;
+    size_t d_capacity;
+    size_t d_size;
     int d_i;
     T d_sum;
 
-    moving_average(size_t len) : d_vec(len), d_i(0) {
+    moving_average(size_t len) : d_size(len), d_i(0) {
+      d_capacity = (size_t)(floor(len/1024)+1)*1024;
+      d_vec = (T*) volk_malloc(sizeof(T) * d_capacity, volk_get_alignment());
+      d_tmp = (T*) volk_malloc(sizeof(T) * d_capacity, volk_get_alignment());
+      std::fill(&d_vec[0], &d_vec[d_size], T(0));
+      d_sum = T(0);
+    }
+
+    ~moving_average() {
+      volk_free(d_vec);
+    }
+
+    void execute(T* x, size_t x_len) {
+      int i2 = d_i;
+      for(int i = 0; i < x_len; ++i) {
+        i2 = (d_i+i)%d_size;
+        d_vec[i2] = x[i];
+      }
+      refresh();
+      d_i = i2;
     }
 
     void execute(T* x, T* res, size_t x_len) {
       int i2 = d_i;
       for(int i = 0; i < x_len; ++i) {
-        int i2 = (d_i+i)%d_vec.size();
-        d_sum += x[i] - d_vec[i2];
+        i2 = (d_i+i)%d_size;
+        // d_sum += x[i] - d_vec[i2];
         d_vec[i2] = x[i];
-        res[i] = d_sum/d_vec.size();
-      }
-      if(d_i+x_len >= d_vec.size())
         refresh();
-
+        res[i] = mean();
+      }
+      // if(d_i+x_len >= d_size)
+      //   refresh();
       d_i = i2;
     }
 
@@ -52,25 +75,24 @@ namespace utils {
       d_sum += x - d_vec[d_i];
       d_vec[d_i] = x;
       d_i++;
-      if(d_i>=d_vec.size()) {
-        d_i -= d_vec.size();
+      if(d_i>=d_size) {
+        d_i -= d_size;
         refresh();
       }
       return mean();
     }
 
     inline T mean() const {
-      return d_sum/(T)d_vec.size();
+      return d_sum/(T)d_size;
     }
 
     void refresh() {
-      d_sum = 0;
-      for(int i = 0; i < d_vec.size(); ++i)
-        d_sum += d_vec[i];
+      volk_32f_accumulator_s32f(&d_tmp[0], &d_vec[0], d_size);
+      d_sum = d_tmp[0];
     }
 
     inline size_t size() const {
-      return d_vec.size();
+      return d_size;
     }
   };
 };

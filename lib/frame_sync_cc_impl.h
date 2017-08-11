@@ -25,6 +25,7 @@
 #include <gnuradio/filter/fft_filter.h>
 #include "utils/digital/moving_average.h"
 #include "crosscorr_detector_cc.h"
+#include "crosscorr_tracker.h"
 
 namespace gr {
   namespace specmonitor {
@@ -32,17 +33,17 @@ namespace gr {
     class frame_sync_cc_impl : public frame_sync_cc
     {
      private:
-      std::vector<std::vector<gr_complex> > d_preamble_seq;
-      std::vector<int> d_n_repeats;
+      frame_params d_frame;
       float d_thres;
 
       float d_awgn;
       short d_state;
 
       crosscorr_detector_cc* d_crosscorr0;
+      crosscorr_tracker* d_tracker;
 
      public:
-      frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres);
+      frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len);
       ~frame_sync_cc_impl();
 
       // Where all the action really happens
@@ -55,8 +56,8 @@ namespace gr {
         return std::vector<gr_complex>(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[N]);
       }
       std::string get_crosscorr0_peaks();
+      std::string get_peaks_json();
     };
-
   } // namespace specmonitor
 } // namespace gr
 
