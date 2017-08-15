@@ -31,6 +31,10 @@ def cross_correlate(x,pseq):
     xcorr = np.correlate(x,pseq)#/np.sqrt(np.mean(np.abs(pseq)**2))
     return xcorr
 
+def apply_cfo(x,cfo):
+    x_cfo = x * np.exp(1j*2*np.pi*cfo*np.arange(x.size))
+    return x_cfo
+
 def generate_preamble(zc_len, n_repeats):
     pseq_list = []
     pseq_norm_list = []
@@ -49,6 +53,15 @@ def generate_preamble(zc_len, n_repeats):
 
     return (x,pseq_list,pseq_norm_list)
 
+def add_preambles(x,toffset,preamble,frame_dur):
+    k = 0
+    first_idx = toffset + k*frame_dur
+    while first_idx <= x.size:
+        preamble_size_copied = min(x.size-first_idx,preamble.size)
+        x[first_idx:first_idx+preamble_size_copied] += preamble[0:preamble_size_copied]
+        k+=1
+        first_idx = toffset + k*frame_dur
+    return x
 
 class qa_frame_sync_cc (gr_unittest.TestCase):
 
@@ -58,25 +71,104 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def test_001_t (self):
-        # In this test, we check if *one* preamble is detected with the correct
-        # amplitude, CFO zero, and at the correct timestamp
-        N = 1000
+    # def test_001_t (self):
+    #     # In this test, we check if *one* preamble is detected with the correct
+    #     # amplitude, CFO zero, and at the correct timestamp
+    #     N = 1000
+    #     zc_len = [11,61]
+    #     toffset = 100
+    #     n_repeats = [3,1]
+    #     samples_per_frame = 1000
+    #     samples_of_awgn = 50
+    #     preamble_amp = np.random.uniform(0.5,100)
+    #     awgn_floor = 1e-3
+    #     precision_places = 5-int(round(np.log10(preamble_amp**2)))
+
+    #     preamble, pseq_list, pseq_norm_list = generate_preamble(zc_len,n_repeats)
+    #     x = np.ones(N,dtype=np.complex128)*awgn_floor
+    #     x[toffset:toffset+preamble.size] = preamble * preamble_amp
+    #     hist_len = max(n_repeats[0]*pseq_list[0].size, zc_len[1]+2*5) # we have to account for margin
+    #     x_with_history = np.append(np.zeros(hist_len,dtype=np.complex128),x)
+    #     toffset_with_hist = toffset+hist_len
+
+    #     vector_source = blocks.vector_source_c(x, True)
+    #     head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
+    #     frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.8,samples_per_frame, samples_of_awgn)
+    #     dst = blocks.vector_sink_c()
+
+    #     self.tb.connect(vector_source,head)
+    #     self.tb.connect(head,frame_sync)
+    #     self.tb.connect(frame_sync,dst)
+
+    #     self.tb.run ()
+    #     in_data = dst.data()
+    #     h = frame_sync.history()-1
+    #     self.assertEqual(h,hist_len)
+    #     self.assertFloatTuplesAlmostEqual(in_data,x_with_history,5) # check the alignment is correct
+    #     # plt.plot(np.abs(in_data))
+    #     # plt.show()
+
+    #     ####################### Unit Test ##########################
+    #     # Check if the preamble starts at expected time
+    #     range_test = np.array([-1,0,preamble.size-1]) + hist_len + toffset
+    #     true_mag_values = np.sqrt(np.array([awgn_floor,preamble_amp,preamble_amp])**2)
+    #     self.assertFloatTuplesAlmostEqual(np.abs([in_data[i] for i in range_test]),true_mag_values,precision_places)
+
+    #     # Check if the peak was detected by the crosscorr_detector
+    #     peak_js = frame_sync.get_crosscorr0_peaks()
+    #     #print('Received the json string:',peak_js)
+    #     js_dict = json.loads(peak_js)
+    #     self.assertEqual(len(js_dict),1)
+    #     self.assertAlmostEqual(js_dict[0]['idx'], toffset + hist_len + zc_len[0]*(n_repeats[0]-1))
+    #     self.assertAlmostEqual(js_dict[0]['corr_val'], preamble_amp**2,precision_places)
+    #     self.assertEqual(js_dict[0]['valid'], True)
+    #     self.assertAlmostEqual(complex(js_dict[0]['schmidl_mean']),preamble_amp**2+0j,precision_places)
+    #     self.assertEqual(len(js_dict[0]['schmidl_vals']),n_repeats[0]-1)
+
+    #     # Check if the peak is being tracked by the crosscorr_tracker
+    #     # If all went well, the tracker must have found the pseq1, and updated the peak_idx for the next frame
+    #     tracked_peak_js = frame_sync.get_peaks_json()
+    #     # print('Received the json string: ', tracked_peak_js)
+    #     js_dict = json.loads(tracked_peak_js)
+    #     self.assertEqual(js_dict[0]['peak_idx'], toffset + hist_len + samples_per_frame)
+    #     self.assertAlmostEqual(js_dict[0]['peak_amp'], preamble_amp**2,precision_places)
+    #     self.assertAlmostEqual(js_dict[0]['cfo'], 0.0)
+    #     self.assertEqual(js_dict[0]['n_frames_elapsed'], 1)
+    #     self.assertEqual(js_dict[0]['n_frames_detected'], 1)
+
+    #     ###################### Visualization #######################
+    #     # xcorr = frame_sync.get_crosscorr0(N)
+    #     # xcorr_with_history = np.append(np.zeros(hist_len-zc_len[0]+1,dtype=np.complex128), xcorr)#[pseq_list[0].size-1::]
+    #     # xcorr_true = cross_correlate(in_data,pseq_norm_list[0])#in_data[hist_len::],pseq0_norm)
+    #     # self.assertFloatTuplesAlmostEqual(xcorr[0:xcorr_true.size],xcorr_true,6)
+
+    #     # plt.plot(np.abs(in_data))
+    #     # plt.plot(np.abs(xcorr_with_history))
+    #     # plt.plot(np.abs(xcorr_true),'r:')
+    #     # plt.show()
+
+    def test_001_t(self):
+        N = 5500
         zc_len = [11,61]
         toffset = 100
         n_repeats = [3,1]
         samples_per_frame = 1000
         samples_of_awgn = 50
-        preamble_amp = np.random.uniform(0.5,100)
+        preamble_amp = 1.5#np.random.uniform(0.5,100)
         awgn_floor = 1e-3
+        cfo = 0.45/zc_len[0]
         precision_places = 5-int(round(np.log10(preamble_amp**2)))
 
+        # derived
         preamble, pseq_list, pseq_norm_list = generate_preamble(zc_len,n_repeats)
         x = np.ones(N,dtype=np.complex128)*awgn_floor
-        x[toffset:toffset+preamble.size] = preamble * preamble_amp
+        x = add_preambles(x,toffset,apply_cfo(preamble*preamble_amp, cfo),samples_per_frame)
         hist_len = max(n_repeats[0]*pseq_list[0].size, zc_len[1]+2*5) # we have to account for margin
         x_with_history = np.append(np.zeros(hist_len,dtype=np.complex128),x)
         toffset_with_hist = toffset+hist_len
+        N_frames_tot = int(np.ceil((N-toffset-preamble.size)/float(samples_per_frame)))
+        tpseq1 = toffset + zc_len[0]*n_repeats[0]
+        preamble_awgn_crosscorr = np.abs(np.sum(x[tpseq1:tpseq1+zc_len[1]]*np.conj(pseq_norm_list[1])))**2/zc_len[1]
 
         vector_source = blocks.vector_source_c(x, True)
         head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
@@ -95,52 +187,16 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         # plt.plot(np.abs(in_data))
         # plt.show()
 
-        ####################### Unit Test ##########################
-        # Check if the preamble starts at expected time
-        range_test = np.array([-1,0,preamble.size-1]) + hist_len + toffset
-        true_mag_values = np.sqrt(np.array([awgn_floor,preamble_amp,preamble_amp])**2)
-        self.assertFloatTuplesAlmostEqual(np.abs([in_data[i] for i in range_test]),true_mag_values,precision_places)
-
-        # Check if the peak was detected by the crosscorr_detector
-        peak_js = frame_sync.get_crosscorr0_peaks()
-        #print('Received the json string:',peak_js)
-        js_dict = json.loads(peak_js)
-        self.assertEqual(len(js_dict),1)
-        self.assertAlmostEqual(js_dict[0]['idx'], toffset + hist_len + zc_len[0]*(n_repeats[0]-1))
-        self.assertAlmostEqual(js_dict[0]['corr_val'], preamble_amp**2,precision_places)
-        self.assertEqual(js_dict[0]['valid'], True)
-        self.assertAlmostEqual(complex(js_dict[0]['schmidl_mean']),preamble_amp**2+0j,precision_places)
-        self.assertEqual(len(js_dict[0]['schmidl_vals']),n_repeats[0]-1)
-
-        # Check if the peak is being tracked by the crosscorr_tracker
-        # If all went well, the tracker must have found the pseq1, and updated the peak_idx for the next frame
-        tracked_peak_js = frame_sync.get_peaks_json()
+        # Check if the preambles are being tracked by the crosscorr_tracker
+        js_dict = json.loads(frame_sync.get_peaks_json())
         # print('Received the json string: ', tracked_peak_js)
-        js_dict = json.loads(tracked_peak_js)
-        self.assertEqual(js_dict[0]['peak_idx'], toffset + hist_len + samples_per_frame)
-        self.assertAlmostEqual(js_dict[0]['peak_amp'], preamble_amp**2,precision_places)
+        self.assertEqual(len(js_dict),1)
+        self.assertEqual(js_dict[0]['peak_idx'], toffset + hist_len + samples_per_frame*N_frames_tot)
+        self.assertAlmostEqual(js_dict[0]['peak_amp'], preamble_awgn_crosscorr,precision_places)
         self.assertAlmostEqual(js_dict[0]['cfo'], 0.0)
-        self.assertEqual(js_dict[0]['n_frames_elapsed'], 1)
-        self.assertEqual(js_dict[0]['n_frames_detected'], 1)
+        self.assertEqual(js_dict[0]['n_frames_elapsed'], N_frames_tot)
+        self.assertEqual(js_dict[0]['n_frames_detected'], N_frames_tot)
 
-        ###################### Visualization #######################
-        # xcorr = frame_sync.get_crosscorr0(N)
-        # xcorr_with_history = np.append(np.zeros(hist_len-zc_len[0]+1,dtype=np.complex128), xcorr)#[pseq_list[0].size-1::]
-        # xcorr_true = cross_correlate(in_data,pseq_norm_list[0])#in_data[hist_len::],pseq0_norm)
-        # self.assertFloatTuplesAlmostEqual(xcorr[0:xcorr_true.size],xcorr_true,6)
-
-        # plt.plot(np.abs(in_data))
-        # plt.plot(np.abs(xcorr_with_history))
-        # plt.plot(np.abs(xcorr_true),'r:')
-        # plt.show()
-
-    def test_002_t(self):
-        N = 5500
-        zc_len = [11,61]
-        toffset = 100
-        n_repeats = [3,1]
-        samples_per_frame = 1000
-        pass
 
 if __name__ == '__main__':
     gr_unittest.run(qa_frame_sync_cc, "qa_frame_sync_cc.xml")

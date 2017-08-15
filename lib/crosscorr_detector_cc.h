@@ -180,78 +180,85 @@ namespace gr {
       // just noise/uncontaminated
 
       // If we find a peak in the smoothed crosscorr, we may have found the preamble
-      unsigned short max_i;
-      volk_32f_index_max_16u(&max_i, d_smooth_corr, noutput_items);
-      float peak_corr = d_smooth_corr[max_i] / len0;
-      float awgn_estim = d_mavg_mag2[max_i], peak_mag2 = d_mavg_mag2[max_i+n_repeats0*len0];// / d_frame->awgn_len;
-      long peak_idx = d_corr_toffset + max_i;
-      // TODO: Check if using a max actually provides acceptable results or i should find local max instead
+      // Analyze sections of length frame_period at a time.
+      for(int section_idx = 0; section_idx < noutput_items; section_idx += d_frame->frame_period) {
+        int max_n = std::min((long int)noutput_items-section_idx, d_frame->frame_period);
+        unsigned short midx;
+        volk_32f_index_max_16u(&midx, d_smooth_corr + section_idx, max_n);
+        // TODO: Check if using a max actually provides acceptable results or i should find local max instead
+        unsigned int max_i = section_idx + midx;
+       
+        float peak_corr = d_smooth_corr[max_i] / len0;  // This is the mean power of the corr smoothed across repeats
+        float awgn_estim = d_mavg_mag2[max_i], peak_mag2 = d_mavg_mag2[max_i+n_repeats0*len0];// / d_frame->awgn_len;
+        long peak_idx = d_corr_toffset + max_i;
+
+        if(peak_corr > d_thres*awgn_estim && is_existing_peak(peak_idx)==false) { // d_thres*d_awgn
+          std::cout << "STATUS: Peak detected: {" << peak_idx << "," << peak_corr << ","
+                    << awgn_estim << "}" << std::endl;
+          int p_;
+          for(p_ = 0; p_ < peaks.size(); ++p_) {
+            if(peaks[p_].idx + len0 == peak_idx) {
+              // if there was an increase relatively to last peak
+              if(peaks[p_].corr_val < d_smooth_corr[max_i]) {
+                peaks[p_].idx = peak_idx;
+                peaks[p_].corr_val = peak_corr;
+                peaks[p_].peak_mag2 = peak_mag2;
+                peaks[p_].awgn_estim = awgn_estim;
+                std::cout << "DEBUG: Updating peak. New peak position: " << peak_idx << std::endl;
+                std::sort(peaks.begin(),peaks.end(),detection_instance::idx_compare);
+              }
+              else {
+                peaks[p_].valid = true;
+                std::cout << "A peak solution was found at " << peaks[p_].idx
+                          << ": " << peaks[p_].corr_val << std::endl;
+              }
+              break;
+            }
+          }
+          if(p_ == peaks.size()) { // this is a new peak hypothesis
+            detection_instance new_peak(d_frame->n_repeats[0]-1);
+            // go back several positions to start computing the autocorrelation
+            assert(hist_len+1-(n_repeats0*len0) >= 0);
+
+            int past_idx = (int)hist_len+1 + (int)max_i - (int)(n_repeats0*len0);
+            for(int k = 0; k < n_repeats0-1; ++k) {
+              int idx = past_idx + k*len0, idx2 = idx + len0;
+              gr_complex res;
+              volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[idx], &in[idx2], len0);
+              res /= len0;
+              new_peak.schmidl_vals.execute(res);
+              // std::cout << "max_i:" << max_i << ",idx:" << idx << ",in[idx]:" << in[idx] << std::endl;
+            }
+            new_peak.idx = peak_idx;
+            new_peak.corr_val = peak_corr;
+            new_peak.peak_mag2 = peak_mag2;
+            new_peak.awgn_estim = awgn_estim;
+            peaks.push_back(new_peak);
+            std::cout << "A peak candidate was found at " << new_peak.idx
+                      << ": " << new_peak.corr_val << std::endl;
+          }
+          else if(peaks[p_].valid==false) {
+            // the peak was updated. Update also its schmidl&cox phase
+            int past_idx = std::max((int)hist_len+1+(int)max_i-(int)len0,0);
+            gr_complex res;
+            volk_32fc_x2_conjugate_dot_prod_32fc(&res,&in[past_idx],&in[(int)hist_len+(int)max_i], len0);
+            res /= len0;
+            peaks[p_].schmidl_vals.execute(res);
+          }
+        }
+
+        // check for peaks to set them to true
+        for(int p_ = 0; p_ < peaks.size(); ++p_)
+          if(peaks[p_].valid==false && peaks[p_].idx + len0 <  d_corr_toffset + section_idx + d_frame->frame_period) {
+            peaks[p_].valid = true;
+            std::cout << "A peak solution was found at " << peaks[p_].idx
+                      << ": " << peaks[p_].corr_val << std::endl;
+          }
+
+      }
 
       // move the unused values(due to the delay) to the start to be used as history in the next work() call
       std::copy(&d_mavg_mag2[noutput_items], &d_mavg_mag2[noutput_items+n_repeats0*len0], &d_mavg_mag2[0]);
-
-      if(peak_corr > d_thres*awgn_estim && is_existing_peak(peak_idx)==false) { // d_thres*d_awgn
-        std::cout << "STATUS: Peak detected: {" << peak_idx << "," << peak_corr << ","
-                  << awgn_estim << "}" << std::endl;
-        int p_;
-        for(p_ = 0; p_ < peaks.size(); ++p_) {
-          if(peaks[p_].idx + len0 == peak_idx) {
-            // if there was an increase relatively to last peak
-            if(peaks[p_].corr_val < d_smooth_corr[max_i]) {
-              peaks[p_].idx = peak_idx;
-              peaks[p_].corr_val = peak_corr;
-              peaks[p_].peak_mag2 = peak_mag2;
-              peaks[p_].awgn_estim = awgn_estim;
-              std::cout << "DEBUG: Updating peak. New peak position: " << peak_idx << std::endl;
-              std::sort(peaks.begin(),peaks.end(),detection_instance::idx_compare);
-            }
-            else {
-              peaks[p_].valid = true;
-              std::cout << "A peak solution was found at " << peaks[p_].idx
-                        << ": " << peaks[p_].corr_val << std::endl;
-            }
-            break;
-          }
-        }
-        if(p_ == peaks.size()) { // this is a new peak hypothesis
-          detection_instance new_peak(d_frame->n_repeats[0]-1);
-          // go back several positions to start computing the autocorrelation
-          assert(hist_len+1-(n_repeats0*len0) >= 0);
-
-          int past_idx = (int)hist_len+1 + (int)max_i - (int)(n_repeats0*len0);
-          for(int k = 0; k < n_repeats0-1; ++k) {
-            int idx = past_idx + k*len0, idx2 = idx + len0;
-            gr_complex res;
-            volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[idx], &in[idx2], len0);
-            res /= len0;
-            new_peak.schmidl_vals.execute(res);
-            // std::cout << "max_i:" << max_i << ",idx:" << idx << ",in[idx]:" << in[idx] << std::endl;
-          }
-          new_peak.idx = peak_idx;
-          new_peak.corr_val = peak_corr;
-          new_peak.peak_mag2 = peak_mag2;
-          new_peak.awgn_estim = awgn_estim;
-          peaks.push_back(new_peak);
-          std::cout << "A peak candidate was found at " << new_peak.idx
-                    << ": " << new_peak.corr_val << std::endl;
-        }
-        else if(peaks[p_].valid==false) {
-          // the peak was updated. Update also its schmidl&cox phase
-          int past_idx = std::max((int)hist_len+1+(int)max_i-(int)len0,0);
-          gr_complex res;
-          volk_32fc_x2_conjugate_dot_prod_32fc(&res,&in[past_idx],&in[(int)hist_len+(int)max_i], len0);
-          res /= len0;
-          peaks[p_].schmidl_vals.execute(res);
-        }
-      }
-
-      // check for peaks to set them to true
-      for(int p_ = 0; p_ < peaks.size(); ++p_)
-        if(peaks[p_].idx + len0 <  d_corr_toffset + noutput_items) {
-          peaks[p_].valid = true;
-          std::cout << "A peak solution was found at " << peaks[p_].idx
-                    << ": " << peaks[p_].corr_val << std::endl;
-        }
     }
 
     bool crosscorr_detector_cc::is_existing_peak(long new_idx) {
@@ -259,6 +266,7 @@ namespace gr {
         long rots = round((new_idx - peaks[p_].idx)/(double)d_frame->frame_period)*d_frame->frame_period;
         int diff = abs(new_idx - (peaks[p_].idx + rots));
         if(diff < 5) {
+          std::cout << "STATUS: Peak at " << new_idx << " is an already existing one. Going to ignore..." << std::endl;
           assert(peaks[p_].valid==true); // it should be already valid
           return true;
         }
