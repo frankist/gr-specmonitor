@@ -113,7 +113,7 @@ namespace gr {
     }
 
     void tracked_peak::update_cfo(gr_complex res, int len0) {
-      float cfo_new = std::arg(res)/(2*M_PI*len0);
+      float cfo_new = -std::arg(res)/(2*M_PI*len0);
       cfo = 0.95*cfo + 0.05*cfo_new;
     }
 
@@ -177,10 +177,10 @@ namespace gr {
         int next_end_pseq0 = next_pseq0 + 2*len0; // points at the end of two seq0
 
         if(next_end_pseq0 >= 0 && next_end_pseq0 < noutput_items) {
-          std::cout << "DEBUG: Correcting CFO for preamble starting at " << next_pseq0 << std::endl;
           gr_complex res;
           volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[next_pseq0],
                                                &in[next_pseq0+len0], len0);
+          std::cout << "DEBUG: Correcting CFO for preamble starting at " << next_pseq0 << ": " << std::arg(res)/(2*M_PI*len0) << std::endl;
           d_peaks[i].update_cfo(res, len0);
           d_state = crosscorr_tracker::TOFFSET;
           peak_updated = true;
@@ -201,10 +201,13 @@ namespace gr {
           int start_idx = pseq1_idx - d_corr_margin;
 
           // compensate the CFO in the original signal
-          lv_32fc_t phase_increment = lv_cmake(std::cos(d_peaks[i].cfo),std::sin(d_peaks[i].cfo));
+          // std::cout << "DEBUG: Gonna compensate CFO with " << d_peaks[i].cfo << std::endl;
+          lv_32fc_t phase_increment = lv_cmake(std::cos(-d_peaks[i].cfo*(float)(2*M_PI)),std::sin(-d_peaks[i].cfo*(float)(2*M_PI)));
           lv_32fc_t phase_init = lv_cmake(1.0f,0.0f);
           volk_32fc_s32fc_x2_rotator_32fc(d_in_cfo, &in[start_idx], phase_increment, &phase_init,
                                           len1 + 2*d_corr_margin);
+          // for(int n = 0; n < len1 + 2*d_corr_margin; ++n)
+          //   d_in_cfo[n] = in[start_idx+n]*std::exp(std::complex<float>(0,-2*M_PI*d_peaks[i].cfo*n));
 
           // find peak within the window [-d_corr_margin,d_corr_margin] in next_pseq1
           std::pair<int,float> peak_pair = find_crosspeak(d_in_cfo, d_frame_ptr->pseq_vec[1],

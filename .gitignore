@@ -3,3 +3,5 @@
 nbproject/
 .#*
 *pyc
+.kdev4/
+gr-specmonitor.kdev4

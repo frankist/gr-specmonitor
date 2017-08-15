@@ -168,7 +168,8 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         toffset_with_hist = toffset+hist_len
         N_frames_tot = int(np.ceil((N-toffset-preamble.size)/float(samples_per_frame)))
         tpseq1 = toffset + zc_len[0]*n_repeats[0]
-        preamble_awgn_crosscorr = np.abs(np.sum(x[tpseq1:tpseq1+zc_len[1]]*np.conj(pseq_norm_list[1])))**2/zc_len[1]
+        preamble_awgn_crosscorr = np.abs(np.sum(apply_cfo(x[tpseq1:tpseq1+zc_len[1]],-cfo)*np.conj(pseq_norm_list[1])))**2/zc_len[1]
+        print "mult: ", preamble_awgn_crosscorr
 
         vector_source = blocks.vector_source_c(x, True)
         head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
@@ -193,7 +194,7 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         self.assertEqual(len(js_dict),1)
         self.assertEqual(js_dict[0]['peak_idx'], toffset + hist_len + samples_per_frame*N_frames_tot)
         self.assertAlmostEqual(js_dict[0]['peak_amp'], preamble_awgn_crosscorr,precision_places)
-        self.assertAlmostEqual(js_dict[0]['cfo'], 0.0)
+        self.assertAlmostEqual(js_dict[0]['cfo'], cfo, precision_places)
         self.assertEqual(js_dict[0]['n_frames_elapsed'], N_frames_tot)
         self.assertEqual(js_dict[0]['n_frames_detected'], N_frames_tot)
 
