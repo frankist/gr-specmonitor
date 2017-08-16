@@ -25,6 +25,23 @@
 
 namespace gr {
   namespace specmonitor {
+    struct crosscorr_peak {
+      long idx;
+      float corr_mag;
+      float preamble_mag2;
+      gr_complex autocorr_val;
+      float awgn_mag2;
+
+      crosscorr_peak(long peak_idx, float crosscorr_mag, float mag2, gr_complex acorr_val, float awgn_estim) :
+        idx(peak_idx),
+        corr_mag(crosscorr_mag),
+        preamble_mag2(mag2),
+        autocorr_val(acorr_val),
+        awgn_mag2(awgn_estim) {}
+      inline float SNRdB() const {return 10*log10(snr());}
+      inline float snr() const {return (preamble_mag2-awgn_mag2)/awgn_mag2;}
+    };
+
     class tracked_peak {
     public:
       double peak_idx;        //< time stamp where the preamble starts

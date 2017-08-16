@@ -206,6 +206,28 @@ namespace gr {
       // NOTE: we divide by a delayed power of the signal. We expect that the samples before the preamble are
       // just noise/uncontaminated
 
+      // for(int kk = 0; kk < noutput_items; ++kk) {
+      //   float peak_corr = d_smooth_corr[kk] / len0;  // This is the mean power of the corr smoothed across repeats
+      //   float awgn_estim = d_mavg_mag2[kk], peak_mag2 = d_mavg_mag2[kk + n_repeats0 * len0];
+      //   long peak_idx = d_corr_toffset + kk;
+
+      //   if(peak_corr > d_thres*awgn_estim && is_existing_peak(peak_idx) == false) {
+      //     // FIXME: change to peak_mag2
+      //     // NOTE: i don't use AWGN for normalization, as it would make my detector sensitive to the energy of the sent signal
+      //     if(kk+len0 < noutput_items && (d_smooth_corr[kk+len0] / len0) > peak_corr) {
+      //       // NOTE: if there is a higher value len0 distance away, skip this peak
+      //       continue;
+      //     }
+      //     detection_instance peak_inst(peak_idx, peak_corr, peak_mag2, awgn_estim, d_frame->n_repeats[0]-1);
+      //     compute_autocorr(peak_inst, in, hist_len, kk, n_repeats0, len0);
+
+      //     peak_inst.valid = true; // TODO: Remove this parameter
+      //     peaks.push_back(peak_inst);
+      //     std::cout << "STATUS: Peak detected: {" << peak_idx << "," << peak_corr << ","
+      //               << awgn_estim << "}" << std::endl;
+      //   }
+      // }
+
       // If we find a peak in the smoothed crosscorr, we may have found the preamble
       // Analyze sections of length frame_period at a time.
       for(int section_idx = 0; section_idx < noutput_items; section_idx += d_frame->frame_period) {

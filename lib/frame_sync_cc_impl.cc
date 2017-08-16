@@ -69,6 +69,17 @@ namespace gr {
       set_history(hist_len + 1);
     }
 
+    bool test_peak_remove(const tracked_peak& p) {
+      bool ret = p.n_frames_detected==1 && p.n_frames_detected==0; // the first peak was missed
+      ret = ret || p.n_missed_frames_contiguous>4; // there are two many frames being missed
+      ret = ret || p.peak_corr/p.awgn_estim < 1.0;
+      return ret;
+    }
+
+    bool test_peak_accept(const tracked_peak& p) {
+      return p.n_frames_detected>4 && p.n_frames_detected/p.n_frames_elapsed > 0.7 && p.snr()>1;
+    }
+
     /*
      * Our virtual destructor.
      */
@@ -104,26 +115,21 @@ namespace gr {
       // track the already detected peaks
       d_tracker->work(in, noutput_items, hist_len, nitems_read(0), 1);
 
+      // erase peaks that are not of good quality
+      std::vector<tracked_peak>& pvec = d_tracker->d_peaks;
+      pvec.erase(std::remove_if(pvec.begin(), pvec.end(), test_peak_remove), pvec.end());
+
       if(d_state == 0) {
-        for(int i = 0; i < d_tracker->d_peaks.size(); ++i) {
-          if(d_tracker->d_peaks[i].n_frames_elapsed > 4 &&
-             d_tracker->d_peaks[i].snr() > 1.5 &&
-             d_tracker->d_peaks[i].n_missed_frames_contiguous==0) {
+        for(int pp = 0; pp < d_tracker->d_peaks.size(); ++pp) {
+          if(test_peak_accept(d_tracker->d_peaks[pp])) {
             dout << "STATUS: Found a good frame candidate: "
-                 << println(d_tracker->d_peaks[i]) << ". I will stop the crosscorr_detector" << std::endl;
+                 << println(d_tracker->d_peaks[pp]) << ". I will stop the crosscorr_detector" << std::endl;
             d_state = 1;
           }
         }
       }
-      else if(d_state == 1) {
-        int i;
-        for(i = 0; i < d_tracker->d_peaks.size(); ++i) {
-          if(d_tracker->d_peaks[i].snr() <1.0 ||
-             d_tracker->d_peaks[i].n_missed_frames_contiguous>4) {
-            d_state = 0;
-            dout << "STATUS: Lost synchronization with frame candidate " << println(d_tracker->d_peaks[i]) << ". Going to look for a new one" << std::endl;
-          }
-        }
+      else if(d_state==1 && d_tracker->d_peaks.size()==0) {
+        dout << "STATUS: Lost synchronization with frame candidates. Going to look for a new one" << std::endl;
       }
 
       //   std::vector<sync_hypothesis> &v = &hypothesis_vec[0];
