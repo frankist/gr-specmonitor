@@ -63,6 +63,10 @@ def add_preambles(x,toffset,preamble,frame_dur):
         first_idx = toffset + k*frame_dur
     return x
 
+def compute_precision(true_value):
+    precision_places = 5-int(round(np.log10(true_value)))
+    return precision_places
+
 class qa_frame_sync_cc (gr_unittest.TestCase):
 
     def setUp (self):
@@ -148,7 +152,7 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
     #     # plt.show()
 
     def test_001_t(self):
-        N = 5500
+        N = 10500
         zc_len = [11,61]
         toffset = 100
         n_repeats = [3,1]
@@ -169,7 +173,7 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         N_frames_tot = int(np.ceil((N-toffset-preamble.size)/float(samples_per_frame)))
         tpseq1 = toffset + zc_len[0]*n_repeats[0]
         preamble_awgn_crosscorr = np.abs(np.sum(apply_cfo(x[tpseq1:tpseq1+zc_len[1]],-cfo)*np.conj(pseq_norm_list[1])))**2/zc_len[1]
-        print "mult: ", preamble_awgn_crosscorr
+        preamble_awgn_mag2 = np.mean(np.abs(x[tpseq1:tpseq1+zc_len[1]])**2)
 
         vector_source = blocks.vector_source_c(x, True)
         head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
@@ -193,8 +197,10 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         # print('Received the json string: ', tracked_peak_js)
         self.assertEqual(len(js_dict),1)
         self.assertEqual(js_dict[0]['peak_idx'], toffset + hist_len + samples_per_frame*N_frames_tot)
-        self.assertAlmostEqual(js_dict[0]['peak_amp'], preamble_awgn_crosscorr,precision_places)
-        self.assertAlmostEqual(js_dict[0]['cfo'], cfo, precision_places)
+        self.assertAlmostEqual(js_dict[0]['peak_corr'], preamble_awgn_crosscorr,precision_places)
+        self.assertAlmostEqual(js_dict[0]['peak_mag2'], preamble_awgn_mag2, precision_places)
+        self.assertAlmostEqual(js_dict[0]['cfo'], cfo, compute_precision(cfo))
+        self.assertAlmostEqual(js_dict[0]['awgn_estim'], awgn_floor**2, compute_precision(awgn_floor**2))
         self.assertEqual(js_dict[0]['n_frames_elapsed'], N_frames_tot)
         self.assertEqual(js_dict[0]['n_frames_detected'], N_frames_tot)
 

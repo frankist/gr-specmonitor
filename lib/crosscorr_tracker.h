@@ -18,6 +18,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
+#include "tracked_peak.h"
 #include <gnuradio/filter/fft_filter.h>
 #include "utils/digital/moving_average.h"
 #include <volk/volk.h>
@@ -50,22 +51,6 @@ namespace gr {
       return std::make_pair(max_idx,max_val/seq_len);
     }
 
-    class tracked_peak {
-    public:
-      double peak_idx;
-      float peak_amp;
-      float cfo;
-      float awgn_estim;
-      int n_frames_elapsed;
-      int n_frames_detected;
-      bool first_flag;
-
-      tracked_peak() : n_frames_elapsed(0), n_frames_detected(0), first_flag(true) {}
-      void update_toffset(long new_peak, float corramp, float thres, long frame_period);
-      void update_cfo(gr_complex res, int len0);
-      void update_awgn(float new_awgn);
-    };
-
     class crosscorr_tracker {
     public:
       // arguments
@@ -88,38 +73,11 @@ namespace gr {
       bool try_update_cfo(const gr_complex* in, int noutput_items, int n_read);
       bool try_update_toffset(const gr_complex *in, int noutput_items, int n_read, float awgn);
       bool try_update_awgn(const gr_complex* in, int noutput_items, int n_read);
-      void insert_peak(const detection_instance& p);
+      std::vector<tracked_peak>::iterator insert_peak(const detection_instance& p);
       void work(const gr_complex* in, int noutput_items, int hist_len, int n_read, float awgn);
       void to_json(rapidjson::PrettyWriter<rapidjson::StringBuffer> &w);
     };
 
-    void tracked_peak::update_toffset(long new_peak, float corramp, float thres, long frame_period) {
-      if(corramp > thres) {
-        if(first_flag==true) {
-          peak_amp = corramp;
-          peak_idx = new_peak;
-          first_flag = false;
-        }
-        else {
-          peak_idx = 0.95*peak_idx + 0.05*new_peak;
-          peak_amp = 0.95*peak_amp + 0.05*corramp;
-        }
-        n_frames_detected++;
-      }
-      else {
-        std::cout << "WARNING: The peak was missed. The crosscorr params were: {"
-                  << new_peak << "," << corramp << "}"  << std::endl;
-      }
-    }
-
-    void tracked_peak::update_cfo(gr_complex res, int len0) {
-      float cfo_new = -std::arg(res)/(2*M_PI*len0);
-      cfo = 0.95*cfo + 0.05*cfo_new;
-    }
-
-    void tracked_peak::update_awgn(float new_awgn) {
-      awgn_estim = 0.95*awgn_estim + 0.05*new_awgn;
-    }
 
     crosscorr_tracker::crosscorr_tracker(frame_params* frame_ptr,
                                          float thres) :
@@ -127,7 +85,6 @@ namespace gr {
       d_thres(thres),
       d_corr_margin(2),
       d_state(crosscorr_tracker::TOFFSET) {
-
       assert(d_frame_ptr->len[1]>0);
       size_t cap = (size_t)ceil((d_frame_ptr->len[1]+2*d_corr_margin) / 1024.0f)*1024;
       d_in_cfo = (gr_complex *) volk_malloc(sizeof(gr_complex)*cap, volk_get_alignment());
@@ -138,15 +95,15 @@ namespace gr {
       volk_free(d_in_cfo);
     }
 
-    void crosscorr_tracker::insert_peak(const detection_instance& p) {
-      tracked_peak c;
-      c.peak_idx = p.idx - (d_frame_ptr->n_repeats[0]-1)*d_frame_ptr->len[0]; // points to beginning of preamble
-      c.peak_amp = p.corr_val;
-      c.cfo = -std::arg(p.schmidl_vals.mean())/(2*M_PI*d_frame_ptr->len[0]);
-      c.awgn_estim = p.awgn_estim;
-      std::cout << "DEBUG: Gonna create tracked peak {" << c.peak_idx << ","
-                << c.peak_amp << "," << c.cfo << "}" << std::endl;
+    std::vector<tracked_peak>::iterator crosscorr_tracker::insert_peak(const detection_instance& p) {
+      tracked_peak c(p.idx - (d_frame_ptr->n_repeats[0]-1)*d_frame_ptr->len[0], // points to beginning of preamble
+                     p.corr_val,
+                     p.peak_mag2,
+                     -std::arg(p.schmidl_vals.mean())/(2*M_PI*d_frame_ptr->len[0]),
+                     p.awgn_estim);
+      // // std::cout << "DEBUG: Gonna create tracked peak " << println(c) << std::endl;
       d_peaks.push_back(c);
+      return d_peaks.end()-1;
     }
 
     bool crosscorr_tracker::try_update_awgn(const gr_complex* in, int noutput_items, int n_read) {
@@ -157,11 +114,11 @@ namespace gr {
         int next_awgn_win = next_pseq0 - d_frame_ptr->awgn_len;
 
         if(next_pseq0 >= 0 && next_pseq0 < noutput_items) {
-          std::cout << "DEBUG: Updating Amp for preamble starting at " << next_pseq0 << std::endl;
           // computes the sum(abs()**2)
           gr_complex res;
           volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[next_awgn_win], &in[next_awgn_win], d_frame_ptr->awgn_len);
-          float mean_pwr = std::norm(res)/d_frame_ptr->awgn_len;
+          float mean_pwr = std::abs(res)/d_frame_ptr->awgn_len;
+          // std::cout << "DEBUG: Updating AWGN for preamble starting at " << next_pseq0 << " to " << mean_pwr << std::endl;
           d_peaks[i].update_awgn(mean_pwr);
           d_state = crosscorr_tracker::CFO;
           peak_updated = true;
@@ -180,7 +137,7 @@ namespace gr {
           gr_complex res;
           volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[next_pseq0],
                                                &in[next_pseq0+len0], len0);
-          std::cout << "DEBUG: Correcting CFO for preamble starting at " << next_pseq0 << ": " << std::arg(res)/(2*M_PI*len0) << std::endl;
+          // std::cout << "DEBUG: Correcting CFO for preamble starting at " << next_pseq0 << ": " << std::arg(res)/(2*M_PI*len0) << std::endl;
           d_peaks[i].update_cfo(res, len0);
           d_state = crosscorr_tracker::TOFFSET;
           peak_updated = true;
@@ -201,7 +158,6 @@ namespace gr {
           int start_idx = pseq1_idx - d_corr_margin;
 
           // compensate the CFO in the original signal
-          // std::cout << "DEBUG: Gonna compensate CFO with " << d_peaks[i].cfo << std::endl;
           lv_32fc_t phase_increment = lv_cmake(std::cos(-d_peaks[i].cfo*(float)(2*M_PI)),std::sin(-d_peaks[i].cfo*(float)(2*M_PI)));
           lv_32fc_t phase_init = lv_cmake(1.0f,0.0f);
           volk_32fc_s32fc_x2_rotator_32fc(d_in_cfo, &in[start_idx], phase_increment, &phase_init,
@@ -216,7 +172,13 @@ namespace gr {
           std::cout << "DEBUG: The preamble (through crosscorr peak1) was detected at "
                     << observed_peak << ", with amp: " << peak_pair.second << std::endl;
 
-          d_peaks[i].update_toffset(observed_peak, peak_pair.second, awgn, d_frame_ptr->frame_period);
+          // Compute the absolute mag2
+          gr_complex res;
+          int block_idx = peak_pair.first + start_idx;
+          volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[block_idx], &in[block_idx], len1);
+          float mean_mag2 = std::abs(res)/len1;
+
+          d_peaks[i].update_toffset(observed_peak, peak_pair.second, mean_mag2, awgn, d_frame_ptr->frame_period);
 
           // update the peak for next frame
           d_peaks[i].peak_idx += d_frame_ptr->frame_period;
@@ -230,7 +192,7 @@ namespace gr {
 
     void crosscorr_tracker::work(const gr_complex* in, int noutput_items, int hist_len, int n_read, float awgn) {
       bool peaks_updated = true;
-      std::cout << "DEBUG: noutput_items=" << noutput_items << std::endl;
+      // std::cout << "DEBUG: noutput_items=" << noutput_items << std::endl;
 
       while(peaks_updated==true) {
         switch(d_state) {
@@ -249,9 +211,11 @@ namespace gr {
       for(int i = 0; i < d_peaks.size(); ++i) {
         w.StartObject();
         w.String("peak_idx");
-        w.Int((long)d_peaks[i].peak_idx);
-        w.String("peak_amp");
-        w.Double(d_peaks[i].peak_amp);
+        w.Int((long)round(d_peaks[i].peak_idx));
+        w.String("peak_corr");
+        w.Double(d_peaks[i].peak_corr);
+        w.String("peak_mag2");
+        w.Double(d_peaks[i].peak_mag2);
         w.String("cfo");
         w.Double(d_peaks[i].cfo);
         w.String("awgn_estim");

@@ -26,7 +26,7 @@
 #include "utils/digital/moving_average.h"
 #include "crosscorr_detector_cc.h"
 #include "crosscorr_tracker.h"
-// #define dout d_debug && std::cout
+#define dout d_debug && std::cout
 
 namespace gr {
   namespace specmonitor {
@@ -44,6 +44,7 @@ namespace gr {
       crosscorr_detector_cc* d_crosscorr0;
       crosscorr_tracker* d_tracker;
 
+      bool d_debug;
      public:
       frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len);
       ~frame_sync_cc_impl();

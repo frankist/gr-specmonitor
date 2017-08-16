@@ -89,12 +89,14 @@ namespace gr {
       // Our correlation filter length
       unsigned int hist_len = history()-1;
 
-      // if(d_state==1) {
-      d_crosscorr0->work(in, noutput_items, hist_len, nitems_read(0), 1);
+      if(d_state==0)
+        d_crosscorr0->work(in, noutput_items, hist_len, nitems_read(0), 1);
+
       std::vector<detection_instance> &v = d_crosscorr0->peaks;
       for(int i = 0; i < v.size(); ++i) {
         if(v[i].valid==true && v[i].tracked==false) {
-          d_tracker->insert_peak(v[i]);
+          std::vector<tracked_peak>::iterator it = d_tracker->insert_peak(v[i]);
+          dout << "STATUS: Found a new peak at " << it->peak_idx << ". Going to track it" << std::endl;
           v[i].tracked = true;
         }
       }
@@ -102,10 +104,24 @@ namespace gr {
       // track the already detected peaks
       d_tracker->work(in, noutput_items, hist_len, nitems_read(0), 1);
 
-      if(d_state != 2) {
+      if(d_state == 0) {
         for(int i = 0; i < d_tracker->d_peaks.size(); ++i) {
-          if(d_tracker->d_peaks[i].n_frames_elapsed > 4 && d_tracker->d_peaks[i].peak_amp>0.5) {
-            d_state = 2;
+          if(d_tracker->d_peaks[i].n_frames_elapsed > 4 &&
+             d_tracker->d_peaks[i].snr() > 1.5 &&
+             d_tracker->d_peaks[i].n_missed_frames_contiguous==0) {
+            dout << "STATUS: Found a good frame candidate: "
+                 << println(d_tracker->d_peaks[i]) << ". I will stop the crosscorr_detector" << std::endl;
+            d_state = 1;
+          }
+        }
+      }
+      else if(d_state == 1) {
+        int i;
+        for(i = 0; i < d_tracker->d_peaks.size(); ++i) {
+          if(d_tracker->d_peaks[i].snr() <1.0 ||
+             d_tracker->d_peaks[i].n_missed_frames_contiguous>4) {
+            d_state = 0;
+            dout << "STATUS: Lost synchronization with frame candidate " << println(d_tracker->d_peaks[i]) << ". Going to look for a new one" << std::endl;
           }
         }
       }
