@@ -166,7 +166,7 @@ namespace gr {
           //   d_in_cfo[n] = in[start_idx+n]*std::exp(std::complex<float>(0,-2*M_PI*d_peaks[i].cfo*n));
 
           // find peak within the window [-d_corr_margin,d_corr_margin] in next_pseq1
-          std::pair<int,float> peak_pair = find_crosspeak(d_in_cfo, d_frame_ptr->pseq_vec[1],
+          std::pair<int,float> peak_pair = find_crosspeak(d_in_cfo, &d_frame_ptr->pseq_vec[1][0],
                                                           len1, 2*d_corr_margin);
           long observed_peak = peak_pair.first + start_idx + n_read - d_seq1_offset;
           std::cout << "DEBUG: The preamble (through crosscorr peak1) was detected at "

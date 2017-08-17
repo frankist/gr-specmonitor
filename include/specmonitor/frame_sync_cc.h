@@ -46,7 +46,7 @@ namespace gr {
        * class. specmonitor::frame_sync_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len);
+      static sptr make(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len, float awgn_guess = 1);
 
       // debug internal variables
       virtual std::vector<gr_complex> get_crosscorr0(int N) = 0;

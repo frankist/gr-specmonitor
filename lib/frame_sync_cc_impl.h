@@ -46,7 +46,7 @@ namespace gr {
 
       bool d_debug;
      public:
-      frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len);
+      frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq, const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len, float awgn_guess);
       ~frame_sync_cc_impl();
 
       // Where all the action really happens

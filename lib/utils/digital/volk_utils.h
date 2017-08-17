@@ -95,6 +95,78 @@ namespace volk_utils {
       return d_size;
     }
   };
+
+  template<typename T>
+  struct volk_array {
+    T* vec;
+    size_t d_capacity;
+
+    volk_array() : d_capacity(0) {
+    }
+
+    volk_array(size_t cap) : d_capacity(cap) {
+      assert(cap>0);
+      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+    }
+
+    volk_array(const volk_array<T>& v) {
+      resize(v.capacity());
+      std::copy(&v[0], &v[v.capacity()], &vec[0]);
+    }
+
+    ~volk_array() {
+      if(capacity()>0)
+        volk_free(vec);
+    }
+
+    inline size_t capacity() const { return d_capacity; }
+
+    volk_array<T>& operator=(const volk_array<T>& v) {
+      return volk_array(v);
+    }
+
+    inline void resize(size_t cap) {
+      d_capacity = cap;
+      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+    }
+
+    inline T& operator[](int i) {
+      assert(i>=0 && i <= capacity());
+      return vec[i];
+    }
+
+    inline const T& operator[](int i) const {
+      assert(i>=0 && i <= capacity()); // I have to do <= capacity for when I want to ref the end()
+      return vec[i];
+    }
+  };
+
+  template<typename T>
+  struct hist_array {
+    T* vec;
+    size_t capacity;
+    size_t hist_len;
+
+    hist_array(size_t cap, size_t h_len) :
+      capacity(cap), hist_len(h_len) {
+      assert(hist_len < capacity);
+      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+    }
+
+    ~hist_array() {
+      volk_free(vec);
+    }
+
+    inline T& operator[](int i) {
+      assert(i>=-hist_len && i < capacity-hist_len);
+      return vec[i-hist_len];
+    }
+
+    inline void advance(int siz) {
+      assert(siz+hist_len <= capacity);
+      std::copy(&vec[siz], &vec[siz+hist_len], &vec[0]);
+    }
+  };
 };
 
 #endif

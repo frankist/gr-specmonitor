@@ -36,23 +36,23 @@ namespace gr {
 
     frame_sync_cc::sptr
     frame_sync_cc::make(const std::vector<std::vector<gr_complex> >& preamble_seq,
-                        const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len)
+                        const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len, float awgn_guess)
     {
       return gnuradio::get_initial_sptr
-        (new frame_sync_cc_impl(preamble_seq, n_repeats, thres, frame_period, awgn_len));
+        (new frame_sync_cc_impl(preamble_seq, n_repeats, thres, frame_period, awgn_len, awgn_guess));
     }
 
     /*
      * The private constructor
      */
     frame_sync_cc_impl::frame_sync_cc_impl(const std::vector<std::vector<gr_complex> >& preamble_seq,
-                                           const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len)
+                                           const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len, float awgn_guess)
       : gr::sync_block("frame_sync_cc",
                        gr::io_signature::make(1, 1, sizeof(gr_complex)),
                        gr::io_signature::make(1, 1, sizeof(gr_complex))),
         d_frame(preamble_seq, n_repeats, frame_period, awgn_len),
         d_thres(thres),
-        d_awgn(0), d_state(0)
+        d_awgn(awgn_guess), d_state(0)
     {
       // In order to easily support the optional second output,
       // don't deal with an unbounded max number of output items.
@@ -61,7 +61,7 @@ namespace gr {
       const size_t nitems = 24*1024;
       set_max_noutput_items(nitems);
 
-      d_crosscorr0 = new crosscorr_detector_cc(&d_frame, nitems, d_thres);
+      d_crosscorr0 = new crosscorr_detector_cc(&d_frame, nitems, d_thres, awgn_guess);
       d_tracker = new crosscorr_tracker(&d_frame, d_thres);
       
       int hist_len = std::max(d_frame.n_repeats[0]*d_frame.len[0], d_frame.len[1]+2*5);
@@ -87,6 +87,7 @@ namespace gr {
     {
       delete d_crosscorr0;
       delete d_tracker;
+      // std::cout << "DESTRUCTORRRRRRR MAIIIIIIN" << std::endl;
     }
 
     int

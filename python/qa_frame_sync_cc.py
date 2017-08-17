@@ -26,6 +26,8 @@ import zadoffchu
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import os
+import time
 
 def cross_correlate(x,pseq):
     xcorr = np.correlate(x,pseq)#/np.sqrt(np.mean(np.abs(pseq)**2))
@@ -64,16 +66,18 @@ def add_preambles(x,toffset,preamble,frame_dur):
     return x
 
 def compute_precision(true_value):
-    precision_places = 5-int(round(np.log10(true_value)))
+    precision_places = 5-int(round(np.log10(max(float(true_value),1.0e-5))))
     return precision_places
 
 class qa_frame_sync_cc (gr_unittest.TestCase):
-
     def setUp (self):
+        print "Starting test..."
         self.tb = gr.top_block ()
 
     def tearDown (self):
+        print "Tearing Down..."
         self.tb = None
+        print "done."
 
     # def test_001_t (self):
     #     # In this test, we check if *one* preamble is detected with the correct
@@ -154,7 +158,7 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
     def test_001_t(self):
         N = 10500
         zc_len = [11,61]
-        toffset = 100
+        toffset = np.random.randint(0,1000)#100
         n_repeats = [3,1]
         samples_per_frame = 1000
         samples_of_awgn = 50
@@ -177,18 +181,26 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
 
         vector_source = blocks.vector_source_c(x, True)
         head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
-        frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.8,samples_per_frame, samples_of_awgn)
+        frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.5,samples_per_frame, samples_of_awgn, awgn_floor**2)
         dst = blocks.vector_sink_c()
 
         self.tb.connect(vector_source,head)
         self.tb.connect(head,frame_sync)
         self.tb.connect(frame_sync,dst)
 
+        print 'Blocked waiting for GDB attach (pid = %d)' % (os.getpid(),)
+        print '\nTest: '
+        print '- toffset: ', toffset
+        print '- preamble start:', toffset+hist_len
+        print ''
+
         self.tb.run ()
         in_data = dst.data()
         h = frame_sync.history()-1
         self.assertEqual(h,hist_len)
         self.assertFloatTuplesAlmostEqual(in_data,x_with_history,5) # check the alignment is correct
+        print 'GR run completed\n'
+        # raw_input ('Press Enter to continue: ')
         # plt.plot(np.abs(in_data))
         # plt.show()
 
