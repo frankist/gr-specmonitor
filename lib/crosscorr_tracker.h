@@ -71,7 +71,7 @@ namespace gr {
                         float thres);
       ~crosscorr_tracker();
       bool try_update_cfo(const gr_complex* in, int noutput_items, int n_read);
-      bool try_update_toffset(const gr_complex *in, int noutput_items, int n_read, float awgn);
+      bool try_update_toffset(const gr_complex *in, int noutput_items, int n_read, int hist_len, float awgn);
       bool try_update_awgn(const gr_complex* in, int noutput_items, int n_read);
       std::vector<tracked_peak>::iterator insert_peak(const detection_instance& p);
       void work(const gr_complex* in, int noutput_items, int hist_len, int n_read, float awgn);
@@ -145,7 +145,7 @@ namespace gr {
       }
     }
 
-    bool crosscorr_tracker::try_update_toffset(const gr_complex *in, int noutput_items, int n_read, float awgn) {
+    bool crosscorr_tracker::try_update_toffset(const gr_complex *in, int noutput_items, int n_read, int hist_len, float awgn) {
       int len1 = d_frame_ptr->len[1];
       bool peak_updated = false;
 
@@ -153,9 +153,11 @@ namespace gr {
         int pseq1_idx = d_peaks[i].peak_idx - n_read + d_seq1_offset;
         int end_idx = pseq1_idx + len1 + d_corr_margin; // points at the end of preamble + corr-margin
 
-        if(end_idx >= 0 && end_idx < noutput_items) {
+        if(end_idx >= len1+2*d_corr_margin && end_idx < noutput_items + len1 + 2*d_corr_margin) {
           // compute the time offset through auto-correlation and update
           int start_idx = pseq1_idx - d_corr_margin;
+          std::cout << start_idx << "," << end_idx << "," << pseq1_idx << "," << noutput_items << std::endl;
+          assert(start_idx>=0 && end_idx < noutput_items + hist_len);
 
           // compensate the CFO in the original signal
           lv_32fc_t phase_increment = lv_cmake(std::cos(-d_peaks[i].cfo*(float)(2*M_PI)),std::sin(-d_peaks[i].cfo*(float)(2*M_PI)));
@@ -201,7 +203,7 @@ namespace gr {
         case crosscorr_tracker::CFO: // compute Schmidl&Cox and update cfo
           peaks_updated = try_update_cfo(in, noutput_items, n_read);
         case crosscorr_tracker::TOFFSET: // compute the time offset through cross-correlation and update
-          peaks_updated = try_update_toffset(in, noutput_items, n_read, awgn);
+          peaks_updated = try_update_toffset(in, noutput_items, n_read, hist_len, awgn);
         }
       }
     }

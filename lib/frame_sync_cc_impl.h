@@ -38,7 +38,7 @@ namespace gr {
       frame_params d_frame;
       float d_thres;
 
-      float d_awgn;
+      // internal state
       short d_state;
 
       crosscorr_detector_cc* d_crosscorr0;

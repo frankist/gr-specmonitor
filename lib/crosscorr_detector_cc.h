@@ -28,6 +28,7 @@
 #include "utils/serialization/rapidjson/document.h"
 #include "utils/prints/print_ranges.h"
 #include "utils/digital/volk_utils.h"
+#include "utils/digital/range_utils.h"
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
 #define _CROSSCORR_DETECTOR_CC_H_
@@ -61,6 +62,12 @@ namespace gr {
       //     volk_free(pseq_vec[i]);
       //   }
       // }
+      int preamble_duration() const {
+        int sum = 0;
+        for(int i = 0; i < len.size(); ++i)
+          sum += len[i]*n_repeats[i];
+        return sum;
+      }
     private:
       frame_params(const frame_params& f) {} // deleted
       frame_params& operator=(const frame_params& f) {} // deleted
@@ -98,28 +105,40 @@ namespace gr {
       const frame_params* d_frame;
       float d_thres;
 
+      // derived
+      int d_len0;
+      int d_len0_tot;
+
       volk_utils::volk_array<gr_complex> d_corr;
       volk_utils::volk_array<float> d_corr_mag;
       volk_utils::volk_array<float> d_smooth_corr;
-      volk_utils::volk_array<float> d_in_mag2;
-      // float *d_mavg_mag2;
-      volk_utils::volk_array<float> d_mavg_mag2;
+      // volk_utils::volk_array<float> d_in_mag2;
+      // volk_utils::volk_array<float> d_mavg_mag2;
+      // volk_utils::volk_array<float> d_preamble_mag2;
       interleaved_moving_average d_interleaved_mavg;
       gr::filter::kernel::fft_filter_ccc* d_filter;
-      // gr::filter::kernel::fft_filter_fff* d_filter2;
-      volk_utils::moving_average<float> *awgn_mavg;
-      int d_smooth_corr_hist_len;
+      // volk_utils::moving_average<float> *awgn_mavg;
+      // volk_utils::moving_average<float> *d_preamble_mag2_mavg;
+      int d_smooth_corr_h_len;
       int d_mavg_mag2_hist_len;
       std::vector<detection_instance> peaks;
       std::vector<detection_instance> peaks_in_buffer;
+
+      // utils::hist_array_view<float> d_awgn_mag2_hist;
+      utils::hist_array_view<float> d_smooth_corr_h;
+      // utils::hist_array_view<float> d_preamble_mag2_hist;
+
+      volk_utils::volk_array<float> d_xmag2;
+      utils::hist_array_view<float> d_xmag2_h;
+      // internal state
+      int d_kk_start;
 
       crosscorr_detector_cc(const frame_params* f_params, int nitems, float thres, float awgn_guess = 1);
 
       ~crosscorr_detector_cc();
 
-      void compute_autocorr(detection_instance& new_peak, const gr_complex* in, int hist_len,
-                       int max_i, int n_repeats0, int len0);
-      void work(const gr_complex* in, int noutput_items, int hist_len, int n_read, float awgn);
+      void compute_autocorr(detection_instance& new_peak, const gr_complex* in, int hist_len, int max_i);
+      void work(const utils::hist_array_view<const gr_complex>& in_h, int noutput_items, int hist_len, int n_read, float awgn);
       std::string peaks_to_json();
       bool is_existing_peak(long new_idx);
     };
@@ -137,18 +156,20 @@ namespace gr {
 
     crosscorr_detector_cc::crosscorr_detector_cc(const frame_params* f_params,
                                                  int nitems, float thres, float awgn_guess) :
-      d_frame(f_params), d_thres(thres),
-      d_interleaved_mavg(f_params->len[0],f_params->n_repeats[0]) {
+      d_frame(f_params), d_thres(thres), 
+      d_len0(f_params->len[0]),
+      d_len0_tot(f_params->len[0]*f_params->n_repeats[0]),
+      d_interleaved_mavg(f_params->len[0],f_params->n_repeats[0]),
+      d_kk_start(0) {
+      d_smooth_corr_h_len = d_len0_tot - d_len0 + 1;
+      d_mavg_mag2_hist_len = d_smooth_corr_h_len + d_frame->len[0]*d_frame->n_repeats[0];
 
-      d_smooth_corr_hist_len = (d_frame->n_repeats[0]-1)*d_frame->len[0] + 1;
-      d_mavg_mag2_hist_len = d_smooth_corr_hist_len + d_frame->len[0]*d_frame->n_repeats[0];
-      // d_corr = (gr_complex *) volk_malloc(sizeof(gr_complex)*nitems, volk_get_alignment());
-      // d_corr_mag = (float *) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
-      // d_smooth_corr = (float *) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
+      // this will compute the crosscorr with peak0
       d_corr.resize(nitems);
       d_corr_mag.resize(nitems);
-      d_smooth_corr.resize(nitems + d_smooth_corr_hist_len);
-      std::fill(&d_smooth_corr[0],&d_smooth_corr[d_smooth_corr_hist_len], 0);
+      d_smooth_corr.resize(nitems + d_smooth_corr_h_len);
+      std::fill(&d_smooth_corr[0],&d_smooth_corr[d_smooth_corr_h_len], 0);
+      d_smooth_corr_h.set(&d_smooth_corr[0], d_smooth_corr_h_len);
 
       // Create a Filter. First normalize the taps, then reverse conjugate them.
       std::vector<gr_complex> pseq_filt(&d_frame->pseq_vec[0][0], &d_frame->pseq_vec[0][d_frame->len[0]]);
@@ -157,35 +178,25 @@ namespace gr {
       std::reverse(pseq_filt.begin(), pseq_filt.end());
       d_filter = new gr::filter::kernel::fft_filter_ccc(1, pseq_filt);
 
-
-      // arrays needed to compute the normalization
-      // d_in_mag2 = (float*) volk_malloc(sizeof(float)*nitems, volk_get_alignment());
-      // d_mavg_mag2 = (float*) volk_malloc(sizeof(float)*(nitems+1024), volk_get_alignment());
-      d_in_mag2.resize(nitems);
-      d_mavg_mag2.resize(nitems+1024);
-      std::fill(&d_mavg_mag2[0], &d_mavg_mag2[d_mavg_mag2_hist_len], awgn_guess); // fill the history with ones
-      std::vector<float> awgn_samples(d_frame->awgn_len,awgn_guess);
-      awgn_mavg = new volk_utils::moving_average<float>(d_frame->awgn_len);
-      awgn_mavg->execute(&awgn_samples[0],d_frame->awgn_len);
-
+      // We keep the mag2 of the received signal to compute the energy and AWGN
+      d_xmag2.resize(nitems+1024*2);
+      d_xmag2_h.set(&d_xmag2[0], d_smooth_corr_h_len + d_len0_tot + d_frame->awgn_len);
+      std::fill(&d_xmag2[0],&d_xmag2[d_xmag2_h.hist_len], awgn_guess);
     }
 
     crosscorr_detector_cc::~crosscorr_detector_cc() {
       delete d_filter;
-      // delete d_filter2;
-      delete awgn_mavg;
-      // std::cout << "DESTRUCTORRRRRRR" << std::endl;
     }
 
     void crosscorr_detector_cc::compute_autocorr(detection_instance& new_peak, const gr_complex* in, int hist_len,
-                                                 int max_i, int n_repeats0, int len0) {
-      assert(hist_len+1-(n_repeats0*len0) >= 0);
-      int past_idx = hist_len + 1 + max_i - n_repeats0*len0; // look back to the beginning of the preamble
-      for(int k = 0; k < n_repeats0-1; ++k) {
-        int idx = past_idx + k*len0, idx2 = idx + len0;
+                                                 int max_i) {
+      assert(hist_len+1-d_len0_tot >= 0);
+      int past_idx = hist_len + 1 + max_i - d_len0_tot; // look back to the beginning of the preamble
+      for(int k = 0; k < d_frame->n_repeats[0]-1; ++k) {
+        int idx = past_idx + k*d_len0, idx2 = idx + d_len0;
         gr_complex res;
-        volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[idx], &in[idx2], len0);
-        res /= len0;
+        volk_32fc_x2_conjugate_dot_prod_32fc(&res, &in[idx], &in[idx2], d_len0);
+        res /= d_len0;
         new_peak.schmidl_vals.execute(res);
         // std::cout << "max_i:" << max_i << ",idx:" << idx << ",in[idx]:" << in[idx] << std::endl;
       }
@@ -198,55 +209,70 @@ namespace gr {
       bool operator()(const detection_instance& d) const {return d.idx < idx; }
     };
 
-    void crosscorr_detector_cc::work(const gr_complex* in, int noutput_items, int hist_len, int n_read, float awgn) {
-      int len0 = d_frame->len[0];
+    void crosscorr_detector_cc::work(const utils::hist_array_view<const gr_complex>& in_h, int noutput_items, int hist_len, int n_read, float awgn) {
       int n_repeats0 = d_frame->n_repeats[0];
-      long d_corr_toffset = n_read + hist_len - len0 + 1 - d_smooth_corr_hist_len;// points to absolute tstamp of beginning of filter
+      long d_corr_toffset = n_read + hist_len - d_len0 + 1 - d_smooth_corr_h_len;// points to absolute tstamp of beginning of filter
 
       // We first calculate the cross-correlation and mag2 it
-      d_filter->filter(noutput_items, &in[hist_len], &d_corr[0]);
+      d_filter->filter(noutput_items, &in_h[0], &d_corr[0]);
       volk_32fc_magnitude_squared_32f(&d_corr_mag[0], &d_corr[0], noutput_items);
 
       // make an interleaved moving average as we know the peaks are at a similar distance
-      d_interleaved_mavg.execute(&d_corr_mag[0], &d_smooth_corr[d_smooth_corr_hist_len], noutput_items);
+      d_interleaved_mavg.execute(&d_corr_mag[0], &d_smooth_corr_h[0], noutput_items);
 
       // Find the magnitude squared of the original signal and average it
-      volk_32fc_magnitude_squared_32f(&d_in_mag2[0], &in[hist_len], noutput_items);
-      // d_filter2->filter(noutput_items, &d_in_mag2[0], &d_mavg_mag2[n_repeats0*len0]);
-      awgn_mavg->execute(&d_in_mag2[0], &d_mavg_mag2[d_mavg_mag2_hist_len], noutput_items);
-      // std::cout << "d_sum: " << awgn_mavg->mean() << std::endl;
+      volk_32fc_magnitude_squared_32f(&d_xmag2_h[0], &in_h[0], noutput_items);
       // NOTE: we divide by a delayed power of the signal. We expect that the samples before the preamble are
       // just noise/uncontaminated
       std::cout << "DEBUG: window: [" << d_corr_toffset << "," << d_corr_toffset+noutput_items << "], noutput_items: " << noutput_items << std::endl;
 
-      for(int kk = 0; kk < noutput_items; ++kk) {
-        float peak_corr = d_smooth_corr[kk] / len0;  // This is the mean power of the corr smoothed across repeats
-        float awgn_estim = d_mavg_mag2[kk], peak_mag2 = d_mavg_mag2[kk + n_repeats0 * len0];
-        long peak_idx = d_corr_toffset + kk;
+      int kk;
+      for(kk = d_kk_start; kk < noutput_items; ++kk) {
+        float *xcorr_ptr = &d_smooth_corr_h[kk-d_smooth_corr_h.hist_len]; // this points to the d_smooth_corr point under analysis. (It can be in history)
+        float *xmag2_ptr = &d_xmag2_h[kk-d_smooth_corr_h.hist_len-d_len0_tot+1];
+        float *awgn_ptr = &d_xmag2_h[kk-d_smooth_corr_h.hist_len-d_len0_tot-d_frame->awgn_len+1];
 
-        if(peak_corr > d_thres*awgn_estim) {
+        float peak_corr = xcorr_ptr[0] / d_len0;  // This is the mean power of the corr smoothed across repeats.
+        long peak_idx = d_corr_toffset + kk;
+        float peak_mag2 = std::accumulate(xmag2_ptr,xmag2_ptr + d_len0_tot,0.0)/d_len0_tot;
+        float awgn_estim = std::accumulate(awgn_ptr,awgn_ptr + d_frame->awgn_len,0.0)/d_frame->awgn_len;
+        gr_complex res;
+        // const gr_complex *pin = &in_h[kk-d_smooth_corr_h.hist_len+1-d_len0_tot];
+        // volk_32fc_x2_conjugate_dot_prod_32fc(&res, pin, pin, d_len0_tot);
+        // float peak_mag2_3 = std::abs(res)/d_len0_tot;
+
+        // if(peak_mag2_2>1.01e-6)
+        //   std::cout << peak_mag2_2 << "," << peak_mag2 << "," << peak_corr << std::endl;
+        // assert(abs(peak_mag2_2/peak_mag2-1)<0.0000001);// && 0);
+        // assert(abs(awgn_mag2_2/awgn_estim-1)<0.0000001);
+        // assert(abs(peak_mag2_2-peak_mag2_3)<0.00001);// && 0);
+
+        if(peak_corr > d_thres*awgn_estim) {//peak_mag2 && peak_mag2 > d_thres2*awgn_estim) {
           // FIXME: change to peak_mag2. Current peak_mag2 is the average over awgn_len and not the preamble size
           // NOTE: i don't use AWGN for normalization, as it would make my detector sensitive to the energy of the sent signal
           unsigned short midx;
-          volk_32f_index_max_16u(&midx, &d_smooth_corr[0] + kk + 1, d_smooth_corr_hist_len-1);
-          unsigned int max_i = kk + 1 + midx;
-          if(d_smooth_corr[kk] < d_smooth_corr[max_i]) { // it is just a local optimum
+          volk_32f_index_max_16u(&midx, xcorr_ptr + 1, d_smooth_corr_h.hist_len-1);
+          int max_i = kk + 1 + midx;
+          if(xcorr_ptr[0] < xcorr_ptr[(int)midx+1]) { // it is just a local optimum
             kk = max_i - 1; // kk is going to be incremented
             continue;
           }
 
           if(is_existing_peak(peak_idx) == false) {
             detection_instance peak_inst(peak_idx, peak_corr, peak_mag2, awgn_estim, d_frame->n_repeats[0]-1);
-            compute_autocorr(peak_inst, in, hist_len, kk-d_smooth_corr_hist_len, n_repeats0, len0);
+            compute_autocorr(peak_inst, in_h.vec, hist_len, kk-d_smooth_corr_h_len);
 
             peak_inst.valid = true; // TODO: Remove this parameter
             peaks.push_back(peak_inst);
             std::cout << "STATUS: Crosscorr Peak0 detected: {" << peak_idx << "," << peak_corr << ","
                       << awgn_estim << "," << peak_mag2 << "," << peak_inst.schmidl_vals.mean() << "}" << std::endl;
           }
-          kk += d_smooth_corr_hist_len;  // skip the margin examined
+          kk += d_smooth_corr_h.hist_len + d_len0 + d_frame->len[1];  // skip the margin examined, plus the pseq1, as the crosscorr(pseq0,pseq1) may not be zero, and the detector may get a false positive
         }
       }
+
+      // NOTE: if there was a hop bigger than the block, we do not continue from position kk=0 in the next call
+      d_kk_start = kk-noutput_items;
 
       // // If we find a peak in the smoothed crosscorr, we may have found the preamble
       // // Analyze sections of length frame_period at a time.
@@ -362,8 +388,13 @@ namespace gr {
         //   }
 
       // move the unused values(due to the delay) to the start to be used as history in the next work() call
-      std::copy(&d_mavg_mag2[noutput_items], &d_mavg_mag2[noutput_items+d_mavg_mag2_hist_len], &d_mavg_mag2[0]);
-      std::copy(&d_smooth_corr[noutput_items], &d_smooth_corr[noutput_items+d_smooth_corr_hist_len], &d_smooth_corr[0]);
+      // std::copy(&d_mavg_mag2[noutput_items], &d_mavg_mag2[noutput_items+d_mavg_mag2_hist_len], &d_mavg_mag2[0]);
+      // d_awgn_mag2_hist.advance(noutput_items);
+      d_smooth_corr_h.advance(noutput_items);
+      // d_preamble_mag2_hist.advance(noutput_items);//d_preamble_mag2_hist.hist_len);
+      d_xmag2_h.advance(noutput_items);
+      // std::copy(&d_smooth_corr[noutput_items], &d_smooth_corr[noutput_items+d_smooth_corr_h_len], &d_smooth_corr[0]);
+      // std::copy(&d_preamble_mag2[noutput_items], &d_preamble_mag2[noutput_items+d_smooth_corr_h_len], &d_preamble_mag2[0]);
     }
 
     bool crosscorr_detector_cc::is_existing_peak(long new_idx) {

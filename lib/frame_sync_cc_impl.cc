@@ -52,7 +52,7 @@ namespace gr {
                        gr::io_signature::make(1, 1, sizeof(gr_complex))),
         d_frame(preamble_seq, n_repeats, frame_period, awgn_len),
         d_thres(thres),
-        d_awgn(awgn_guess), d_state(0)
+        d_state(0)
     {
       // In order to easily support the optional second output,
       // don't deal with an unbounded max number of output items.
@@ -64,8 +64,8 @@ namespace gr {
       d_crosscorr0 = new crosscorr_detector_cc(&d_frame, nitems, d_thres, awgn_guess);
       d_tracker = new crosscorr_tracker(&d_frame, d_thres);
       
-      int hist_len = std::max(d_frame.n_repeats[0]*d_frame.len[0], d_frame.len[1]+2*5);
-      hist_len = std::max(hist_len,(int)d_frame.awgn_len);
+      int hist_len = d_frame.preamble_duration()+d_frame.awgn_len;//std::max(d_frame.n_repeats[0]*d_frame.len[0], d_frame.len[1]+2*5);
+      //hist_len = std::max(hist_len,(int)d_frame.awgn_len);
       set_history(hist_len + 1);
     }
 
@@ -100,9 +100,10 @@ namespace gr {
 
       // Our correlation filter length
       unsigned int hist_len = history()-1;
+      const utils::hist_array_view<const gr_complex> in_h(in, hist_len);
 
       if(d_state==0)
-        d_crosscorr0->work(in, noutput_items, hist_len, nitems_read(0), 1);
+        d_crosscorr0->work(in_h, noutput_items, hist_len, nitems_read(0), 1);
 
       std::vector<detection_instance> &v = d_crosscorr0->peaks;
       for(int i = 0; i < v.size(); ++i) {
