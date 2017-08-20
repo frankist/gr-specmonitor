@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <algorithm>
+#include <limits>
 
 #ifndef RANGE_UTILS_H_
 #define RANGE_UTILS_H_
@@ -29,26 +30,35 @@ namespace utils {
   struct hist_array_view {
     T* vec;
     int hist_len;
+    int d_size;
 
     hist_array_view() : vec(NULL), hist_len(0) {}
 
     hist_array_view(T* vec_x, int h_len) :
       vec(vec_x),
-      hist_len(h_len) {
+      hist_len(h_len),
+      d_size(std::numeric_limits<int>::max()) {
     }
 
-    void set(T* vec_x, int h_len) {
+    hist_array_view(T* vec_x, int h_len, int siz) :
+      vec(vec_x),
+      hist_len(h_len),
+      d_size(siz) {
+    }
+
+    void set(T* vec_x, int h_len, int siz = std::numeric_limits<int>::max()) {
       vec = vec_x;
       hist_len = h_len;
+      d_size = siz;
     }
 
     inline T& operator[](int i) {
-      assert(i>=-hist_len);
+      assert(i>=-hist_len && i <= d_size);
       return vec[i+hist_len];
     }
 
     inline const T& operator[](int i) const {
-      assert(i>=-hist_len);
+      assert(i>=-hist_len && i <= d_size);
       return vec[i+hist_len];
     }
 

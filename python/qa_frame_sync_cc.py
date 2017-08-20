@@ -221,11 +221,11 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
         zc_len = [5,13]
         toffset = 3500#8070
         n_repeats = [500,1]
-        samples_per_frame = 8000
+        samples_per_frame = 9000
         samples_of_awgn = 50
         preamble_amp = 1.5#np.random.uniform(0.5,100)
         awgn_floor = 1e-3
-        cfo = 0.45/zc_len[0]
+        cfo = 0#0.45/zc_len[0]
 
         for r in range(N-np.sum([n_repeats[i]*zc_len[i] for i in range(2)])):
             self.tb = gr.top_block ()
@@ -234,7 +234,7 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
             preamble, pseq_list, pseq_norm_list = generate_preamble(zc_len,n_repeats)
             x = np.ones(N,dtype=np.complex128)*awgn_floor
             x = add_preambles(x,toffset,apply_cfo(preamble*preamble_amp, cfo),samples_per_frame)
-            hist_len = preamble.size + samples_of_awgn
+            hist_len = 2*preamble.size + samples_of_awgn
             # hist_len = max(max(n_repeats[0]*pseq_list[0].size, zc_len[1]+2*5),samples_of_awgn) # we have to account for margin
             x_with_history = np.append(np.zeros(hist_len,dtype=np.complex128),x)
             toffset_with_hist = toffset+hist_len

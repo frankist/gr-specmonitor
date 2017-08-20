@@ -19,12 +19,96 @@
  */
 
 #include <volk/volk.h>
+#include <gnuradio/filter/fir_filter_with_buffer.h>
 #include <vector>
 
 #ifndef VOLK_UTILS_H_
 #define VOLK_UTILS_H_
 
 namespace volk_utils {
+
+  template<typename T>
+  struct volk_array {
+    T* vec;
+    size_t d_capacity;
+
+    volk_array() : d_capacity(0) {
+    }
+
+    volk_array(size_t cap) : d_capacity(cap) {
+      assert(cap>0);
+      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+    }
+
+    volk_array(const volk_array<T>& v) {
+      resize(v.capacity());
+      std::copy(&v[0], &v[v.capacity()], &vec[0]);
+    }
+
+    ~volk_array() {
+      if(capacity()>0)
+        volk_free(vec);
+    }
+
+    inline size_t capacity() const { return d_capacity; }
+
+    volk_array<T> operator=(const volk_array<T>& v) {
+      return volk_array(v);
+    }
+
+    inline void resize(size_t cap) {
+      d_capacity = cap;
+      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+    }
+
+    inline T& operator[](int i) {
+      assert(i>=0 && i <= capacity());
+      return vec[i];
+    }
+
+    inline const T& operator[](int i) const {
+      assert(i>=0 && i <= capacity()); // I have to do <= capacity for when I want to ref the end()
+      return vec[i];
+    }
+  };
+
+  class moving_average_ff {
+  public:
+    gr::filter::kernel::fir_filter_with_buffer_fff* d_filter;
+
+    moving_average_ff(size_t len) {
+      std::cout << "Creating MAVG: " << len << std::endl;
+      d_filter = new gr::filter::kernel::fir_filter_with_buffer_fff(std::vector<float>(len,1));
+      assert(len>0);
+    }
+
+    // Note: I have to define the copy constructor bc I have an internal pointer
+    moving_average_ff(const moving_average_ff& m) {
+      d_filter = new gr::filter::kernel::fir_filter_with_buffer_fff(m.d_filter->taps());
+    }
+
+    ~moving_average_ff() {
+      delete d_filter;
+    }
+
+    moving_average_ff operator=(const moving_average_ff& m) {
+      return moving_average_ff(m);
+    }
+
+    void execute(float *x, float *res, size_t x_len) {
+      d_filter->filterN(res, x, x_len);
+      volk_32f_s32f_normalize(res, (float)d_filter->ntaps(), x_len);
+    }
+
+    float execute(const float& x) {
+      return d_filter->filter(x)/d_filter->ntaps();
+    }
+
+    inline size_t size() const {
+      return d_filter->ntaps();
+    }
+  };
+
   template<typename T>
   class moving_average {
   public:
@@ -45,6 +129,7 @@ namespace volk_utils {
 
     ~moving_average() {
       volk_free(d_vec);
+      volk_free(d_tmp);
     }
 
     void execute(T* x, size_t x_len) {
@@ -94,79 +179,39 @@ namespace volk_utils {
     inline size_t size() const {
       return d_size;
     }
+
+  private:
+    moving_average(const moving_average& m) {} // Note: I have to disable the copy constructor due to internal ptrs
+    moving_average<T>& operator=(const moving_average& m) {} // Note: disable this one too
   };
 
-  template<typename T>
-  struct volk_array {
-    T* vec;
-    size_t d_capacity;
 
-    volk_array() : d_capacity(0) {
-    }
+  // template<typename T>
+  // struct hist_array {
+  //   T* vec;
+  //   size_t capacity;
+  //   size_t hist_len;
 
-    volk_array(size_t cap) : d_capacity(cap) {
-      assert(cap>0);
-      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
-    }
+  //   hist_array(size_t cap, size_t h_len) :
+  //     capacity(cap), hist_len(h_len) {
+  //     assert(hist_len < capacity);
+  //     vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+  //   }
 
-    volk_array(const volk_array<T>& v) {
-      resize(v.capacity());
-      std::copy(&v[0], &v[v.capacity()], &vec[0]);
-    }
+  //   ~hist_array() {
+  //     volk_free(vec);
+  //   }
 
-    ~volk_array() {
-      if(capacity()>0)
-        volk_free(vec);
-    }
+  //   inline T& operator[](int i) {
+  //     assert(i>=-hist_len && i < capacity-hist_len);
+  //     return vec[i-hist_len];
+  //   }
 
-    inline size_t capacity() const { return d_capacity; }
-
-    volk_array<T>& operator=(const volk_array<T>& v) {
-      return volk_array(v);
-    }
-
-    inline void resize(size_t cap) {
-      d_capacity = cap;
-      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
-    }
-
-    inline T& operator[](int i) {
-      assert(i>=0 && i <= capacity());
-      return vec[i];
-    }
-
-    inline const T& operator[](int i) const {
-      assert(i>=0 && i <= capacity()); // I have to do <= capacity for when I want to ref the end()
-      return vec[i];
-    }
-  };
-
-  template<typename T>
-  struct hist_array {
-    T* vec;
-    size_t capacity;
-    size_t hist_len;
-
-    hist_array(size_t cap, size_t h_len) :
-      capacity(cap), hist_len(h_len) {
-      assert(hist_len < capacity);
-      vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
-    }
-
-    ~hist_array() {
-      volk_free(vec);
-    }
-
-    inline T& operator[](int i) {
-      assert(i>=-hist_len && i < capacity-hist_len);
-      return vec[i-hist_len];
-    }
-
-    inline void advance(int siz) {
-      assert(siz+hist_len <= capacity);
-      std::copy(&vec[siz], &vec[siz+hist_len], &vec[0]);
-    }
-  };
+  //   inline void advance(int siz) {
+  //     assert(siz+hist_len <= capacity);
+  //     std::copy(&vec[siz], &vec[siz+hist_len], &vec[0]);
+  //   }
+  // };
 };
 
 #endif
