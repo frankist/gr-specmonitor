@@ -58,6 +58,9 @@ namespace gr {
       std::vector<gr_complex> get_crosscorr0(int N) { 
         return std::vector<gr_complex>(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[N]);
       }
+      std::vector<gr_complex> get_crosscorr0_smooth(int N) { 
+        return std::vector<gr_complex>(&d_crosscorr0->d_smooth_corr_h[-d_crosscorr0->d_smooth_corr_h.hist_len()],&d_crosscorr0->d_smooth_corr_h[N]);
+      }
       std::string get_crosscorr0_peaks();
       std::string get_peaks_json();
     };

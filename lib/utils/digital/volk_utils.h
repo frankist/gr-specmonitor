@@ -40,7 +40,7 @@ namespace volk_utils {
       vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
     }
 
-    volk_array(const volk_array<T>& v) {
+    volk_array(const volk_array<T>& v) : d_capacity(0) {
       resize(v.capacity());
       std::copy(&v[0], &v[v.capacity()], &vec[0]);
     }
@@ -57,6 +57,8 @@ namespace volk_utils {
     }
 
     inline void resize(size_t cap) {
+      if(d_capacity>0)
+        volk_free(vec);
       d_capacity = cap;
       vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
     }
@@ -72,42 +74,140 @@ namespace volk_utils {
     }
   };
 
+  template<typename T>
+  struct hist_volk_array {
+    volk_array<T> vec;
+    int d_hist_len;
+
+    hist_volk_array() : d_hist_len(0) {
+    }
+
+    hist_volk_array(int h_len, int len) : vec(len+h_len), d_hist_len(h_len) {
+    }
+
+    void resize(int h_len, int len) {
+      vec.resize(len+h_len);
+      d_hist_len = h_len;
+    }
+
+    inline T& operator[](int i) {
+      assert(i>=-hist_len() && i <= size());
+      return vec[i+hist_len()];
+    }
+
+    inline const T& operator[](int i) const {
+      assert(i>=-hist_len() && i <= size());
+      return vec[i+hist_len()];
+    }
+
+    inline void advance(int siz) {
+      std::copy(&vec[siz], &vec[siz+hist_len()], &vec[0]);
+    }
+
+    inline int size() const {
+      return ((int)vec.capacity()) - d_hist_len;
+    }
+
+    inline int hist_len() const {
+      return d_hist_len;
+    }
+  };
+
+  template<typename T>
+  class volk_matrix {
+  public:
+    volk_array<T> vec;
+    int d_nrows;
+    int d_ncols;
+
+    volk_matrix(unsigned int nrows, unsigned int ncols) :
+      vec(nrows*ncols), d_nrows(nrows), d_ncols(ncols) {
+    }
+
+    T& at(int row, int col) {
+      assert(row>=0 && col>=0 && row < d_nrows && col < d_ncols);
+      return vec[col*d_nrows + row];
+    }
+
+    inline int ncols() const {return d_ncols;}
+    inline int nrows() const {return d_nrows;}
+    inline int length() const {return d_nrows*d_ncols;}
+  };
+
   class moving_average_ff {
   public:
-    gr::filter::kernel::fir_filter_with_buffer_fff* d_filter;
+    volk_array<float> d_xbuf;
+    volk_array<float> d_xtmp;
+    unsigned int d_size;
+    int d_i;
 
-    moving_average_ff(size_t len) {
-      std::cout << "Creating MAVG: " << len << std::endl;
-      d_filter = new gr::filter::kernel::fir_filter_with_buffer_fff(std::vector<float>(len,1));
-      assert(len>0);
-    }
-
-    // Note: I have to define the copy constructor bc I have an internal pointer
-    moving_average_ff(const moving_average_ff& m) {
-      d_filter = new gr::filter::kernel::fir_filter_with_buffer_fff(m.d_filter->taps());
-    }
-
-    ~moving_average_ff() {
-      delete d_filter;
-    }
-
-    moving_average_ff operator=(const moving_average_ff& m) {
-      return moving_average_ff(m);
+    moving_average_ff(size_t len) :
+      d_xbuf(len), d_xtmp(len), d_size(len), d_i(0) {
+      std::fill(&d_xbuf[0],&d_xbuf[d_size],0);
+      std::fill(&d_xtmp[0],&d_xtmp[d_size],0);
     }
 
     void execute(float *x, float *res, size_t x_len) {
-      d_filter->filterN(res, x, x_len);
-      volk_32f_s32f_normalize(res, (float)d_filter->ntaps(), x_len);
+      for(int i = 0; i < x_len; ++i) {
+        d_xbuf[d_i] = x[i];
+        volk_32f_accumulator_s32f(&d_xtmp[0], &d_xbuf[0], d_size);
+        res[i] = d_xtmp[0];
+        d_i = (d_i + 1) % d_size;
+      }
+      volk_32f_s32f_normalize(res, (float)d_size, x_len);
     }
 
-    float execute(const float& x) {
-      return d_filter->filter(x)/d_filter->ntaps();
+    float execute(float x) {
+      d_xbuf[d_i] = x;
+      volk_32f_accumulator_s32f(&d_xtmp[0], &d_xbuf[0], d_size);
+      d_i = (d_i + 1) % d_size;
+      return d_xtmp[0]/(float) d_size;
+    }
+
+    inline float mean() const {
+      return d_xtmp[0]/(float) d_size;
     }
 
     inline size_t size() const {
-      return d_filter->ntaps();
+      return d_size;
     }
   };
+
+  // class moving_average_ff {
+  // public:
+  //   gr::filter::kernel::fir_filter_with_buffer_fff* d_filter;
+
+  //   moving_average_ff(size_t len) {
+  //     d_filter = new gr::filter::kernel::fir_filter_with_buffer_fff(std::vector<float>(len,1));
+  //     assert(len>0);
+  //   }
+
+  //   // Note: I have to define the copy constructor bc I have an internal pointer
+  //   moving_average_ff(const moving_average_ff& m) {
+  //     d_filter = new gr::filter::kernel::fir_filter_with_buffer_fff(m.d_filter->taps());
+  //   }
+
+  //   ~moving_average_ff() {
+  //     delete d_filter;
+  //   }
+
+  //   moving_average_ff operator=(const moving_average_ff& m) {
+  //     return moving_average_ff(m);
+  //   }
+
+  //   void execute(float *x, float *res, size_t x_len) {
+  //     d_filter->filterN(res, x, x_len);
+  //     volk_32f_s32f_normalize(res, (float)d_filter->ntaps(), x_len);
+  //   }
+
+  //   float execute(const float& x) {
+  //     return d_filter->filter(x)/d_filter->ntaps();
+  //   }
+
+  //   inline size_t size() const {
+  //     return d_filter->ntaps();
+  //   }
+  // };
 
   template<typename T>
   class moving_average {

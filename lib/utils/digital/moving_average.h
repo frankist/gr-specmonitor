@@ -19,6 +19,8 @@
  */
 
 #include <vector>
+#include <numeric>
+#include "range_utils.h"
 
 #ifndef MOVING_AVERAGE_H_
 #define MOVING_AVERAGE_H_
@@ -71,6 +73,33 @@ namespace utils {
 
     inline size_t size() const {
       return d_vec.size();
+    }
+  };
+
+  template<typename T>
+  class high_precision_interleaved_moving_sum {
+  public:
+    utils::matrix<T> m;
+    int d_r, d_c;
+
+    high_precision_interleaved_moving_sum(int mavg_size, int n_avgs) :
+      m(mavg_size, n_avgs), d_r(0), d_c(0) {
+    }
+
+    inline T execute(T x) {
+      m.at(d_r,d_c) = x;
+      T ret = std::accumulate(&m.at(0,d_c),&m.at(m.nrows(),d_c),0.0);
+      if(++d_r == m.nrows()) {
+        d_r = 0;
+        d_c = (d_c+1)%m.ncols();
+      }
+      return ret;
+    }
+
+    void execute(T* x, T* res, unsigned int len) {
+      for(int i = 0; i < len; ++i) {
+        res[i] = execute(x[i]);
+      }
     }
   };
 };

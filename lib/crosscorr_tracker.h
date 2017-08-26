@@ -99,8 +99,8 @@ namespace gr {
       tracked_peak c(p.idx - (d_frame_ptr->n_repeats[0]-1)*d_frame_ptr->len[0], // points to beginning of preamble
                      p.corr_val,
                      p.peak_mag2,
-                     -std::arg(p.schmidl_vals.mean())/(2*M_PI*d_frame_ptr->len[0]),
-                     p.awgn_estim);
+                     p.autocorr_mean,//-std::arg(p.autocorr_mean)/(2*M_PI*d_frame_ptr->len[0]),
+                     p.awgn_estim, d_frame_ptr->len[0], p.peakno);
       // // std::cout << "DEBUG: Gonna create tracked peak " << println(c) << std::endl;
       d_peaks.push_back(c);
       return d_peaks.end()-1;
@@ -110,7 +110,7 @@ namespace gr {
       int len0 = d_frame_ptr->len[0];
       bool peak_updated = false;
       for(int i = 0; i < d_peaks.size(); ++i) {
-        int next_pseq0 = d_peaks[i].peak_idx - n_read;
+        int next_pseq0 = d_peaks[i].tidx - n_read;
         int next_awgn_win = next_pseq0 - d_frame_ptr->awgn_len;
 
         if(next_pseq0 >= 0 && next_pseq0 < noutput_items) {
@@ -130,7 +130,7 @@ namespace gr {
       int len0 = d_frame_ptr->len[0];
       bool peak_updated = false;
       for(int i = 0; i < d_peaks.size(); ++i) {
-        int next_pseq0 = d_peaks[i].peak_idx - n_read;
+        int next_pseq0 = d_peaks[i].tidx - n_read;
         int next_end_pseq0 = next_pseq0 + 2*len0; // points at the end of two seq0
 
         if(next_end_pseq0 >= 0 && next_end_pseq0 < noutput_items) {
@@ -150,17 +150,17 @@ namespace gr {
       bool peak_updated = false;
 
       for(int i = 0; i < d_peaks.size(); ++i) {
-        int pseq1_idx = d_peaks[i].peak_idx - n_read + d_seq1_offset;
+        int pseq1_idx = d_peaks[i].tidx - n_read + d_seq1_offset;
         int end_idx = pseq1_idx + len1 + d_corr_margin; // points at the end of preamble + corr-margin
 
         if(end_idx >= len1+2*d_corr_margin && end_idx < noutput_items + len1 + 2*d_corr_margin) {
           // compute the time offset through auto-correlation and update
           int start_idx = pseq1_idx - d_corr_margin;
-          std::cout << start_idx << "," << end_idx << "," << pseq1_idx << "," << noutput_items << std::endl;
+          // std::cout << start_idx << "," << end_idx << "," << pseq1_idx << "," << noutput_items << std::endl;
           assert(start_idx>=0 && end_idx < noutput_items + hist_len);
 
           // compensate the CFO in the original signal
-          lv_32fc_t phase_increment = lv_cmake(std::cos(-d_peaks[i].cfo*(float)(2*M_PI)),std::sin(-d_peaks[i].cfo*(float)(2*M_PI)));
+          lv_32fc_t phase_increment = lv_cmake(std::cos(-d_peaks[i].cfo()*(float)(2*M_PI)),std::sin(-d_peaks[i].cfo()*(float)(2*M_PI)));
           lv_32fc_t phase_init = lv_cmake(1.0f,0.0f);
           volk_32fc_s32fc_x2_rotator_32fc(d_in_cfo, &in[start_idx], phase_increment, &phase_init,
                                           len1 + 2*d_corr_margin);
@@ -183,7 +183,7 @@ namespace gr {
           d_peaks[i].update_toffset(observed_peak, peak_pair.second, mean_mag2, awgn, d_frame_ptr->frame_period);
 
           // update the peak for next frame
-          d_peaks[i].peak_idx += d_frame_ptr->frame_period;
+          d_peaks[i].increment_peak_idx(d_frame_ptr->frame_period);
           d_peaks[i].n_frames_elapsed++;
           d_state = crosscorr_tracker::AWGN;
           peak_updated = true;
@@ -206,22 +206,25 @@ namespace gr {
           peaks_updated = try_update_toffset(in, noutput_items, n_read, hist_len, awgn);
         }
       }
+
+      std::cout << "YOLOLO " << d_peaks.size() << std::endl;
     }
 
     void crosscorr_tracker::to_json(rapidjson::PrettyWriter<rapidjson::StringBuffer> &w) {
+      std::cout << "WOLOLOLOLOLOLOLOLO " << d_peaks.size() << std::endl;
       w.StartArray();
       for(int i = 0; i < d_peaks.size(); ++i) {
         w.StartObject();
         w.String("peak_idx");
-        w.Int((long)round(d_peaks[i].peak_idx));
+        w.Int(d_peaks[i].tidx);
         w.String("peak_corr");
-        w.Double(d_peaks[i].peak_corr);
+        w.Double(d_peaks[i].corr_mag);
         w.String("peak_mag2");
-        w.Double(d_peaks[i].peak_mag2);
+        w.Double(d_peaks[i].preamble_mag2);
         w.String("cfo");
-        w.Double(d_peaks[i].cfo);
+        w.Double(d_peaks[i].cfo());
         w.String("awgn_estim");
-        w.Double(d_peaks[i].awgn_estim);
+        w.Double(d_peaks[i].awgn_mag2);
         w.String("n_frames_elapsed");
         w.Int(d_peaks[i].n_frames_elapsed);
         w.String("n_frames_detected");

@@ -49,7 +49,7 @@ namespace gr {
                                            const std::vector<int>& n_repeats, float thres, long frame_period, int awgn_len, float awgn_guess)
       : gr::sync_block("frame_sync_cc",
                        gr::io_signature::make(1, 1, sizeof(gr_complex)),
-                       gr::io_signature::make(1, 1, sizeof(gr_complex))),
+                       gr::io_signature::make(1, 2, sizeof(gr_complex))),
         d_frame(preamble_seq, n_repeats, frame_period, awgn_len),
         d_thres(thres),
         d_state(0)
@@ -72,7 +72,7 @@ namespace gr {
     bool test_peak_remove(const tracked_peak& p) {
       bool ret = p.n_frames_detected==1 && p.n_frames_detected==0; // the first peak was missed
       ret = ret || p.n_missed_frames_contiguous>4; // there are two many frames being missed
-      ret = ret || p.peak_corr/p.awgn_estim < 1.0;
+      ret = ret || p.corr_mag/p.awgn_mag2 < 1.0;
       return ret;
     }
 
@@ -109,7 +109,7 @@ namespace gr {
       for(int i = 0; i < v.size(); ++i) {
         if(v[i].valid==true && v[i].tracked==false) {
           std::vector<tracked_peak>::iterator it = d_tracker->insert_peak(v[i]);
-          dout << "STATUS: Found a new peak at " << it->peak_idx << ". Going to track it" << std::endl;
+          dout << "STATUS: Found a new peak at " << it->tidx << ". Going to track it" << std::endl;
           v[i].tracked = true;
         }
       }
@@ -166,7 +166,13 @@ namespace gr {
       //   }
       // }
 
-      memcpy(out, &in[0], sizeof(gr_complex)*noutput_items);
+      memcpy(out, &in_h[-in_h.hist_len], sizeof(gr_complex)*noutput_items);
+
+      if (output_items.size() > 1) {
+        gr_complex* out1 = (gr_complex*) output_items[1];
+        std::copy(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[noutput_items], out1);
+      }
+
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }

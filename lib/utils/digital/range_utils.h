@@ -21,6 +21,7 @@
 #include <cassert>
 #include <algorithm>
 #include <limits>
+#include <vector>
 
 #ifndef RANGE_UTILS_H_
 #define RANGE_UTILS_H_
@@ -65,6 +66,31 @@ namespace utils {
     inline void advance(int siz) {
       std::copy(&vec[siz], &vec[siz+hist_len], &vec[0]);
     }
+  };
+
+  template<typename T>
+  class matrix {
+  public:
+    std::vector<T> vec;
+    int d_nrows;
+    int d_ncols;
+    typedef typename std::vector<T>::iterator iterator;
+
+    matrix(unsigned int nrows, unsigned int ncols) :
+      vec(nrows*ncols), d_nrows(nrows), d_ncols(ncols) {
+    }
+
+    T& at(int row, int col) {
+      assert(row>=0 && col>=0 && row <= d_nrows && col <= d_ncols);
+      return vec[col*d_nrows + row];
+    }
+
+    matrix<T>::iterator begin() {return vec.begin();}
+    matrix<T>::iterator end() {return vec.end();}
+
+    inline int ncols() const {return d_ncols;}
+    inline int nrows() const {return d_nrows;}
+    inline int length() const {return d_nrows*d_ncols;}
   };
 }
 
