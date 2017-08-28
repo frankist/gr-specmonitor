@@ -61,19 +61,12 @@ namespace gr {
       const size_t nitems = 24*1024;
       set_max_noutput_items(nitems);
 
-      d_crosscorr0 = new crosscorr_detector_cc(&d_frame, nitems, d_thres, awgn_guess);
+      d_crosscorr0 = new crosscorr_detector_cc(&d_frame, nitems, d_thres/2, awgn_guess);
       d_tracker = new crosscorr_tracker(&d_frame, d_thres);
       
       int hist_len = 2*d_frame.preamble_duration()+d_frame.awgn_len;//std::max(d_frame.n_repeats[0]*d_frame.len[0], d_frame.len[1]+2*5);
       //hist_len = std::max(hist_len,(int)d_frame.awgn_len);
       set_history(hist_len + 1);
-    }
-
-    bool test_peak_remove(const tracked_peak& p) {
-      bool ret = p.n_frames_detected==1 && p.n_frames_detected==0; // the first peak was missed
-      ret = ret || p.n_missed_frames_contiguous>4; // there are two many frames being missed
-      ret = ret || p.corr_mag/p.awgn_mag2 < 1.0;
-      return ret;
     }
 
     bool test_peak_accept(const tracked_peak& p) {
@@ -95,6 +88,7 @@ namespace gr {
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
     {
+      std::cout << "DEBUG: Gonna process window: [" << nitems_read(0) << "," << nitems_read(0)+noutput_items << "]" << std::endl;
       const gr_complex *in = (const gr_complex *) input_items[0];
       gr_complex *out = (gr_complex *) output_items[0];
 
@@ -105,21 +99,20 @@ namespace gr {
       if(d_state==0)
         d_crosscorr0->work(in_h, noutput_items, hist_len, nitems_read(0), 1);
 
-      std::vector<detection_instance> &v = d_crosscorr0->peaks;
-      for(int i = 0; i < v.size(); ++i) {
-        if(v[i].valid==true && v[i].tracked==false) {
-          std::vector<tracked_peak>::iterator it = d_tracker->insert_peak(v[i]);
-          dout << "STATUS: Found a new peak at " << it->tidx << ". Going to track it" << std::endl;
-          v[i].tracked = true;
-        }
-      }
-
       // track the already detected peaks
-      d_tracker->work(in, noutput_items, hist_len, nitems_read(0), 1);
+      d_tracker->work(in_h, noutput_items, nitems_read(0));
 
-      // erase peaks that are not of good quality
-      std::vector<tracked_peak>& pvec = d_tracker->d_peaks;
-      pvec.erase(std::remove_if(pvec.begin(), pvec.end(), test_peak_remove), pvec.end());
+      // insert the new peaks detected and track them, one at a time.
+      std::vector<preamble_peak> &v = d_crosscorr0->peaks;
+      for(int i = 0; i < v.size(); ++i) {
+        std::vector<tracked_peak>::iterator it = d_tracker->try_insert_peak(v[i]);
+        if(it != d_tracker->d_peaks.end()) {
+          dout << "STATUS: Found a new peak at " << it->preamble_idx() << ". Going to track it" << std::endl;
+          d_tracker->work(in_h,noutput_items,nitems_read(0));
+        }
+        else
+          dout << "STATUS: Found a peak at " << v[i].tidx << ". However it already existed" << std::endl;
+      }
 
       if(d_state == 0) {
         for(int pp = 0; pp < d_tracker->d_peaks.size(); ++pp) {
@@ -133,38 +126,6 @@ namespace gr {
       else if(d_state==1 && d_tracker->d_peaks.size()==0) {
         dout << "STATUS: Lost synchronization with frame candidates. Going to look for a new one" << std::endl;
       }
-
-      //   std::vector<sync_hypothesis> &v = &hypothesis_vec[0];
-      //   for(int i = 0; i < v.size(); ++i) {
-      //     pseq2_start = v[i].idx + d_preamble_seq[0].size()*d_n_repeats[0];
-      //     if(pseq2_start >= nitems_read(0) && pseq2_start < nitems_read(0) + noutput_items[0]) {
-            
-      //     }
-      //   }
-      // }
-
-      // if(d_state==1) {
-      //   d_filter0->filter(noutput_items, &in[hist_len], d_corr0);
-      //   volk_32fc_magnitude_squared_32f(&d_corr0_mag[0], d_corr0, noutput_items);
-
-      //   // computes the interleaved moving average to sum cross-corr peaks
-      //   int interv_i = d_corr0_mavg_idx;
-      //   for(int i = 0; i < noutput_items; ++i) {
-      //     interv_i = (d_corr0_mavg_idx+i)%d_corr0_mavg_interleaved.size();
-      //     d_corr0_mavg[i] = d_corr0_mavg_interleaved[interv_i].execute(d_corr0_mag[i]);
-      //   }
-      //   d_corr0_mavg_idx = interv_i;
-
-      //   unsigned short max_i;
-      //   volk_32f_index_max_16u(&max_i, d_corr0_mavg, noutput_items);
-      //   if(d_corr0_mavg[max_i]>d_thres*d_awgn) {
-      //     int autocorr_i = std::max((int)max_i - (int)(d_n_repeats[0]*d_seq0_len),0);
-      //     for(int k = 0; k < d_seq0_len; ++k) {
-      //       //FIXME: Check that it does not go over.
-      //       //mult(&in[autocorr_i+k*d_seq0_len], np.conj(&in[autocorr_i + k*d_seq0_len + hist_len]), d_seq0_len);
-      //     }
-      //   }
-      // }
 
       memcpy(out, &in_h[-in_h.hist_len], sizeof(gr_complex)*noutput_items);
 

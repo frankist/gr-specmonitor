@@ -285,33 +285,15 @@ namespace volk_utils {
     moving_average<T>& operator=(const moving_average& m) {} // Note: disable this one too
   };
 
+  void compensate_cfo(gr_complex *y, const gr_complex* x, float frac_cfo, int len,
+                         gr_complex phase_init = gr_complex(1.0f,0.0f)) {
+    lv_32fc_t phase_increment = lv_cmake(std::cos(-frac_cfo*(float)(2*M_PI)),std::sin(-frac_cfo*(float)(2*M_PI)));
+    // lv_32fc_t phase_init = lv_cmake(1.0f,0.0f);
 
-  // template<typename T>
-  // struct hist_array {
-  //   T* vec;
-  //   size_t capacity;
-  //   size_t hist_len;
-
-  //   hist_array(size_t cap, size_t h_len) :
-  //     capacity(cap), hist_len(h_len) {
-  //     assert(hist_len < capacity);
-  //     vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
-  //   }
-
-  //   ~hist_array() {
-  //     volk_free(vec);
-  //   }
-
-  //   inline T& operator[](int i) {
-  //     assert(i>=-hist_len && i < capacity-hist_len);
-  //     return vec[i-hist_len];
-  //   }
-
-  //   inline void advance(int siz) {
-  //     assert(siz+hist_len <= capacity);
-  //     std::copy(&vec[siz], &vec[siz+hist_len], &vec[0]);
-  //   }
-  // };
+    volk_32fc_s32fc_x2_rotator_32fc(y, x, phase_increment, &phase_init, len);
+    // for(int n = 0; n < len1 + 2*d_corr_margin; ++n)
+    //   d_in_cfo[n] = in[start_idx+n]*std::exp(std::complex<float>(0,-2*M_PI*d_peaks[i].cfo*n));
+  }
 };
 
 #endif

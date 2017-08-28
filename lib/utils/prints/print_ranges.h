@@ -23,7 +23,10 @@ template<typename T>
 std::string print_complex(std::complex<T> c)
 {
     std::stringstream os;
-    os << c.real() << "+" << c.imag() << "j";
+    if(c.imag()>0)
+      os << c.real() << "+" << c.imag() << "j";
+    else
+      os << c.real() << c.imag() << "j";
     return os.str();
 }
 

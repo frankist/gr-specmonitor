@@ -29,6 +29,7 @@
 #include "utils/prints/print_ranges.h"
 #include "utils/digital/volk_utils.h"
 #include "utils/digital/range_utils.h"
+#include "tracked_peak.h"
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
 #define _CROSSCORR_DETECTOR_CC_H_
@@ -71,10 +72,23 @@ namespace gr {
           sum += len[i]*n_repeats[i];
         return sum;
       }
+
     private:
       frame_params(const frame_params& f) {} // deleted
       frame_params& operator=(const frame_params& f) {} // deleted
     };
+
+    void compute_preamble(volk_utils::volk_array<gr_complex> &out, const frame_params& f) {
+      out.resize(f.preamble_duration());
+      int n = 0;
+      for(int i = 0; i < f.len.size(); ++i)
+        for(int r = 0; r < f.n_repeats[i]; ++r) {
+          std::copy(&f.pseq_vec[i][0], &f.pseq_vec[i][f.len[i]], &out[n]);
+          utils::set_mean_amplitude(&out[n],f.len[i]);
+          n += f.len[i];
+        }
+      utils::normalize(&out[0],f.preamble_duration());
+    }
 
     class interleaved_moving_average {
     public:
@@ -86,23 +100,6 @@ namespace gr {
       void execute(float* x, float* y, int n);
     };
 
-    struct detection_instance {
-      long idx;
-      float corr_val;
-      float peak_mag2;
-      float awgn_estim;
-      gr_complex autocorr_mean;
-      bool valid;
-      bool tracked;
-      int peakno;
-
-      detection_instance() : valid(false), tracked(false) {}
-      detection_instance(long idx_x, float corr, float mag2, float awgn, gr_complex autocorr_val, int pno) :
-        idx(idx_x), corr_val(corr), peak_mag2(mag2), awgn_estim(awgn),
-        autocorr_mean(autocorr_val), valid(false), tracked(false), peakno(pno) {}
-      static bool idx_compare(const detection_instance& a, const detection_instance& b) {return a.idx < b.idx;}
-      static bool is_valid(const detection_instance& a) {return a.valid;}
-    };
 
     class crosscorr_detector_cc {
     public:
@@ -119,7 +116,7 @@ namespace gr {
       interleaved_moving_average d_interleaved_mavg;
       gr::filter::kernel::fir_filter_with_buffer_ccc* d_filter;
       int d_max_margin;
-      std::vector<detection_instance> peaks;
+      std::vector<preamble_peak> peaks;
 
       volk_utils::hist_volk_array<float> d_xmag2_h;
       // volk_utils::hist_volk_array<float> d_xautocorr_h;
@@ -132,7 +129,7 @@ namespace gr {
 
       ~crosscorr_detector_cc();
 
-      void compute_autocorr(detection_instance& new_peak, const utils::hist_array_view<const gr_complex>& in_h, int max_i);
+      void compute_autocorr(preamble_peak& new_peak, const utils::hist_array_view<const gr_complex>& in_h, int max_i);
       bool check_if_max_within_margin(int &midx, gr_complex &autocorr_res,
                                       const utils::hist_array_view<const gr_complex>& in_h,
                                       float *xcorr_ptr, int tidx);
@@ -192,7 +189,7 @@ namespace gr {
       delete d_filter;
     }
 
-    void crosscorr_detector_cc::compute_autocorr(detection_instance& new_peak,
+    void crosscorr_detector_cc::compute_autocorr(preamble_peak& new_peak,
                                                  const utils::hist_array_view<const gr_complex>& in_h,
                                                  int max_i) {
       // assert(1-d_len0_tot >= 0);
@@ -240,16 +237,11 @@ namespace gr {
       return true;
     }
 
-    class remove_idx_cmp {
-    public:
-      long idx;
-      remove_idx_cmp(long idx_x) : idx(idx_x) {}
-      bool operator()(const detection_instance& d) const {return d.idx < idx; }
-    };
-
     void crosscorr_detector_cc::work(const utils::hist_array_view<const gr_complex>& in_h, int noutput_items, int hist_len, int n_read, float awgn) {
+      peaks.clear();
+
       int n_repeats0 = d_frame->n_repeats[0];
-      long d_corr_toffset = n_read + hist_len -d_len0 + 1 - d_max_margin;// points to absolute tstamp of beginning of filter
+      long d_corr_toffset = n_read - d_len0 + 1 - d_max_margin;// points to absolute tstamp of beginning of filter
 
       // We first calculate the cross-correlation and mag2 it
       d_filter->filterN(&d_corr[0], &in_h[0], noutput_items);
@@ -278,8 +270,7 @@ namespace gr {
         // volk_32fc_x2_conjugate_dot_prod_32fc(&res, pin, pin, d_len0_tot);
         // float peak_mag2_3 = std::abs(res)/d_len0_tot;
 
-        // if(peak_corr > d_thres*awgn_estim) {
-        if(peak_corr > d_thres*peak_mag2) {
+        if(peak_corr > d_thres*peak_mag2) { //*awgn_estim
           // NOTE: i don't use AWGN for normalization, as it would make my detector sensitive to the energy of the sent signal
           int midx;
           gr_complex res;
@@ -289,15 +280,12 @@ namespace gr {
             continue;
           }
 
-          if(is_existing_peak(peak_idx) == false) {
-            float awgn_estim = std::accumulate(awgn_ptr,awgn_ptr + d_frame->awgn_len,0.0)/d_frame->awgn_len;
-            res /= (d_len0_tot-d_len0);
-            detection_instance peak_inst(peak_idx, peak_corr, peak_mag2, awgn_estim, res, d_peakno++);
-            peak_inst.valid = true; // TODO: Remove this parameter
-            peaks.push_back(peak_inst);
-            std::cout << "STATUS: Crosscorr Peak0 detected: {" << peak_idx << "," << peak_corr << ","
-                      << awgn_estim << "," << peak_mag2 << "," << peak_inst.autocorr_mean << "}" << std::endl;
-          }
+          float awgn_estim = std::accumulate(awgn_ptr,awgn_ptr + d_frame->awgn_len,0.0)/d_frame->awgn_len;
+          gr_complex res2 = (std::abs(res)/(d_len0_tot-d_len0)) * std::exp(gr_complex(0,std::arg(res)/d_len0));
+          preamble_peak p(peak_idx-d_len0_tot+d_len0, peak_corr, peak_mag2, res2, awgn_estim);
+          peaks.push_back(p);
+          std::cout << "STATUS: Crosscorr Peak0 detected at " << peak_idx << ": " << println(p) << std::endl;
+
           kk += d_max_margin + d_len0 + d_frame->len[1];  // skip the margin examined, plus the pseq1, as the crosscorr(pseq0,pseq1) may not be zero, and the detector may get a false positive
         }
       }
@@ -311,12 +299,11 @@ namespace gr {
 
     bool crosscorr_detector_cc::is_existing_peak(long new_idx) {
       for(int p_ = 0; p_ < peaks.size(); ++p_) {
-        long rots = round((new_idx - peaks[p_].idx)/(double)d_frame->frame_period)*d_frame->frame_period;
-        int diff = abs(new_idx - (peaks[p_].idx + rots));
+        long rots = round((new_idx - peaks[p_].tidx)/(double)d_frame->frame_period)*d_frame->frame_period;
+        int diff = abs(new_idx - (peaks[p_].tidx + rots));
         if(diff < 5) {
           std::cout << "DEBUG: Peak at " << new_idx
                     << " is an already existing one. Going to ignore..." << std::endl;
-          assert(peaks[p_].valid==true); // it should be already valid
           return true;
         }
       }
@@ -332,24 +319,16 @@ namespace gr {
       std::vector<std::string> peak_strs(peaks.size());
 
       w.StartArray();
-      for(std::vector<detection_instance>::iterator it = peaks.begin(); it != peaks.end(); ++it) {
+      for(std::vector<preamble_peak>::iterator it = peaks.begin(); it != peaks.end(); ++it) {
         w.StartObject();
         w.String("idx");
-        w.Int(it->idx);
+        w.Int(it->tidx);
         w.String("corr_val");
-        w.Double(it->corr_val);
+        w.Double(it->corr_mag);
         w.String("peak_mag2");
-        w.Double(it->peak_mag2);
-        // w.String("schmidl_vals");
-        // w.StartArray();
-        // for(int i = 0; i < it->schmidl_vals.size(); ++i) {
-        //   w.String(print_complex(it->schmidl_vals.d_vec[i]).c_str());
-        // }
-        // w.EndArray();
+        w.Double(it->preamble_mag2);
         w.String("schmidl_mean");
-        w.String(print_complex(it->autocorr_mean).c_str());
-        w.String("valid");
-        w.Bool(it->valid);
+        w.String(print_complex(it->autocorr_val).c_str());
         w.EndObject();
       }
       w.EndArray();
