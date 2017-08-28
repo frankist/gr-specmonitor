@@ -29,6 +29,7 @@
 #include "utils/prints/print_ranges.h"
 #include "utils/digital/volk_utils.h"
 #include "utils/digital/range_utils.h"
+#include "frame_params.h"
 #include "tracked_peak.h"
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
@@ -44,51 +45,51 @@ namespace gr {
       return res;
     }
 
-    class frame_params {
-    public:
-      // std::vector<gr_complex*> pseq_vec;
-      std::vector<volk_utils::volk_array<gr_complex> > pseq_vec;
-      std::vector<size_t> len;
-      std::vector<int> n_repeats;
-      long frame_period;
-      int awgn_len;
-      frame_params(const std::vector<std::vector<gr_complex> >& p_vec, const std::vector<int>& n_r,
-                   long f_period, int awgn_l) :
-        pseq_vec(p_vec.size()), len(p_vec.size()),
-        n_repeats(p_vec.size()), frame_period(f_period), awgn_len(awgn_l) {
-        assert(pseq_vec.size()==n_r.size());
-        for(int i = 0; i < p_vec.size(); ++i) {
-          len[i] = p_vec[i].size();
-          // pseq_vec[i] = (gr_complex*) volk_malloc(sizeof(gr_complex)*len[i], volk_get_alignment());
-          pseq_vec[i].resize(len[i]);
-          std::copy(&p_vec[i][0], &p_vec[i][len[i]], &pseq_vec[i][0]);
-          utils::normalize(&pseq_vec[i][0], len[i]);
-        }
-        n_repeats = n_r;
-      }
-      int preamble_duration() const {
-        int sum = 0;
-        for(int i = 0; i < len.size(); ++i)
-          sum += len[i]*n_repeats[i];
-        return sum;
-      }
+    // class frame_params {
+    // public:
+    //   // std::vector<gr_complex*> pseq_vec;
+    //   std::vector<volk_utils::volk_array<gr_complex> > pseq_vec;
+    //   std::vector<size_t> len;
+    //   std::vector<int> n_repeats;
+    //   long frame_period;
+    //   int awgn_len;
+    //   frame_params(const std::vector<std::vector<gr_complex> >& p_vec, const std::vector<int>& n_r,
+    //                long f_period, int awgn_l) :
+    //     pseq_vec(p_vec.size()), len(p_vec.size()),
+    //     n_repeats(p_vec.size()), frame_period(f_period), awgn_len(awgn_l) {
+    //     assert(pseq_vec.size()==n_r.size());
+    //     for(int i = 0; i < p_vec.size(); ++i) {
+    //       len[i] = p_vec[i].size();
+    //       // pseq_vec[i] = (gr_complex*) volk_malloc(sizeof(gr_complex)*len[i], volk_get_alignment());
+    //       pseq_vec[i].resize(len[i]);
+    //       std::copy(&p_vec[i][0], &p_vec[i][len[i]], &pseq_vec[i][0]);
+    //       utils::normalize(&pseq_vec[i][0], len[i]);
+    //     }
+    //     n_repeats = n_r;
+    //   }
+    //   int preamble_duration() const {
+    //     int sum = 0;
+    //     for(int i = 0; i < len.size(); ++i)
+    //       sum += len[i]*n_repeats[i];
+    //     return sum;
+    //   }
 
-    private:
-      frame_params(const frame_params& f) {} // deleted
-      frame_params& operator=(const frame_params& f) {} // deleted
-    };
+    // private:
+    //   frame_params(const frame_params& f) {} // deleted
+    //   frame_params& operator=(const frame_params& f) {} // deleted
+    // };
 
-    void compute_preamble(volk_utils::volk_array<gr_complex> &out, const frame_params& f) {
-      out.resize(f.preamble_duration());
-      int n = 0;
-      for(int i = 0; i < f.len.size(); ++i)
-        for(int r = 0; r < f.n_repeats[i]; ++r) {
-          std::copy(&f.pseq_vec[i][0], &f.pseq_vec[i][f.len[i]], &out[n]);
-          utils::set_mean_amplitude(&out[n],f.len[i]);
-          n += f.len[i];
-        }
-      utils::normalize(&out[0],f.preamble_duration());
-    }
+    // void compute_preamble(volk_utils::volk_array<gr_complex> &out, const frame_params& f) {
+    //   out.resize(f.preamble_duration());
+    //   int n = 0;
+    //   for(int i = 0; i < f.len.size(); ++i)
+    //     for(int r = 0; r < f.n_repeats[i]; ++r) {
+    //       std::copy(&f.pseq_vec[i][0], &f.pseq_vec[i][f.len[i]], &out[n]);
+    //       utils::set_mean_amplitude(&out[n],f.len[i]);
+    //       n += f.len[i];
+    //     }
+    //   utils::normalize(&out[0],f.preamble_duration());
+    // }
 
     class interleaved_moving_average {
     public:

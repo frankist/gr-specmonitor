@@ -146,6 +146,7 @@ def test2():
     toffset = 200
     Nruns = 100
     sum_ratios = np.zeros(len(SNRdBrange))
+    sum_falarm = np.zeros(len(SNRdBrange))
 
     cfo = 0#0.01
     for ii, s in enumerate(SNRdBrange):
@@ -164,7 +165,7 @@ def test2():
 
             vector_source = blocks.vector_source_c(x, True)
             head = blocks.head(gr.sizeof_gr_complex, len(x_with_history))
-            frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.01,samples_per_frame, samples_of_awgn, awgn_pwr)
+            frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.15,samples_per_frame, samples_of_awgn, awgn_pwr)
             dst = blocks.vector_sink_c()
 
             tb.connect(vector_source,head)
@@ -194,9 +195,13 @@ def test2():
                     r = n_frames_detected / float(N_frames_tot+1)
                     print 'r:', r
                     sum_ratios[ii] = sum_ratios[ii] + r
+            sum_falarm[ii] += len(js_dict)-1
 
     rate_detection = sum_ratios / Nruns
-    plt.plot(SNRdBrange, rate_detection)
+    rate_falarm = sum_falarm / Nruns
+    fig, (ax0, ax1) = plt.subplots(nrows=2)
+    ax0.plot(SNRdBrange, rate_detection)
+    ax1.plot(SNRdBrange, rate_falarm, ':')
     plt.show()
 
 if __name__ == '__main__':

@@ -95,7 +95,7 @@ namespace gr {
       d_seq1_offset = d_frame_ptr->len[0] * d_frame_ptr->n_repeats[0];
 
       // create the total preamble
-      compute_preamble(d_preamble, *d_frame_ptr);
+      frame_params_utils::compute_preamble(d_preamble, *d_frame_ptr);
       // std::cout << container::print(&d_preamble[0], &d_preamble[d_preamble.capacity()]) << std::endl;
     }
 

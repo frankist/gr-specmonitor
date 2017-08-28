@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import json
 import os
 import time
+from framing_utils import *
 
 def cross_correlate(x,pseq):
     xcorr = np.correlate(x,pseq)#/np.sqrt(np.mean(np.abs(pseq)**2))
@@ -36,24 +37,6 @@ def cross_correlate(x,pseq):
 def apply_cfo(x,cfo):
     x_cfo = x * np.exp(1j*2*np.pi*cfo*np.arange(x.size))
     return x_cfo
-
-def generate_preamble(zc_len, n_repeats):
-    pseq_list = []
-    pseq_norm_list = []
-    for p in zc_len:
-        pseq = zadoffchu.generate_sequence(p,1,0)
-        pseq_list.append(pseq)
-        pseq_norm = pseq / np.sqrt(np.sum(np.abs(pseq)**2))
-        pseq_norm_list.append(pseq_norm)
-    n_samples = np.sum([zc_len[i]*n_repeats[i] for i in range(len(zc_len))])
-    x = np.zeros(n_samples,dtype=np.complex128)
-    t = 0
-    for i in range(len(zc_len)):
-        for r in range(n_repeats[i]):
-            x[t:t+zc_len[i]] = pseq_list[i]
-            t = t + zc_len[i]
-
-    return (x,pseq_list,pseq_norm_list)
 
 def add_preambles(x,toffset,preamble,frame_dur):
     k = 0

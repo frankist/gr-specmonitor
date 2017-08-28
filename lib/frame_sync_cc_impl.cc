@@ -50,7 +50,7 @@ namespace gr {
       : gr::sync_block("frame_sync_cc",
                        gr::io_signature::make(1, 1, sizeof(gr_complex)),
                        gr::io_signature::make(1, 2, sizeof(gr_complex))),
-        d_frame(preamble_seq, n_repeats, frame_period, awgn_len),
+        d_frame(preamble_seq, n_repeats, frame_period, awgn_len, 0),
         d_thres(thres),
         d_state(0)
     {
