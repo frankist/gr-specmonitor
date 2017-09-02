@@ -173,6 +173,26 @@ namespace volk_utils {
     }
   };
 
+  class hist_moving_average_ff {
+  public:
+    volk_array<float> d_xcsum;
+    int mavg_size;
+
+    hist_moving_average_ff(size_t capacity, size_t len) :
+      d_xcsum(capacity), mavg_size(len) {}
+
+    void execute(const hist_volk_array<float>& x, float* res, size_t xlen) {
+      // basically the "implicit" refresh happens in every call
+      volk_32f_accumulator_s32f(&d_xcsum[0], &x[-mavg_size], xlen+mavg_size);
+      volk_32f_x2_subtract_32f(res, &d_xcsum[mavg_size], &d_xcsum[0], xlen);
+    }
+
+    inline size_t size() const {
+      return mavg_size;
+    }
+  };
+
+
   // class moving_average_ff {
   // public:
   //   gr::filter::kernel::fir_filter_with_buffer_fff* d_filter;

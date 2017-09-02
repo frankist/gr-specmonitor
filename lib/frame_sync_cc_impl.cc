@@ -88,6 +88,7 @@ namespace gr {
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
     {
+      tclock.tic();
       std::cout << "DEBUG: Gonna process window: [" << nitems_read(0) << "," << nitems_read(0)+noutput_items << "]" << std::endl;
       const gr_complex *in = (const gr_complex *) input_items[0];
       gr_complex *out = (gr_complex *) output_items[0];
@@ -120,6 +121,7 @@ namespace gr {
             dout << "STATUS: Found a good frame candidate: "
                  << println(d_tracker->d_peaks[pp]) << ". I will stop the crosscorr_detector" << std::endl;
             d_state = 1;
+            d_crosscorr0->peaks.clear();
           }
         }
       }
@@ -134,6 +136,8 @@ namespace gr {
         std::copy(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[noutput_items], out1);
       }
 
+      double t = tclock.toc();
+      std::cout << "STATUS: state: " << d_state << ",Time elapsed: " << t << ",rate[MS/s]: " << noutput_items/(t*1e6) << std::endl;
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }

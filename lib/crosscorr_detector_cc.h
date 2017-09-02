@@ -31,6 +31,7 @@
 #include "utils/digital/range_utils.h"
 #include "frame_params.h"
 #include "tracked_peak.h"
+#include "utils/general/tictoc.h"
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
 #define _CROSSCORR_DETECTOR_CC_H_
@@ -126,6 +127,9 @@ namespace gr {
       int d_kk_start;
       int d_peakno;
 
+      // debug
+      std::vector<TicToc> tictoc_vec;
+
       crosscorr_detector_cc(const frame_params* f_params, int nitems, float thres, float awgn_guess = 1);
 
       ~crosscorr_detector_cc();
@@ -184,6 +188,7 @@ namespace gr {
 
       // d_xautocorr_h.resize(d_max_margin + d_len0_tot, nitems);
       // std::fill(&d_xautocorr_h[-d_xautocorr_h.hist_len()], &d_xautocorr_h[0], awgn_guess);
+      tictoc_vec.resize(4);
     }
 
     crosscorr_detector_cc::~crosscorr_detector_cc() {
@@ -244,9 +249,14 @@ namespace gr {
       int n_repeats0 = d_frame->n_repeats[0];
       long d_corr_toffset = n_read - d_len0 + 1 - d_max_margin;// points to absolute tstamp of beginning of filter
 
+      std::vector<double> tvec(tictoc_vec.size());
+      tictoc_vec[0].tic();
+
+      tictoc_vec[2].tic();
       // We first calculate the cross-correlation and mag2 it
       d_filter->filterN(&d_corr[0], &in_h[0], noutput_items);
       volk_32fc_magnitude_squared_32f(&d_corr_mag[0], &d_corr[0], noutput_items);
+      tvec[2] = tictoc_vec[2].toc();
 
       // make an interleaved moving average as we know the peaks are at a similar distance
       d_interleaved_mavg.execute(&d_corr_mag[0], &d_smooth_corr_h[0], noutput_items);
@@ -257,8 +267,15 @@ namespace gr {
       // just noise/uncontaminated
       std::cout << "DEBUG: window: [" << d_corr_toffset << "," << d_corr_toffset+noutput_items << "], noutput_items: " << noutput_items << std::endl;
 
-      int kk;
+      tvec[0] = tictoc_vec[0].toc();
+      tictoc_vec[1].tic();
+
+      int kk, kkprev = d_kk_start-2;
+      float mag2_sum;
       for(kk = d_kk_start; kk < noutput_items; ++kk) {
+        int klast = kkprev;
+        kkprev = kk;
+
         int tt = kk - d_max_margin;
         float *xcorr_ptr = &d_smooth_corr_h[tt]; // this points to the d_smooth_corr point under analysis. (It can be in history)
         float *xmag2_ptr = &d_xmag2_h[tt-d_len0_tot+1];
@@ -266,12 +283,17 @@ namespace gr {
 
         float peak_corr = xcorr_ptr[0] / d_len0;  // This is the mean power of the corr smoothed across repeats.
         long peak_idx = d_corr_toffset + kk;
-        float peak_mag2 = std::accumulate(xmag2_ptr,xmag2_ptr + d_len0_tot,0.0)/d_len0_tot;
+        if(klast + 1 != kk || kk%100==0)
+          mag2_sum = std::accumulate(xmag2_ptr,xmag2_ptr + d_len0_tot,0.0);
+        else
+          mag2_sum += xmag2_ptr[d_len0_tot-1] - xmag2_ptr[-1];
+        float peak_mag2 = mag2_sum / d_len0_tot;
         // const gr_complex *pin = &in_h[kk-d_smooth_corr_h.hist_len+1-d_len0_tot];
         // volk_32fc_x2_conjugate_dot_prod_32fc(&res, pin, pin, d_len0_tot);
         // float peak_mag2_3 = std::abs(res)/d_len0_tot;
 
         if(peak_corr > d_thres*peak_mag2) { //*awgn_estim
+          tictoc_vec[3].tic();
           // NOTE: i don't use AWGN for normalization, as it would make my detector sensitive to the energy of the sent signal
           int midx;
           gr_complex res;
@@ -288,14 +310,21 @@ namespace gr {
           std::cout << "STATUS: Crosscorr Peak0 detected at " << peak_idx << ": " << println(p) << std::endl;
 
           kk += d_max_margin + d_len0 + d_frame->len[1];  // skip the margin examined, plus the pseq1, as the crosscorr(pseq0,pseq1) may not be zero, and the detector may get a false positive
+          tvec[3] = tictoc_vec[3].toc();
         }
       }
+
+      tvec[1] = tictoc_vec[1].toc();
 
       // NOTE: if there was a hop bigger than the block, we do not continue from position kk=0 in the next call
       d_kk_start = kk-noutput_items;
 
       d_smooth_corr_h.advance(noutput_items);
       d_xmag2_h.advance(noutput_items);
+
+      double ratio = std::accumulate(&tvec[0],&tvec[2],0.0);
+      std::cout << "Tictoc distribution: " << tvec[0]/ratio << "," << tvec[1]/ratio << std::endl;
+      std::cout << "Tictoc ratio: " << tvec[3]/tvec[1] << "," << tvec[2]/tvec[0] << std::endl;
     }
 
     bool crosscorr_detector_cc::is_existing_peak(long new_idx) {

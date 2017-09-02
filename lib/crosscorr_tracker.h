@@ -131,6 +131,7 @@ namespace gr {
           peak_updated = true;
         }
       }
+      return peak_updated;
     }
 
     bool crosscorr_tracker::try_update_cfo(const utils::hist_array_view<const gr_complex>& in_h,
@@ -153,6 +154,8 @@ namespace gr {
           peak_updated = true;
         }
       }
+
+      return peak_updated;
     }
 
     bool crosscorr_tracker::try_update_toffset(const utils::hist_array_view<const gr_complex>& in_h,
