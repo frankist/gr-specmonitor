@@ -249,17 +249,19 @@ namespace gr {
       int n_repeats0 = d_frame->n_repeats[0];
       long d_corr_toffset = n_read - d_len0 + 1 - d_max_margin;// points to absolute tstamp of beginning of filter
 
-      std::vector<double> tvec(tictoc_vec.size());
+      std::vector<double> tvec(tictoc_vec.size()+1);
       tictoc_vec[0].tic();
 
-      tictoc_vec[2].tic();
+      tictoc_vec[1].tic();
       // We first calculate the cross-correlation and mag2 it
       d_filter->filterN(&d_corr[0], &in_h[0], noutput_items);
       volk_32fc_magnitude_squared_32f(&d_corr_mag[0], &d_corr[0], noutput_items);
-      tvec[2] = tictoc_vec[2].toc();
+      tvec[2] = tictoc_vec[1].toc();
 
+      tictoc_vec[2].tic();
       // make an interleaved moving average as we know the peaks are at a similar distance
       d_interleaved_mavg.execute(&d_corr_mag[0], &d_smooth_corr_h[0], noutput_items);
+      tvec[4] = tictoc_vec[2].toc();
 
       // Find the magnitude squared of the original signal and average it
       volk_32fc_magnitude_squared_32f(&d_xmag2_h[0], &in_h[0], noutput_items);
@@ -268,6 +270,7 @@ namespace gr {
       std::cout << "DEBUG: window: [" << d_corr_toffset << "," << d_corr_toffset+noutput_items << "], noutput_items: " << noutput_items << std::endl;
 
       tvec[0] = tictoc_vec[0].toc();
+      tvec[3] = 0;
       tictoc_vec[1].tic();
 
       int kk, kkprev = d_kk_start-2;
@@ -278,6 +281,15 @@ namespace gr {
 
         int tt = kk - d_max_margin;
         float *xcorr_ptr = &d_smooth_corr_h[tt]; // this points to the d_smooth_corr point under analysis. (It can be in history)
+
+        int midx;
+        gr_complex res;
+        bool test = check_if_max_within_margin(midx,res,in_h,xcorr_ptr,tt);
+        if(test==false) {
+          kk = kk + midx - 1; // kk is going to be incremented at the for(;;), so we subtract by zero
+          continue;
+        }
+
         float *xmag2_ptr = &d_xmag2_h[tt-d_len0_tot+1];
         float *awgn_ptr = &d_xmag2_h[tt-d_len0_tot-d_frame->awgn_len+1];
 
@@ -295,14 +307,6 @@ namespace gr {
         if(peak_corr > d_thres*peak_mag2) { //*awgn_estim
           tictoc_vec[3].tic();
           // NOTE: i don't use AWGN for normalization, as it would make my detector sensitive to the energy of the sent signal
-          int midx;
-          gr_complex res;
-          bool test = check_if_max_within_margin(midx,res,in_h,xcorr_ptr,tt);
-          if(test==false) {
-            kk = kk + midx - 1; // kk is going to be incremented at the for(;;), so we subtract by zero
-            continue;
-          }
-
           float awgn_estim = std::accumulate(awgn_ptr,awgn_ptr + d_frame->awgn_len,0.0)/d_frame->awgn_len;
           gr_complex res2 = (std::abs(res)/(d_len0_tot-d_len0)) * std::exp(gr_complex(0,std::arg(res)/d_len0));
           preamble_peak p(peak_idx-d_len0_tot+d_len0, peak_corr, peak_mag2, res2, awgn_estim);
@@ -310,7 +314,7 @@ namespace gr {
           std::cout << "STATUS: Crosscorr Peak0 detected at " << peak_idx << ": " << println(p) << std::endl;
 
           kk += d_max_margin + d_len0 + d_frame->len[1];  // skip the margin examined, plus the pseq1, as the crosscorr(pseq0,pseq1) may not be zero, and the detector may get a false positive
-          tvec[3] = tictoc_vec[3].toc();
+          tvec[3] += tictoc_vec[3].toc();
         }
       }
 
@@ -324,7 +328,7 @@ namespace gr {
 
       double ratio = std::accumulate(&tvec[0],&tvec[2],0.0);
       std::cout << "Tictoc distribution: " << tvec[0]/ratio << "," << tvec[1]/ratio << std::endl;
-      std::cout << "Tictoc ratio: " << tvec[3]/tvec[1] << "," << tvec[2]/tvec[0] << std::endl;
+      std::cout << "Tictoc ratio: " << tvec[3]/tvec[1] << "," << tvec[2]/tvec[0] << "," << tvec[4]/tvec[0] << std::endl;
     }
 
     bool crosscorr_detector_cc::is_existing_peak(long new_idx) {
