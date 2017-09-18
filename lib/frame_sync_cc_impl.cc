@@ -80,7 +80,6 @@ namespace gr {
     {
       delete d_crosscorr0;
       delete d_tracker;
-      // std::cout << "DESTRUCTORRRRRRR MAIIIIIIN" << std::endl;
     }
 
     int
@@ -88,8 +87,11 @@ namespace gr {
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
     {
-      tclock.tic();
-      std::cout << "DEBUG: Gonna process window: [" << nitems_read(0) << "," << nitems_read(0)+noutput_items << "]" << std::endl;
+      if(d_debug) {
+        tclock.tic();
+        dout << "DEBUG: Gonna process window: [" << nitems_read(0) << "," << nitems_read(0)+noutput_items << "]" << std::endl;
+      }
+
       const gr_complex *in = (const gr_complex *) input_items[0];
       gr_complex *out = (gr_complex *) output_items[0];
 
@@ -97,6 +99,7 @@ namespace gr {
       unsigned int hist_len = history()-1;
       const utils::hist_array_view<const gr_complex> in_h(in, hist_len, noutput_items);
 
+      // run the detector
       if(d_state==0)
         d_crosscorr0->work(in_h, noutput_items, hist_len, nitems_read(0), 1);
 
@@ -115,6 +118,7 @@ namespace gr {
           dout << "STATUS: Found a peak at " << v[i].tidx << ". However it already existed" << std::endl;
       }
 
+      // check if we should toggle state tracking<->detecting
       if(d_state == 0) {
         for(int pp = 0; pp < d_tracker->d_peaks.size(); ++pp) {
           if(test_peak_accept(d_tracker->d_peaks[pp])) {
@@ -136,8 +140,11 @@ namespace gr {
         std::copy(&d_crosscorr0->d_corr[0],&d_crosscorr0->d_corr[noutput_items], out1);
       }
 
-      double t = tclock.toc();
-      std::cout << "STATUS: state: " << d_state << ",Time elapsed: " << t << ",rate[MS/s]: " << noutput_items/(t*1e6) << std::endl;
+      if(d_debug) {
+        double t = tclock.toc();
+        std::cout << "STATUS: state: " << d_state << ",Time elapsed: " << t << ",rate[MS/s]: " << noutput_items/(t*1e6) << std::endl;
+      }
+
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }
@@ -163,33 +170,6 @@ namespace gr {
         d.Parse(st.c_str());
         return st;
     }
-
-    // std::string frame_sync_cc_impl::get_hypotheses() {
-    //   using namespace rapidjson;
-
-    //   rapidjson::StringBuffer s;
-    //   Document d;
-
-    //   rapidjson::PrettyWriter<rapidjson::StringBuffer> w(s);
-    //   std::vector<std::string> peak_strs(hypothesis_vec.size());
-
-    //   w.StartArray();
-    //   for(std::vector<detection_instance>::iterator it = hypothesis_vec.begin(); it != hypothesis_vec.end(); ++it) {
-    //     w.StartObject();
-    //     w.String("idx");
-    //     w.Int(it->idx);
-    //     w.String("corr_val");
-    //     w.Double(it->corr_val);
-    //     w.String("cfo");
-    //     w.Double(it->cfo);
-    //     w.EndObject();
-    //   }
-    //   w.EndArray();
-
-    //   std::string st = s.GetString();
-    //   d.Parse(st.c_str());
-    //   return st;
-    // }
 
   } /* namespace specmonitor */
 } /* namespace gr */

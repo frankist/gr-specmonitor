@@ -25,6 +25,7 @@
 #include "utils/math/operation.h"
 #include "utils/math/transform.h"
 #include <numeric>
+#include <boost/bind.hpp>
 
 #ifndef _CROSSCORR_TRACKER_CC_H_
 #define _CROSSCORR_TRACKER_CC_H_
@@ -37,7 +38,6 @@ namespace gr {
     std::pair<int,float> find_crosspeak(const gr_complex* v, const gr_complex* pseq, int seq_len, int N) {
       int max_idx = -1;
       float max_val = -1;
-      // std::cout << "crosscorr: [";
       for(int i = 0; i < N; ++i) {
         gr_complex res;
         volk_32fc_x2_conjugate_dot_prod_32fc(&res, &v[i], &pseq[0], seq_len);
@@ -45,9 +45,7 @@ namespace gr {
           max_val = std::norm(res);
           max_idx = i;
         }
-        // std::cout << std::norm(res)/seq_len << ",";
       }
-      // std::cout << "]" << std::endl;
       return std::make_pair(max_idx,max_val/seq_len);
     }
 
@@ -65,8 +63,9 @@ namespace gr {
       // internal
       gr_complex* d_in_cfo;
       std::vector<tracked_peak> d_peaks;
-      enum TrackState {AWGN, CFO, TOFFSET};
-      TrackState d_state;
+      // enum TrackState {AWGN, CFO, TOFFSET};
+      // TrackState d_state;
+      long d_tracked_counter;
 
       crosscorr_tracker(frame_params* frame_ptr,
                         float thres);
@@ -75,6 +74,7 @@ namespace gr {
       bool try_update_toffset(const utils::hist_array_view<const gr_complex>& in_h,
                               int noutput_items, int n_read);
       bool try_update_awgn(const utils::hist_array_view<const gr_complex>& in_h, int noutput_items, int n_read);
+      bool test_peak_remove(const tracked_peak& p);
       void try_erase_peaks();
       bool is_existing_peak(long new_idx);
       std::vector<tracked_peak>::iterator try_insert_peak(const preamble_peak& p);
@@ -88,7 +88,7 @@ namespace gr {
       d_frame_ptr(frame_ptr),
       d_thres(thres),
       d_corr_margin(2),
-      d_state(crosscorr_tracker::TOFFSET) {
+      d_tracked_counter(0) {
       assert(d_frame_ptr->len[1]>0);
       size_t cap = (size_t)ceil((d_frame_ptr->len[1]+2*d_corr_margin) / 1024.0f)*1024;
       d_in_cfo = (gr_complex *) volk_malloc(sizeof(gr_complex)*cap, volk_get_alignment());
@@ -106,7 +106,7 @@ namespace gr {
     std::vector<tracked_peak>::iterator crosscorr_tracker::try_insert_peak(const preamble_peak& p) {
       if(is_existing_peak(p.tidx))
         return d_peaks.end();
-      tracked_peak c(p);
+      tracked_peak c(p,d_tracked_counter++);
       d_peaks.push_back(c);
       return d_peaks.end()-1;
     }
@@ -185,7 +185,7 @@ namespace gr {
           long observed_peak = peak_pair.first + start_idx + n_read - d_seq1_offset;
           std::cout << "DEBUG: The preamble (through crosscorr peak1) was detected at "
                     << observed_peak << ", with amp: " << peak_pair.second << std::endl;
-          
+
           // Compute the absolute mag2
           gr_complex res;
           int block_idx = peak_pair.first + start_idx;
@@ -216,14 +216,12 @@ namespace gr {
         peaks_updated |= try_update_cfo(in_h, noutput_items, n_read);
         peaks_updated |= try_update_toffset(in_h, noutput_items, n_read);
       }
-
-      std::cout << "YOLOLO " << d_peaks.size() << std::endl;
     }
 
-    bool test_peak_remove(const tracked_peak& p) {
+    bool crosscorr_tracker::test_peak_remove(const tracked_peak& p) {
       bool ret = p.n_frames_elapsed>=1 && p.n_frames_detected==0; // the first peak was missed
       ret = ret || p.n_missed_frames_contiguous>4; // there are two many frames being missed
-      // ret = ret || p.crosscorr_mag()/p.awgn_power() < 1.0;
+      ret = ret || p.crosscorr_mag()/p.preamble_power() < d_thres;
       if(ret)
         std::cout << "Going to remove peak:" << p.n_frames_detected
                 << "," << p.n_frames_elapsed << "," << println(p) << std::endl;
@@ -231,9 +229,13 @@ namespace gr {
     }
 
     void crosscorr_tracker::try_erase_peaks() {
-      d_peaks.erase(std::remove_if(d_peaks.begin(), d_peaks.end(), test_peak_remove), d_peaks.end());
+      d_peaks.erase(std::remove_if(d_peaks.begin(),
+                                   d_peaks.end(),
+                                   boost::bind(&crosscorr_tracker::test_peak_remove,
+                                               this, _1)),
+                                   d_peaks.end());
+      // d_peaks.erase(std::remove_if(d_peaks.begin(), d_peaks.end(), test_peak_remove), d_peaks.end());
     }
-
 
     bool crosscorr_tracker::is_existing_peak(long new_idx) {
       for(int p_ = 0; p_ < d_peaks.size(); ++p_) {

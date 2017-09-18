@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2017 <+YOU OR YOUR COMPANY+>.
+ * Copyright 2017 Francisco Paisana.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@
 #include "frame_params.h"
 #include "tracked_peak.h"
 #include "utils/general/tictoc.h"
+#include "modules/interleaved_filtering.h"
 
 #ifndef _CROSSCORR_DETECTOR_CC_H_
 #define _CROSSCORR_DETECTOR_CC_H_
@@ -46,63 +47,6 @@ namespace gr {
       return res;
     }
 
-    // class frame_params {
-    // public:
-    //   // std::vector<gr_complex*> pseq_vec;
-    //   std::vector<volk_utils::volk_array<gr_complex> > pseq_vec;
-    //   std::vector<size_t> len;
-    //   std::vector<int> n_repeats;
-    //   long frame_period;
-    //   int awgn_len;
-    //   frame_params(const std::vector<std::vector<gr_complex> >& p_vec, const std::vector<int>& n_r,
-    //                long f_period, int awgn_l) :
-    //     pseq_vec(p_vec.size()), len(p_vec.size()),
-    //     n_repeats(p_vec.size()), frame_period(f_period), awgn_len(awgn_l) {
-    //     assert(pseq_vec.size()==n_r.size());
-    //     for(int i = 0; i < p_vec.size(); ++i) {
-    //       len[i] = p_vec[i].size();
-    //       // pseq_vec[i] = (gr_complex*) volk_malloc(sizeof(gr_complex)*len[i], volk_get_alignment());
-    //       pseq_vec[i].resize(len[i]);
-    //       std::copy(&p_vec[i][0], &p_vec[i][len[i]], &pseq_vec[i][0]);
-    //       utils::normalize(&pseq_vec[i][0], len[i]);
-    //     }
-    //     n_repeats = n_r;
-    //   }
-    //   int preamble_duration() const {
-    //     int sum = 0;
-    //     for(int i = 0; i < len.size(); ++i)
-    //       sum += len[i]*n_repeats[i];
-    //     return sum;
-    //   }
-
-    // private:
-    //   frame_params(const frame_params& f) {} // deleted
-    //   frame_params& operator=(const frame_params& f) {} // deleted
-    // };
-
-    // void compute_preamble(volk_utils::volk_array<gr_complex> &out, const frame_params& f) {
-    //   out.resize(f.preamble_duration());
-    //   int n = 0;
-    //   for(int i = 0; i < f.len.size(); ++i)
-    //     for(int r = 0; r < f.n_repeats[i]; ++r) {
-    //       std::copy(&f.pseq_vec[i][0], &f.pseq_vec[i][f.len[i]], &out[n]);
-    //       utils::set_mean_amplitude(&out[n],f.len[i]);
-    //       n += f.len[i];
-    //     }
-    //   utils::normalize(&out[0],f.preamble_duration());
-    // }
-
-    class interleaved_moving_average {
-    public:
-      int d_idx;
-      int d_len;
-      std::vector<utils::moving_average<double> > d_mavg_vec;
-
-      interleaved_moving_average(int len,int mavg_size,float val=1e-6);
-      void execute(float* x, float* y, int n);
-    };
-
-
     class crosscorr_detector_cc {
     public:
       const frame_params* d_frame;
@@ -112,10 +56,11 @@ namespace gr {
       int d_len0;
       int d_len0_tot;
 
+      // internal
       volk_utils::volk_array<gr_complex> d_corr;
       volk_utils::volk_array<float> d_corr_mag;
       volk_utils::hist_volk_array<float> d_smooth_corr_h;
-      interleaved_moving_average d_interleaved_mavg;
+      interleaved_moving_average_fff d_interleaved_mavg;
       gr::filter::kernel::fir_filter_with_buffer_ccc* d_filter;
       int d_max_margin;
       std::vector<preamble_peak> peaks;
@@ -143,22 +88,6 @@ namespace gr {
       bool is_existing_peak(long new_idx);
     };
 
-    interleaved_moving_average::interleaved_moving_average(int len,int mavg_size,float val) :
-      d_idx(0), d_len(len), d_mavg_vec(len,mavg_size) {
-      std::vector<double> init_vals(mavg_size,val), tmp(mavg_size);
-      for (int jj = 0; jj < len; ++jj) {
-        d_mavg_vec[jj].execute(&init_vals[0],&tmp[0],mavg_size);
-      }
-    }
-
-    void interleaved_moving_average::execute(float* x, float*y, int n) {
-      for(int i = 0; i < n; ++i) {
-        y[i] = d_mavg_vec[d_idx].execute(x[i]);
-        // d_mavg_vec[d_idx].execute(&x[i],&y[i],1);
-        d_idx = (d_idx+1)%d_len;
-      }
-    }
-
     crosscorr_detector_cc::crosscorr_detector_cc(const frame_params* f_params,
                                                  int nitems, float thres, float awgn_guess) :
       d_frame(f_params), d_thres(thres),
@@ -167,6 +96,9 @@ namespace gr {
       d_interleaved_mavg(f_params->len[0],f_params->n_repeats[0]),
       d_kk_start(0),
       d_peakno(0) {
+      std::vector<float> v(d_len0_tot,awgn_guess);
+      d_interleaved_mavg.execute(&v[0],v.size());
+
       d_max_margin = d_len0_tot - d_len0 + 1; // peaks in crosscorr0 have to be maximum within a window of this size
 
       // this will compute the crosscorr with peak0

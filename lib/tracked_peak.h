@@ -52,6 +52,7 @@ namespace gr {
       preamble_peak c;
       double d_peak_idx;        //< time stamp where the preamble starts
     public:
+      long d_seqno;
       int n_frames_elapsed;
       int n_frames_detected;
       int n_missed_frames_contiguous;
@@ -60,8 +61,8 @@ namespace gr {
       enum TrackState {AWGN, CFO, TOFFSET};
       TrackState d_state;
 
-      tracked_peak(long idx, float pcorr, float pmag2, gr_complex aval, float awgn_est);
-      tracked_peak(const preamble_peak& p);
+      tracked_peak(long idx, float pcorr, float pmag2, gr_complex aval, float awgn_est, long seqno);
+      tracked_peak(const preamble_peak& p, long seqno);
       void update_toffset(long new_peak, float corramp, float mag2, float thres, long frame_period);
       void update_cfo(gr_complex res);
       void update_awgn(float new_awgn);
@@ -78,9 +79,10 @@ namespace gr {
       inline preamble_peak peak_params() const {return c;}
     };
 
-    tracked_peak::tracked_peak(long idx, float pcorr, float pmag2, gr_complex aval, float awgn_est) :
+    tracked_peak::tracked_peak(long idx, float pcorr, float pmag2, gr_complex aval, float awgn_est, long seqno) :
       c(idx, pcorr, pmag2, aval, awgn_est), 
       d_peak_idx((double)idx),
+      d_seqno(seqno),
       n_frames_elapsed(0),
       n_frames_detected(0),
       n_missed_frames_contiguous(0),
@@ -88,8 +90,9 @@ namespace gr {
       d_state(tracked_peak::TOFFSET) {
     }
 
-    tracked_peak::tracked_peak(const preamble_peak& p) :
+    tracked_peak::tracked_peak(const preamble_peak& p, long seqno) :
       c(p), d_peak_idx(c.tidx),
+      d_seqno(seqno),
       n_frames_elapsed(0),
       n_frames_detected(0),
       n_missed_frames_contiguous(0),

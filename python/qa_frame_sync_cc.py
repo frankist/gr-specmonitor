@@ -98,7 +98,7 @@ class qa_frame_sync_cc (gr_unittest.TestCase):
 
         vector_source = blocks.vector_source_c(x, True)
         head = blocks.head(gr.sizeof_gr_complex, N)#len(x_with_history))
-        frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.8,samples_per_frame, samples_of_awgn)
+        frame_sync = specmonitor.frame_sync_cc(pseq_list,n_repeats,0.8,samples_per_frame, samples_of_awgn, awgn_floor**2)
         dst = blocks.vector_sink_c()
 
         self.tb.connect(vector_source,head)

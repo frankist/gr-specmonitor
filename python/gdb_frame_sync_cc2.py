@@ -206,7 +206,7 @@ def test_robustness_AWGN():
 
 def check_speed():
     N = 100000#9000
-    zc_len = [5,201]#[51,201]
+    zc_len = [29,201]#[51,201]
     n_repeats = [20,1]#[10,1]
     samples_per_frame = 2000
     samples_of_awgn = 50
@@ -265,6 +265,6 @@ def check_speed():
 if __name__ == '__main__':
     print 'Blocked waiting for GDB attach (pid = %d)' % (os.getpid(),)
     raw_input ('Press Enter to continue: ')
-    # test_robustness_AWGN()
-    check_speed()
+    test_robustness_AWGN()
+    # check_speed()
     print 'Finished the simulation'
