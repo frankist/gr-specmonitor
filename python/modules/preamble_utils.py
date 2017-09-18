@@ -49,18 +49,90 @@ class preamble_params:
         preamble /= np.sqrt(np.mean(np.abs(self.preamble)**2))
         return preamble
 
-def generate_type1(pseq_len_list, barker_len,):
+def generate_preamble_type1(pseq_len_list, barker_len):
     pseq_list = []
     for i,v in enumerate(pseq_len_list):
         pseq_list.append(zadoffchu.generate_sequence(v,1,0))
-    pseq_len_coef = zadoffchu.barker_codes[barker_len]
-    pseq_len_coef.append(1)
-    pseq_len_seq = [0]*barker_len
-    pseq_len_seq.append(1)
+        pseq_len_coef = zadoffchu.barker_codes[barker_len]
+        pseq_len_coef.append(1)
+        pseq_len_seq = [0]*barker_len
+        pseq_len_seq.append(1)
     return preamble_params(pseq_list,pseq_len_seq,pseq_list_coef)
 
-def find_type1(p_params):
+def get_schmidl_sequence(crosscorr_seq):
+    schmidl_seq = [1]*(len(crosscorr_seq)-1)
+    for i,p in enumerate(schmidl_seq):
+        schmidl_seq[i] = np.exp(1j*(np.angle(crosscorr_seq[i+1])-np.angle(crosscorr_seq[i])))
+    return schmidl_seq
 
+class tracked_peak:
+    def __init__(self, tidx, xcorr_peak, xautocorr, cfo, xmag2, awgn_estim):
+        self.tidx = tidx
+        self.xcorr = xcorr_peak
+        self.xautocorr = xautocorr
+        self.cfo = cfo
+        self.preamble_mag2 = xmag2
+        self.awgn_mag2 = awgn_estim
+
+class preamble_type1_detector:
+    def __init__(self, params, awgn_len):
+        self.params = params
+        self.barker_len = len(self.params.pseq_list_seq)-1
+        self.barker_vec = self.params.pseq_list_seq[0:-1]
+        self.barker_diff = get_schmidl_sequence(self.barker_vec)
+        self.pseq0 = self.params.pseq_list_norm[0]
+        self.pseq0_tot_len = self.pseq0.size*self.barker_len
+        self.awgn_len = awgn_len
+        self.hist_len = self.awgn_len + self.params.preamble_len
+        self.hist_vec = []#np.zeros(self.hist_len)
+        self.margin = 4
+        self.awgn_len = 100
+
+        self.nread = 0
+        self.max_peak = tracked_peak(-1,-1,-1,-1,-1)
+
+        # i keep these vars in mem for debug
+        self.x_with_hist = []
+        self.xcorr = []
+        self.xcorr_filt = []
+
+    def find_xcorr_peak(self,x,max_i,margin,cfo):
+        xcorr_max = -1
+        xcorr_max_i = -1
+        x_nocfo = compensate_cfo(x[max_i-margin:max_i+margin+self.params.preamble_len],p.cfo)
+        for i in range(2*margin):
+            xcorr = np.correlate(x_nocfo[i:i+self.params.preamble_len],self.params.preamble)
+            if np.abs(xcorr) > xcorr_max:
+                xcorr_max = np.abs(xcorr)
+                xcorr_max_i = i
+        return (xcorr_max,xcorr_max_i-margin)
+
+    def work(self,x):
+        self.x_with_hist = np.append(self.hist_vec,x)
+        self.xcorr = np.correlate(x_with_hist,self.pseq0)
+
+        max_n = xcorr.size-self.hist_len
+        self.xcorr_filt = np.zeros(max_n)
+        for i in range(max_n):
+            v = xcorr[i:i+self.pseq0_tot_len:self.pseq0.size]
+            self.xcorr_filt[i] = np.sum(v*self.barker_len)
+        max_i = np.argmax(np.abs(self.xcorr_filt))
+
+        pseq0_tot = x_with_hist[max_i:max_i+self.pseq0_tot_len]
+        xautocorr = compute_schmidl_cox_peak(pseq0_tot,self.pseq0.size)
+        xschmidl = np.sum(xautocorr*self.barker_diff)
+        xmag2 = np.mean(np.abs(x_with_hist[max_i:max_i+self.preamble_len])**2)
+        awgn_estim = np.mean(np.abs(x_with_hist[max_i-self.awgn_len:max_i])**2)
+
+        p = tracked_peak(self.nread+max_i, -1, np.abs(xschmidl)**2, -np.angle(2*np.pi*self.pseq0.size), xmag2, awgn_estim)
+        p.xcorr,toff = self.find_xcorr_peak(x_with_hist,max_i,self.margin,p.cfo)
+        p.tidx += toff
+        if p.xcorr > self.max_peak.xcorr:
+            self.max_peak = p
+
+        self.hist_vec = x_with_hist[-self.hist_len::]
+        assert self.hist_vec.size == self.hist_len
+        self.nread += x.size
 
 def compute_schmidl_cox_peak(x,nBins_half):
     delayed_xmult = np.zeros(x.size-nBins_half,dtype='complex64')
