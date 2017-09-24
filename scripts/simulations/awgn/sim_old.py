@@ -18,47 +18,17 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 #
+import sys
 sys.path.append('../../../python/modules')
-import metadata_handler as mh
-
-stage_names = ['waveform','Tx','RF','Rx']
-
-# waveform_params = mh.ParamProductChain(
-#     ('type','fileno'), # parameter names
-#     [('LTE',range(100)), # parameter list of products
-#      ('WLAN',range(200)),
-#      ('DC',1)
-#     ]
-#     # ('freq_excursion',np.linspace(-0.5,-0.5,100))
-# )
-# Tx_param_values = (
-#     ('time_offset','phase_offset','window_offset','soft_gain','frequency_offset'),
-#     [(range(0,1000,5),np.linspace(-np.pi,np.pi,100),[1000],np.linspace(0.01,1,100),np.linspace(-0.45,0.45,100))]
-# )
-Tx_params = mh.ParamProduct([
-    ('time_offset',range(0,1000,5)),
-    ('phase_offset',np.linspace(-np.pi,np.pi,100)),
-    ('window_size',1000),
-    ('n_windows',10),
-    ('soft_gain',np.linspace(0.01,1,100)),
-    ('frequency_offset',np.linspace(-0.45,0.45,100))
-])
-RF_params = mh.ParamProduct([
-    ('awgn',1),
-    ('hard_gain',1),
-    ('centre_frequency',2.3e9)
-])
-Rx_params = mh.ParamProduct([
-    ('rx_mult_coef',1)
-])
-
-# TODO: GENERATE waveform_params from files that exist in the "waveform_templates" folder
-# and create "waveform" folder with files numbered and all tidied up
-
-def sim():
-    # waveform_params = read_folder('waveform_templates')
-    param_handler = MultiStageParamHandler([waveform_params,Tx_params, RF_params, Rx_params])
-    # save param_handler for later loading
+import os
+import time
+from gnuradio import gr
+from gnuradio import blocks
+import specmonitor as specmonitor
+import zadoffchu
+import numpy as np
+import json
+import argparse
 
 # class sim_awgn:
 #     def __init__(self):
