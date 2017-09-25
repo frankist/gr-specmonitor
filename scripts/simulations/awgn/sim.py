@@ -24,9 +24,9 @@ import metadata_handler as mh
 stage_names = ['waveform','Tx','RF','Rx']
 
 # waveform_params = mh.ParamProductChain(
-#     ('type','fileno'), # parameter names
+#     ('type','encoding'), # parameter names
 #     [('LTE',range(100)), # parameter list of products
-#      ('WLAN',range(200)),
+#      ('WLAN',range(8),),
 #      ('DC',1)
 #     ]
 #     # ('freq_excursion',np.linspace(-0.5,-0.5,100))
@@ -35,7 +35,16 @@ stage_names = ['waveform','Tx','RF','Rx']
 #     ('time_offset','phase_offset','window_offset','soft_gain','frequency_offset'),
 #     [(range(0,1000,5),np.linspace(-np.pi,np.pi,100),[1000],np.linspace(0.01,1,100),np.linspace(-0.45,0.45,100))]
 # )
-Tx_params = mh.ParamProduct([
+LTE_params = [
+    ('waveform','LTE'),
+    ('BW',[1.4,5,10,20])
+]
+WIFI_params = [
+    ('waveform','WIFI'),
+    ('BW',[1.4,5,10,20])
+]
+waveform_params = ParamProductJoin([LTE_params,WIFI_params])
+Tx_params = mh.ParamProductJoin([
     ('time_offset',range(0,1000,5)),
     ('phase_offset',np.linspace(-np.pi,np.pi,100)),
     ('window_size',1000),
@@ -43,22 +52,50 @@ Tx_params = mh.ParamProduct([
     ('soft_gain',np.linspace(0.01,1,100)),
     ('frequency_offset',np.linspace(-0.45,0.45,100))
 ])
-RF_params = mh.ParamProduct([
+RF_params = mh.ParamProductJoin([
     ('awgn',1),
     ('hard_gain',1),
     ('centre_frequency',2.3e9)
 ])
-Rx_params = mh.ParamProduct([
+Rx_params = mh.ParamProductJoin([
     ('rx_mult_coef',1)
 ])
 
 # TODO: GENERATE waveform_params from files that exist in the "waveform_templates" folder
 # and create "waveform" folder with files numbered and all tidied up
 
-def sim():
-    # waveform_params = read_folder('waveform_templates')
+def generate_params():
+    # TODO:waveform_params = read_folder('waveform_templates')
     param_handler = MultiStageParamHandler([waveform_params,Tx_params, RF_params, Rx_params])
-    # save param_handler for later loading
+    # TODO:save param_handler for later loading
+
+def generate_fileformat(lvl):
+    format_str = 'data'
+    for i in range(lvl):
+        format_str += '_{}'
+    format_str+='pkl'
+
+class MakeFileSimulator:
+    def __init__(self):#TODO
+        self.__multistage_handler__ = None
+
+    def get_multistage_handler(self):#TODO
+        pass
+
+    def generate_filenames(self,level_list):
+        def generate_stage_filenames(lvl):
+            handler = self.get_multistage_handler()
+            stage_sizes = [handler.get_stage_size(a) for a in range(lvl)]
+            return FilenameUtils.get_stage_filename_list(stage_sizes)
+        if type(level_list) in [list,tuple]:
+            return [generate_stage_filenames(v) for v in level_list]
+        return [generate_stage_filenames(level_list)]
+
+    def print_filenames(self,level_list):
+        fnames = self.generate_filenames(level_list)
+        for f_list in fnames:
+            for f in f_list:
+                print f
 
 # class sim_awgn:
 #     def __init__(self):

@@ -21,6 +21,33 @@
 
 import numpy as np
 import itertools
+from collections import Iterable
+
+def convert2list(v):
+    if not isinstance(v,Iterable) or type(v) is str:
+        return [v]
+    elif type(v) is tuple:
+        return list(v)
+    return v
+
+class LabelParam:
+    def __init__(self,label,value):
+        if type(label) is not str:
+            raise ValueError('ERROR: expected a string as parameter name. Got {}'.format(label))
+        self.__val__ = (label,convert2list(value))
+    def label(self):
+        return self.__val__[0]
+    def value(self):
+        return self.__val__[1]
+    def to_tuple(self): # for itertools flattening
+        return ([self.__val__[0]],self.__val__[1])
+    def to_dict(self): # for json conversion
+        return {self.__val__[0]:self.__val__[1]}
+
+def params_to_pickle(it,result_filename): # I use pickle instead of JSON to keep format at destiny
+    # l = [param.to_dict() for param in it]
+    d = {param.to_dict() for param in it}
+    return pickle.dumps({'result_filename':result_filename,'parameters':d})
 
 class ParamProduct:
     def __init__(self,param_list,true_predicates=None):
@@ -44,11 +71,30 @@ class ParamProductChain:
                     raise ValueError('ERROR: Value {} has to be iterable and not string'.format(v))
 
     def get_iterable(self):
-        return itertools.chain(*[itertools.product(*v) for v in self.param_list])
+        return itertools.chain(*[itertools.product(*v) for v in self.paramlist])
 
     @classmethod
     def parse_list(cls,l):
         return cls(l[0],l[1])
+
+class ParamProductJoin:
+    def __init__(self,param_prod_list): # here not even the labels have to be the same
+        self.param_prod_list = []
+        for prod_list in param_prod_list:
+            l = []
+            for pair in prod_list:
+                l.append(LabelParam(pair[0],pair[1]))
+            self.param_prod_list.append(l)
+
+    def get_iterable(self):
+        prod = []
+        for prod_list in self.param_prod_list:
+            l = []
+            for pair in prod_list:
+                # print list(itertools.product(*pair.to_tuple()))
+                l.append(itertools.product(*pair.to_tuple())) # we get ('label',value) pairs here
+            prod.append(itertools.product(*l))
+        return itertools.chain(*prod)
 
 stage_names = ['waveform','Tx','RF','Rx']
 format_extension = 'pkl'
@@ -73,12 +119,33 @@ class MultiStageParamHandler:
             return itertools.islice(v,*idx_range)
         return itertools.islice(v,idx_range)
 
-def get_filename(stage_idx,runs_idxs):
-    s = '{}/data' % (stage_names[stage_idx])
-    for v in runs_idxs:
-        s += '_{}' % (v)
-    s += '.{}' % (format_extension)
-    return s
+class FilenameUtils:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_stage_format(stage_number):
+        fmt_str = '{}/data'.format(stage_names[stage_number])
+        fmt_str += '_{}'*stage_number
+        fmt_str += '.{}' % (format_extension)
+        return fmt_str
+
+    @staticmethod
+    def get_stage_filename(stage_number,stage_run_idxs):
+        fmt_str = FilenameUtils.get_stage_format(stage_number)
+        fmt_str.format(*stage_run_idxs)
+        return fmt_str
+
+    @staticmethod
+    def get_stage_filename_list(stage_sizes):
+        stage_number = len(stage_sizes)
+        fmt_str = FilenameUtils.get_stage_format(stage_number)
+        prod_file_idxs = itertools.product(*[range(a) for a in stage_sizes])
+        return [fmt_str.format(*v) for v in prod_file_idxs]
+
+    @staticmethod
+    def parse_filename():
+        pass
 
 def load_handler(filename):
     p = pickle.load(filename)
@@ -101,6 +168,19 @@ def test_product_and_chain():
     assert l == l2
     assert l[0]==('lte',0)
     # print l
+
+def test_product_join():
+    pprod1 = [
+        ('type',['wifi']),
+        ('encoding',range(4))
+    ]
+    pprod2 = [
+        ('type',['lte']),
+        ('bw',range(3))
+    ]
+    prodjoin = ParamProductJoin([pprod1,pprod2])
+    l = list(prodjoin.get_iterable())
+    print l
 
 def test_staged_params():
     waveform_list = ['PC','LFM','PM']
@@ -126,5 +206,6 @@ def test_staged_params():
     assert l[1] == (waveform_list[1],freq_list[0])
 
 if __name__ == '__main__':
-    test_product_and_chain()
-    test_staged_params()
+    test_product_join()
+    # test_product_and_chain()
+    # test_staged_params()

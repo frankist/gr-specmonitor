@@ -31,3 +31,20 @@ def generate_sequence(zc_length, u, q, n_start = 0, num_samples = -1):
 
     return np.array(zc)
 
+def generate_noDC_sequence(zc_length, u, q, guard_len = 0):
+    num_samples = zc_length+guard_len
+    n_end = 0 + zc_length
+    guard_len_half = int(np.floor(guard_len/2))
+    zc_len_half = int(np.floor(zc_length/2))
+
+    zc = [0]*num_samples#np.zeros(num_samples, dtype='complex')
+    zc_seq = np.array([np.exp(-1j*np.pi*u*float(n*(n+1+2*q))/zc_length) for n in range(n_end)])
+    zc[-zc_len_half-1::] = zc_seq[0:zc_len_half+1]
+    zc[0:zc_len_half] = zc_seq[zc_len_half+1::]
+    zc[0] = 0
+
+    return np.fft.ifft(zc)
+
+barker_codes = {2:[1,-1],3:[1,1,-1],4:[1,1,-1,1], \
+               5:[1,1,1,-1,1],7:[1,1,1,-1,-1,1,-1],11:[1,1,1,-1,-1,-1,1,-1,-1,1,-1], \
+              13:[1,1,1,1,1,-1,-1,1,1,-1,1,-1,1]}
