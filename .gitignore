@@ -5,3 +5,5 @@ nbproject/
 *pyc
 .kdev4/
 gr-specmonitor.kdev4
+.idea/
+scripts/simulations/awgn/sim0/*

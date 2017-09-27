@@ -23,6 +23,13 @@ from gnuradio import gr
 from gnuradio import blocks
 from gnuradio import analog
 import sys
+import pickle
+from bounding_box import *
+
+def print_params(params):
+    print 'sig_source_c starting'
+    for k,v in params.iteritems():
+        print k,v,type(v)
 
 def run_signal_source(args):
     gr_waveform_map = {'square':analog.GR_SQR_WAVE,'saw':analog.GR_SAW_WAVE}
@@ -30,23 +37,35 @@ def run_signal_source(args):
     #skip_samples =
     amp = 1.0
     offset = 0
+    # print_params(d)
+    wf = gr_waveform_map[d['waveform']]
 
     tb = gr.top_block()
 
-    source = analog.signal_source_c(d['sample_rate'],gr_waveform_map[d['waveform']],
+    source = analog.sig_source_c(d['sample_rate'],wf,
                                     d['frequency'],amp,offset)
-    head = blocks.head(gr.sizeof_gr_complex, d['num_samples'])
-    dst = blocks.file_sink(gr.sizeof_gr_complex,args['result_filename'])
+    head = blocks.head(gr.sizeof_gr_complex, int(d['number_samples']))
+    dst = blocks.vector_sink_c()
+    # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
 
     tb.connect(source,head)
     tb.connect(head,dst)
 
+    print 'STATUS: Starting GR waveform generator script'
     tb.run()
+    print 'STATUS: GR script finished'
 
     # TODO: read file to insert bounding boxes and params
-    # write bounding boxes
-    # write parameters
-    # write samples
+    gen_data = np.array(dst.data())
+    print 'STATUS: Going to compute Bounding Boxes'
+    box_list = compute_bounding_box(gen_data)
+    print 'STATUS: Finished computing the Bounding Boxes'
+    # print [(b.time_bounds,b.freq_bounds) for b in box_list]
+
+    v = {'parameters':args['parameters'],'IQsamples':gen_data}
+    v['parameters']['bounding_boxes'] = box_list
+    with open(args['targetfolder']+'/'+args['targetfilename'],'wb') as f:
+        pickle.dump(v,f)
 
 if __name__ == '__main__':
     args = pickle.loads(sys.argv[1])

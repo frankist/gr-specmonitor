@@ -22,6 +22,9 @@
 import numpy as np
 import itertools
 from collections import Iterable
+import importlib
+import os
+import pickle
 
 def convert2list(v):
     if not isinstance(v,Iterable) or type(v) is str:
@@ -43,6 +46,8 @@ class LabelParam:
         return ([self.__val__[0]],self.__val__[1])
     def to_dict(self): # for json conversion
         return {self.__val__[0]:self.__val__[1]}
+    def number_values(self):
+        return len(self.value())
 
 def params_to_pickle(it,result_filename): # I use pickle instead of JSON to keep format at destiny
     # l = [param.to_dict() for param in it]
@@ -79,11 +84,11 @@ class ParamProductChain:
 
 class ParamProductJoin:
     def __init__(self,param_prod_list): # here not even the labels have to be the same
+        self.product_size = 0
         self.param_prod_list = []
         for prod_list in param_prod_list:
-            l = []
-            for pair in prod_list:
-                l.append(LabelParam(pair[0],pair[1]))
+            l = [LabelParam(pair[0],pair[1]) for pair in prod_list]
+            self.product_size += np.cumprod([v.number_values() for v in l])[-1]
             self.param_prod_list.append(l)
 
     def get_iterable(self):
@@ -96,8 +101,8 @@ class ParamProductJoin:
             prod.append(itertools.product(*l))
         return itertools.chain(*prod)
 
-stage_names = ['waveform','Tx','RF','Rx']
-format_extension = 'pkl'
+    def get_size(self):
+        return self.product_size
 
 class MultiStageParamHandler:
     def __init__(self,staged_params):
@@ -115,19 +120,48 @@ class MultiStageParamHandler:
         v = self.staged_params[stage].get_iterable()
         if idx_range is None:
             return v
-        if len(idx_range)>1:
+        if type(idx_range) in [list,tuple]:#len(idx_range)>1:
             return itertools.islice(v,*idx_range)
-        return itertools.islice(v,idx_range)
+        return itertools.islice(v,idx_range,idx_range+1)
 
-class FilenameUtils:
-    def __init__(self):
-        pass
+    def get_stage_size(self,stage):
+        return self.staged_params[stage].get_size()
+
+class SimParamsHandler:
+    def __init__(self,session_name,stage_names,stage_params):
+        self.session_name = session_name
+        self.stage_names = stage_names
+        self.stage_params = stage_params
+
+    def save(self):
+        with open(handler_fileformat.format(self.session_name),'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load_cfg_file(cls,session_name,cfg_file):
+        fbase = os.path.splitext(os.path.basename(cfg_file))[0]
+        cfg_module = importlib.import_module(fbase)
+        sp = MultiStageParamHandler(cfg_module.stage_params)
+        session_handler = cls(session_name,cfg_module.stage_names,sp)
+        return session_handler
 
     @staticmethod
-    def get_stage_format(stage_number):
+    def load_handler(session_name):
+        with open(handler_fileformat.format(session_name),'r') as f:
+            return pickle.load(f)
+
+###### DEFAULT VALUES ##########
+handler_fileformat = '{0}/{0}_handler.pkl'
+
+################################
+
+class FilenameUtils:
+    @staticmethod
+    def get_stage_format(stage_names,stage_number):
         fmt_str = '{}/data'.format(stage_names[stage_number])
-        fmt_str += '_{}'*stage_number
-        fmt_str += '.{}' % (format_extension)
+        fmt_str += '_{}'*(stage_number+1)
+        fmt_str += '.pkl'
+        # fmt_str += '.{}'.format(format_extension)
         return fmt_str
 
     @staticmethod
@@ -137,9 +171,9 @@ class FilenameUtils:
         return fmt_str
 
     @staticmethod
-    def get_stage_filename_list(stage_sizes):
-        stage_number = len(stage_sizes)
-        fmt_str = FilenameUtils.get_stage_format(stage_number)
+    def get_stage_filename_list(stage_names,stage_sizes):
+        stage_number = len(stage_sizes)-1
+        fmt_str = FilenameUtils.get_stage_format(stage_names,stage_number)
         prod_file_idxs = itertools.product(*[range(a) for a in stage_sizes])
         return [fmt_str.format(*v) for v in prod_file_idxs]
 
@@ -147,10 +181,11 @@ class FilenameUtils:
     def parse_filename():
         pass
 
-def load_handler(filename):
-    p = pickle.load(filename)
-
 ########### TESTING #############
+
+def test_fileutils():
+    l = FilenameUtils.get_stage_filename_list([5,4,3])
+    print l
 
 def test_product_and_chain():
     pchain = ParamProductChain(
@@ -206,6 +241,7 @@ def test_staged_params():
     assert l[1] == (waveform_list[1],freq_list[0])
 
 if __name__ == '__main__':
-    test_product_join()
+    test_fileutils()
+    # test_product_join()
     # test_product_and_chain()
     # test_staged_params()

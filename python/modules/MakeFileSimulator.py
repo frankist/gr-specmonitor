@@ -19,8 +19,10 @@
 # Boston, MA 02110-1301, USA.
 #
 
-import metadata_handler
+import metadata_handler as mh
 import os
+import pickle
+import importlib
 
 # returns the stage number, and the stages run indexes
 def parse_filename(f):
@@ -28,7 +30,7 @@ def parse_filename(f):
     pos = fbase.find('data_')
     # TODO: make asserts that we are in the right pos
     tokens = fbase[pos::].split('_')
-    return (len(tokens)-1,tokens)
+    return (len(tokens)-2,[int(i) for i in tokens[1::]])
 
 def get_run_all_stages_parameters(handler,filename):
     stage_number,stage_idxs = parse_filename(filename)
@@ -41,46 +43,80 @@ def get_run_stage_parameters(handler,filename):
 
 def generate_filenames(handler,level_list):
     def generate_stage_filenames(handler,lvl):
-        stage_sizes = [handler.get_stage_size(a) for a in range(lvl)]
-        return FilenameUtils.get_stage_filename_list(stage_sizes)
-    if type(level_list) in [list,tuple]:
-        return [generate_stage_filenames(handler,v) for v in level_list]
-    return [generate_stage_filenames(handler,level_list)]
+        stage_sizes = [handler.stage_params.get_stage_size(a) for a in range(lvl+1)]
+        return mh.FilenameUtils.get_stage_filename_list(handler.stage_names,stage_sizes)
+    return [generate_stage_filenames(handler,v) for v in level_list]
 
-class MakeFileSimulator:
-    handler_filename = 'handler_params.pkl'
+# NOTE: you should create this metafile in a subfolder to avoid collisions with other running sims
+handler_filename = 'handler_params.pkl'
 
-    @staticmethod
-    def get_handler():
-        return pickle.load(MakeFileSimulator.handler_filename)
+############## COMMANDS ###############
 
-    @staticmethod
-    def start_sim(cfg_file):
-        # NOTE: you should create this metafile in a subfolder to avoid collisions with other running sims
-        from cfg_file import stage_params,stage_cmd_parser
-        param_handler = metadata_handler.MultiStageParamHandler(stage_params)
-        pickle.dump([param_handler,stage_cmd_parser],MakefileSimulator.handler_filename)
+class SessionCommandParser:
+    def __init__(self,session_name,handler_type):
+        self.session_name = session_name
+        self.handler_type = handler_type
 
-    @staticmethod
-    def get_filenames(level_list):
-        handler,_ = MakeFileSimulator.get_handler()
-        fnames = generate_filenames(handler,level_list)
+    def __get_handler__(self):
+        return self.handler_type.load_handler(self.session_name)
+
+    def start_session(self,args):
+        cfg_file = args[0]
+        session_handler = self.handler_type.load_cfg_file(self.session_name,cfg_file)
+        session_handler.save()
+        # fbase = os.path.splitext(os.path.basename(cfg_file))[0]
+        # cfg_module = importlib.import_module(fbase)
+        # session_handler = SimParamsHandler(cfg_module)
+        # param_handler = mh.MultiStageParamHandler(cfg_module.test_params)
+        # with open(hfname,'wb') as f:
+        #     pickle.dump(param_handler, f)
+
+    def get_filenames(self,args):
+        stage_nums = [int(args[0])]
+        handler = self.__get_handler__()
+        fnames = generate_filenames(handler,stage_nums)
         for f_list in fnames:
             for f in f_list:
                 print f
 
     @staticmethod
     def pickle_cmd_args(filename):
-        handler,_ = MakeFileSimulator.get_handler()
+        handler = get_handler()
         params_of_stage = get_run_stage_parameters(handler,filename)
         pkl_str = pickle.dumps(params_of_stage)
         print pkl_str
 
-    @staticmethod
-    def run_cmd(filename):
-        handler,cmd_parser = MakeFileSimulator.get_handler()
-        stage_number,_ = parse_filename(filename)
-        params_of_stage = get_run_stage_parameters(handler,filename)
-        cmd_str = cmd_parser(stage_number,params_of_stage)
-        pkl_str = pickle.dumps(params_of_stage)
-        print cmd_str, pkl_str
+    @classmethod
+    def run_cmd(cls,argv,handler_type=mh.SimParamsHandler):
+        session_name = argv[1]
+        methodname = argv[2]
+        args = argv[3::]
+        s = cls(session_name,handler_type)
+        method = getattr(s,methodname)
+        # possibles = globals().copy()
+        # possibles.update(locals())
+        # method = possibles.get()
+        if not method:
+            raise NotImplementedError('Method %s not implemented' % methodname)
+        method(args)
+
+
+
+############# COMMANDS PARSER #################
+
+def run_cmd(command_strs):
+    filehandler = command_strs[0]
+    methodname = command_strs[1]
+    args = command_strs[2::]
+
+    s = SessionCommandParser(filehandler)
+    method = getattr(s, methodname)
+    # possibles = globals().copy()
+    # possibles.update(locals())
+    # method = possibles.get()
+    if not method:
+        raise NotImplementedError('Method %s not implemented' % methodname)
+    method(args)
+
+if __name__ =='__main__':
+    run_cmd(sys.argv[1])

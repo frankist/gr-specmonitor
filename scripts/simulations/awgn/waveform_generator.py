@@ -20,21 +20,14 @@
 #
 
 import sys
-sys.path.append('../../../python/modules')
-sys.path.append('../../../python/labeling_modules')
 import MakeFileSimulator
-import waveform_generator
+sys.path.append('../../../python/modules')
+sys.path.append('../../../python/modules/waveform_generators')
+import signal_source as sc
 
-class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
-    def generate_waveform(self,args):
-        handler = self.__get_handler__()
-        targetfilename = args[0]
-        run_parameters = MakeFileSimulator.get_run_stage_parameters(handler.stage_params,targetfilename)
-        d = {'parameters':dict(run_parameters),
-             'targetfolder':handler.session_name,
-             'targetfilename':targetfilename}
-        waveform_generator.waveform_gen_launcher(d)
+def waveform_gen_launcher(params):
+    if params['parameters']['waveform'] in ['square','saw']:
+        sc.run_signal_source(params)
+    else:
+        raise ValueError('ERROR: Do not recognize this waveform')
 
-if __name__ == '__main__':
-    # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)
-    AWGNSessionCmdParser.run_cmd(sys.argv)
