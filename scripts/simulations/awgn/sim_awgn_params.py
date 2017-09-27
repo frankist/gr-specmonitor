@@ -22,9 +22,10 @@
 import sys
 sys.path.append('../../../python/modules')
 import metadata_handler as mh
+import numpy as np
 
 # format_extension = 'pkl'
-stage_names = ['waveform']
+stage_names = ['waveform','Tx']
 
 SignalSource_params = mh.ParamProductJoin([[
     ('waveform',['square','saw']),
@@ -34,5 +35,9 @@ SignalSource_params = mh.ParamProductJoin([[
     ('skip_samples',0)
 ]])
 
-stage_params = [SignalSource_params]
+TX_params = mh.ParamProductJoin([[
+    ('frequency_offset',np.linspace(-0.3,0.3,100))
+]])
+
+stage_params = [SignalSource_params,TX_params]
 

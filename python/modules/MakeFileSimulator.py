@@ -64,27 +64,27 @@ class SessionCommandParser:
         cfg_file = args[0]
         session_handler = self.handler_type.load_cfg_file(self.session_name,cfg_file)
         session_handler.save()
-        # fbase = os.path.splitext(os.path.basename(cfg_file))[0]
-        # cfg_module = importlib.import_module(fbase)
-        # session_handler = SimParamsHandler(cfg_module)
-        # param_handler = mh.MultiStageParamHandler(cfg_module.test_params)
-        # with open(hfname,'wb') as f:
-        #     pickle.dump(param_handler, f)
 
     def get_filenames(self,args):
-        stage_nums = [int(args[0])]
         handler = self.__get_handler__()
+        stage_nums = [int(handler.stage_names.index(args[0]))]
         fnames = generate_filenames(handler,stage_nums)
         for f_list in fnames:
             for f in f_list:
                 print f
 
-    @staticmethod
-    def pickle_cmd_args(filename):
-        handler = get_handler()
-        params_of_stage = get_run_stage_parameters(handler,filename)
-        pkl_str = pickle.dumps(params_of_stage)
-        print pkl_str
+    def get_dependency(self,args):
+        pass#TODO: make this
+
+    def apply_transformations(self,args):
+        print 'gonna apply the transformation for file ',args[0]
+
+    # @staticmethod
+    # def pickle_cmd_args(filename):
+    #     handler = get_handler()
+    #     params_of_stage = get_run_stage_parameters(handler,filename)
+    #     pkl_str = pickle.dumps(params_of_stage)
+    #     print pkl_str
 
     @classmethod
     def run_cmd(cls,argv,handler_type=mh.SimParamsHandler):
@@ -104,19 +104,19 @@ class SessionCommandParser:
 
 ############# COMMANDS PARSER #################
 
-def run_cmd(command_strs):
-    filehandler = command_strs[0]
-    methodname = command_strs[1]
-    args = command_strs[2::]
+# def run_cmd(command_strs):
+#     filehandler = command_strs[0]
+#     methodname = command_strs[1]
+#     args = command_strs[2::]
 
-    s = SessionCommandParser(filehandler)
-    method = getattr(s, methodname)
-    # possibles = globals().copy()
-    # possibles.update(locals())
-    # method = possibles.get()
-    if not method:
-        raise NotImplementedError('Method %s not implemented' % methodname)
-    method(args)
+#     s = SessionCommandParser(filehandler)
+#     method = getattr(s, methodname)
+#     # possibles = globals().copy()
+#     # possibles.update(locals())
+#     # method = possibles.get()
+#     if not method:
+#         raise NotImplementedError('Method %s not implemented' % methodname)
+#     method(args)
 
 if __name__ =='__main__':
     run_cmd(sys.argv[1])

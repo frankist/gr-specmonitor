@@ -141,6 +141,7 @@ class SimParamsHandler:
     def load_cfg_file(cls,session_name,cfg_file):
         fbase = os.path.splitext(os.path.basename(cfg_file))[0]
         cfg_module = importlib.import_module(fbase)
+        # TODO: Parse the module to see if every variable is initialized
         sp = MultiStageParamHandler(cfg_module.stage_params)
         session_handler = cls(session_name,cfg_module.stage_names,sp)
         return session_handler
@@ -158,7 +159,7 @@ handler_fileformat = '{0}/{0}_handler.pkl'
 class FilenameUtils:
     @staticmethod
     def get_stage_format(stage_names,stage_number):
-        fmt_str = '{}/data'.format(stage_names[stage_number])
+        fmt_str = '{0}/data'.format(stage_names[stage_number])
         fmt_str += '_{}'*(stage_number+1)
         fmt_str += '.pkl'
         # fmt_str += '.{}'.format(format_extension)

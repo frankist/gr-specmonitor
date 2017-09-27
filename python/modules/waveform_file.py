@@ -20,14 +20,72 @@
 #
 
 import numpy as np
+# import digital_rf as drf
+from json import JSONDecoder
+from functools import partial
 
-def generate_sequence(zc_length, u, q, n_start = 0, num_samples = -1):
-    if num_samples < 0:
-        num_samples = zc_length
-    n_end = n_start + num_samples
+# I need to polymorph this bc I may have multiple signal formats
 
-    zc = [0]*num_samples#np.zeros(num_samples, dtype='complex')
-    zc[0:num_samples] = [np.exp(np.complex(0,-1.0*np.pi*u*float(n*(n+1+2*q))/zc_length)) for n in range(n_start,n_end)]
+# def json_parse(fileobj, key_halt='IQsamples', buffersize=2048, decoder=JSONDecoder()):
+#     buffer = ''
+#     for chunk in iter(partial(fileobj.read, buffersize), ''):
+#          buffer += chunk
+#          while buffer:
+#              try:
+#                  result_tmp, index = decoder.raw_decode(buffer)
+#                  if key_halt in result.keys():
+#                      del result['key_halt']
+#                      return result
+#                  buffer = buffer[index:]
+#              except ValueError:
+#                  # Not enough data to decode, read more
+#                  break
 
-    return np.array(zc)
+class WaveformFileReader:
+    def __init__(self):
+        pass
 
+    @abstractmethod
+    def size(self):
+        pass
+
+    @abstractmethod
+    def metadata(self):
+        pass
+
+    @abstractmethod
+    def read_section(self, start, end):
+        pass
+
+class WaveformPklReader(WaveformFileReader):
+    def __init__(self,fname):
+        self.wavdata = pickle.load(fname)
+
+    def size():
+        return self.wavedata['IQsamples'].size
+
+    def metadata():
+        return self.wavedata['metadata']
+
+    def read_section(self,idx=0,end_idx=None):
+        if end_idx is None:
+            return self.wavdata['IQsamples'][idx::]
+        else:
+            return self.wavdata['IQsamples'][idx:end_idx]
+
+def write_waveform_pickle(fname,IQsamples,metadata):
+    d = {'IQsamples':IQsamples,'metadata':metadata}
+    pickle.dump(fname,d)
+
+# class BoundingBoxSignal:
+#     def __init__(self, tstart,tend,frac_bw):
+#         self.tstart = tstart
+#         self.tend = tend
+#         self.frac_bw = frac_bw
+
+#     def to_dict(self):
+#         return {'start':self.tstart,'end':self.tend,'fractional_bw':self.frac_bw}
+
+#     @staticmethod
+#     def from_dict(d):
+#         return BoundingBoxSignal(d['start'],d['end'],d['fractional_bw'])
