@@ -64,8 +64,10 @@ def run_signal_source(args):
 
     v = {'parameters':args['parameters'],'IQsamples':gen_data}
     v['parameters']['bounding_boxes'] = box_list
-    with open(args['targetfolder']+'/'+args['targetfilename'],'wb') as f:
+    fname=args['targetfolder']+'/'+args['targetfilename']
+    with open(fname,'wb') as f:
         pickle.dump(v,f)
+    print 'STATUS: Finished writing to file',fname
 
 if __name__ == '__main__':
     args = pickle.loads(sys.argv[1])

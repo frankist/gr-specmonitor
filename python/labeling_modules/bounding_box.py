@@ -137,13 +137,8 @@ def find_frequency_bounds(x,fftsize,thres=0.05):
 import time
 
 def compute_bounding_box(x):
-    print 'ola tudo bem. Isto e o tamanho:',x.size
-    start_time = time.time()
     tinterv_list = find_tx_intervals(x)
-    print 'number of boxes:',len(tinterv_list),'elapsed time(time intervals):',time.time()-start_time
-    start_time = time.time()
     finterv = find_frequency_bounds(x,x.size) # FIXME: Make a smarter frequency estimator that partitions the signal
-    print 'elapsed time(freq intervals):',time.time()-start_time
-    # into smaller intervals and computes the average frequency bounds of each
+    # print 'elapsed time(freq intervals):',time.time()-start_time
     boxes = [BoundingBox(i,finterv) for i in tinterv_list]
     return boxes
