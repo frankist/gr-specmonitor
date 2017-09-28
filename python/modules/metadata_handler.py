@@ -25,6 +25,7 @@ from collections import Iterable
 import importlib
 import os
 import pickle
+from filename_utils import *
 
 def convert2list(v):
     if not isinstance(v,Iterable) or type(v) is str:
@@ -127,34 +128,36 @@ class MultiStageParamHandler:
     def get_stage_size(self,stage):
         return self.staged_params[stage].get_size()
 
-class SimParamsHandler:
-    def __init__(self,session_name,stage_names,stage_params):
-        self.session_name = session_name
-        self.stage_names = stage_names
+class SessionParamsHandler:
+    def __init__(self,stage_params,filenames_handler):
+        self.filename_handler = filenames_handler
         self.stage_params = stage_params
 
-    def save(self):
-        with open(handler_fileformat.format(self.session_name),'wb') as f:
+    def session_name(self):
+        return self.filename_handler.session_name
+
+    def stage_name_list(self):
+        return self.filename_handler.stage_name_list
+
+    def save(self,fname):
+        with open(fname,'wb') as f:
             pickle.dump(self, f)
 
     @classmethod
-    def load_cfg_file(cls,session_name,cfg_file):
+    def load_cfg_file(cls,session_file,session_name,cfg_file):
         fbase = os.path.splitext(os.path.basename(cfg_file))[0]
         cfg_module = importlib.import_module(fbase)
         # TODO: Parse the module to see if every variable is initialized
         sp = MultiStageParamHandler(cfg_module.stage_params)
-        session_handler = cls(session_name,cfg_module.stage_names,sp)
+        sfh = SessionFilenamesHandler(session_file,session_name,cfg_module.stage_names)
+        session_handler = cls(sp,sfh)
         return session_handler
 
     @staticmethod
-    def load_handler(session_name):
-        with open(handler_fileformat.format(session_name),'r') as f:
+    def load_handler(session_file):
+        with open(session_file,'r') as f:
             return pickle.load(f)
 
-###### DEFAULT VALUES ##########
-handler_fileformat = '{0}/{0}_handler.pkl'
-
-################################
 
 class FilenameUtils:
     @staticmethod

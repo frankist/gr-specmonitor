@@ -23,6 +23,7 @@ import metadata_handler as mh
 import os
 import pickle
 import importlib
+from filename_utils import *
 
 # returns the stage number, and the stages run indexes
 def parse_filename(f):
@@ -44,7 +45,7 @@ def get_run_stage_parameters(handler,filename):
 def generate_filenames(handler,level_list):
     def generate_stage_filenames(handler,lvl):
         stage_sizes = [handler.stage_params.get_stage_size(a) for a in range(lvl+1)]
-        return mh.FilenameUtils.get_stage_filename_list(handler.stage_names,stage_sizes)
+        return handler.filename_handler.get_stage_filename_list(stage_sizes)
     return [generate_stage_filenames(handler,v) for v in level_list]
 
 # NOTE: you should create this metafile in a subfolder to avoid collisions with other running sims
@@ -53,31 +54,43 @@ handler_filename = 'handler_params.pkl'
 ############## COMMANDS ###############
 
 class SessionCommandParser:
-    def __init__(self,session_name,handler_type):
-        self.session_name = session_name
+    def __init__(self,session_file,handler_type):
+        self.session_file = session_file
         self.handler_type = handler_type
 
     def __get_handler__(self):
-        return self.handler_type.load_handler(self.session_name)
+        return self.handler_type.load_handler(self.session_file)
 
     def start_session(self,args):
-        cfg_file = args[0]
-        session_handler = self.handler_type.load_cfg_file(self.session_name,cfg_file)
-        session_handler.save()
+        session_name = args[0]
+        cfg_file = args[1]
+        session_handler = self.handler_type.load_cfg_file(self.session_file,session_name,cfg_file)
+        session_handler.save(self.session_file)
 
     def get_filenames(self,args):
+        if len(args)==0:
+            raise ValueError('You must provide a stage name')
         handler = self.__get_handler__()
-        stage_nums = [int(handler.stage_names.index(args[0]))]
+        stage_nums = [int(handler.stage_name_list().index(args[0]))]
         fnames = generate_filenames(handler,stage_nums)
         for f_list in fnames:
             for f in f_list:
                 print f
 
-    def get_dependency(self,args):
-        pass#TODO: make this
+    def get_dependencies(self,args):
+        if len(args)==0:
+            raise ValueError('You must provide a filename from where to derive dependencies')
+        fname = args[0]
+        handler = self.__get_handler__()
+        stage_number,stage_idxs = handler.filename_handler.parse_filename(fname)
+        print handler.filename_handler.get_stage_filename(stage_idxs[0:-1])
 
     def apply_transformations(self,args):
+        handler = self.__get_handler__()
         print 'gonna apply the transformation for file ',args[0]
+        fname = args[0]#handler.filename_handler.get_session_path()+'/'+args[0]
+        f = open(fname,'w')
+        f.close()
 
     # @staticmethod
     # def pickle_cmd_args(filename):
@@ -87,20 +100,22 @@ class SessionCommandParser:
     #     print pkl_str
 
     @classmethod
-    def run_cmd(cls,argv,handler_type=mh.SimParamsHandler):
-        session_name = argv[1]
+    def run_cmd(cls,argv,handler_type=mh.SessionParamsHandler):
+        session_file = argv[1]
         methodname = argv[2]
         args = argv[3::]
-        s = cls(session_name,handler_type)
+        s = cls(session_file,handler_type)
         method = getattr(s,methodname)
         # possibles = globals().copy()
         # possibles.update(locals())
         # method = possibles.get()
         if not method:
             raise NotImplementedError('Method %s not implemented' % methodname)
-        method(args)
-
-
+        try:
+            ret = method(args)
+        except ValueError:
+            strcmd = ' '.join(argv)
+            raise ValueError('ERROR for command: "'+strcmd+'"')
 
 ############# COMMANDS PARSER #################
 

@@ -23,7 +23,6 @@ import sys
 sys.path.append('../../../python/modules')
 sys.path.append('../../../python/labeling_modules')
 import MakeFileSimulator
-import waveform_generator
 
 class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
     def generate_waveform(self,args):
@@ -31,8 +30,9 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
         targetfilename = args[0]
         run_parameters = MakeFileSimulator.get_run_stage_parameters(handler.stage_params,targetfilename)
         d = {'parameters':dict(run_parameters),
-             'targetfolder':handler.session_name,
+             'targetfolder':handler.filename_handler.get_session_path(),
              'targetfilename':targetfilename}
+        import waveform_generator
         waveform_generator.waveform_gen_launcher(d)
 
 if __name__ == '__main__':
