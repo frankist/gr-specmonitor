@@ -25,22 +25,14 @@ import pickle
 import importlib
 from filename_utils import *
 
-# returns the stage number, and the stages run indexes
-def parse_filename(f):
-    fbase = os.path.splitext(os.path.basename(f))[0]
-    pos = fbase.find('data_')
-    # TODO: make asserts that we are in the right pos
-    tokens = fbase[pos::].split('_')
-    return (len(tokens)-2,[int(i) for i in tokens[1::]])
-
 def get_run_all_stages_parameters(handler,filename):
-    stage_number,stage_idxs = parse_filename(filename)
+    stage_number,stage_idxs = handler.filename_handler.parse_filename(filename)
     params_per_stage = [list(handler.stage_iterable(s,stage_idxs[s]))[0] for s in range(stage_number)]
     return params_per_stage
 
 def get_run_stage_parameters(handler,filename):
-    stage_number,stage_idxs = parse_filename(filename)
-    return list(handler.stage_iterable(stage_number,stage_idxs[stage_number]))[0]
+    stage_number,stage_idxs = handler.filename_handler.parse_filename(filename)
+    return list(handler.stage_params.stage_iterable(stage_number,stage_idxs[stage_number]))[0]
 
 def generate_filenames(handler,level_list):
     def generate_stage_filenames(handler,lvl):
@@ -116,6 +108,9 @@ class SessionCommandParser:
         except ValueError:
             strcmd = ' '.join(argv)
             raise ValueError('ERROR for command: "'+strcmd+'"')
+        # except IOError:
+        #     strcmd = ' '.join(argv)
+        #     raise ValueError('IOERROR for command: "'+strcmd+'"')
 
 ############# COMMANDS PARSER #################
 

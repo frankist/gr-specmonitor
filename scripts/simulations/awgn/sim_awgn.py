@@ -28,7 +28,7 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
     def generate_waveform(self,args):
         handler = self.__get_handler__()
         targetfilename = args[0]
-        run_parameters = MakeFileSimulator.get_run_stage_parameters(handler.stage_params,targetfilename)
+        run_parameters = MakeFileSimulator.get_run_stage_parameters(handler,targetfilename)
         d = {'parameters':dict(run_parameters),
              'targetfolder':handler.filename_handler.get_session_path(),
              'targetfilename':targetfilename}
