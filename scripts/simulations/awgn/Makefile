@@ -10,14 +10,24 @@ RUN_CMD = $(SIM_EXEC) $(SESSION_HANDLER_FILE)
 Tx_DATASET = $(shell $(RUN_CMD) get_filenames Tx)
 WAVEFORM_DATASET = $(shell $(RUN_CMD) get_filenames waveform)
 
-# define SESSIONFILERUN
-# # FORCE: $(SESSION_HANDLER_FILE)
-# mkdir -p $(SIMPATH)
-# mkdir -p $(SIMPATH)/waveform
-# mkdir -p $(SIMPATH)/Tx
-# $(RUN_CMD) start_session $(SIM_NAME) $(SIM_PARAM_FILE)
-# endef
-# FOO:=$(call SESSIONFILERUN)
+# PREPROCESSING STAGE
+# NOTE: I needed to do this, bc makefile prerequisites do not allow stipulating an order.
+#       If order is not stipulated, I can't guarantee that the cfg file exists before generating filenames
+
+define SESSIONPRERUN
+mkdir -p $(SIMPATH);
+mkdir -p $(SIMPATH)/waveform;
+mkdir -p $(SIMPATH)/Tx;
+$(RUN_CMD) parse_config $(SIM_NAME) $(SIM_PARAM_FILE)
+endef
+PRERUN:=$(shell $(SESSIONPRERUN))
+PRECIOUSFILES := $(WAVEFORM_DATASET)
+
+# END PREPROCESSING STAGE
+
+.PRECIOUS: $(WAVEFORM_DATASET)
+# .SECONDARY:
+.SECONDEXPANSION:
 
 all: $(SESSION_HANDLER_FILE) $(Tx_DATASET)
 
@@ -30,18 +40,11 @@ restart: clean $(SESSION_HANDLER_FILE)
 
 $(SESSION_HANDLER_FILE):
 	@echo New session is being generated
-	mkdir -p $(SIMPATH)
-	mkdir -p $(SIMPATH)/waveform
-	mkdir -p $(SIMPATH)/Tx
-	$(RUN_CMD) start_session $(SIM_NAME) $(SIM_PARAM_FILE)
-
-# .PRECIOUS: $(WAVEFORM_DATASET)
-.SECONDARY:
+	$(SESSIONPRERUN)
 
 $(SIMPATH)/waveform/data_%.pkl: $(SESSION_HANDLER_FILE)
 	$(RUN_CMD) generate_waveform $@
 
-.SECONDEXPANSION:
 $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 	$(RUN_CMD) apply_transformations $@
 

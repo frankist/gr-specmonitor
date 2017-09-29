@@ -53,7 +53,9 @@ class SessionCommandParser:
     def __get_handler__(self):
         return self.handler_type.load_handler(self.session_file)
 
-    def start_session(self,args):
+    def parse_config(self,args):
+        if os.path.isfile(self.session_file): # If file already exists, do NOTHING
+            return
         session_name = args[0]
         cfg_file = args[1]
         session_handler = self.handler_type.load_cfg_file(self.session_file,session_name,cfg_file)
@@ -83,13 +85,6 @@ class SessionCommandParser:
         fname = args[0]#handler.filename_handler.get_session_path()+'/'+args[0]
         f = open(fname,'w')
         f.close()
-
-    # @staticmethod
-    # def pickle_cmd_args(filename):
-    #     handler = get_handler()
-    #     params_of_stage = get_run_stage_parameters(handler,filename)
-    #     pkl_str = pickle.dumps(params_of_stage)
-    #     print pkl_str
 
     @classmethod
     def run_cmd(cls,argv,handler_type=mh.SessionParamsHandler):
