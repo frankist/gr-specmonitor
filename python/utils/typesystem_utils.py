@@ -18,24 +18,14 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 #
+from collections import Iterable
 
-import sys
-sys.path.append('../../../python/modules')
-sys.path.append('../../../python/labeling_modules')
-sys.path.append('../../../python/utils')
-import MakeFileSimulator
-
-class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
-    def generate_waveform(self,args):
-        handler = self.__get_handler__()
-        targetfilename = args[0]
-        run_parameters = MakeFileSimulator.get_run_stage_parameters(handler,targetfilename)
-        d = {'parameters':dict(run_parameters),
-             'targetfolder':handler.filename_handler.get_session_path(),
-             'targetfilename':targetfilename}
-        import waveform_generator
-        waveform_generator.waveform_gen_launcher(d)
+def convert2list(v):
+    if not isinstance(v,Iterable) or type(v) is str:
+        return [v]
+    elif type(v) is not str:
+        return list(v)
+    return v
 
 if __name__ == '__main__':
-    # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)
-    AWGNSessionCmdParser.run_cmd(sys.argv)
+    pass

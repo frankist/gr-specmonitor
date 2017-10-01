@@ -21,23 +21,51 @@
 
 import sys
 sys.path.append('../../../python/modules')
+sys.path.append('../../../python/labeling_modules')
+sys.path.append('../../../python/utils')
 import metadata_handler as mh
 import numpy as np
 
 # format_extension = 'pkl'
-stage_names = ['waveform','Tx']
+stage_names = ['waveform','Tx'] # order matters
+tags = ['sig_source','wlan']
 
-SignalSource_params = mh.ParamProductJoin([[
-    ('waveform',['square','saw']),
-    ('sample_rate',20e6),
-    ('frequency',[1e3,1e4,1e5,1e6]),
-    ('number_samples',1e6),
-    ('skip_samples',0)
-]])
+d = {'sig_source':
+     {'waveform':
+      [
+          ('waveform',['square','saw']),
+          ('frequency',[1e3,1e4,1e5]),
+      ],
+      'Tx':
+      [
+          ('frequency_offset',np.linspace(-0.3,0.3,100))
+      ]
+     },
+     'wlan':
+     {'waveform':
+      [
+          ('waveform',['wlan']),
+      ]
+     }
+}
 
-TX_params = mh.ParamProductJoin([[
-    ('frequency_offset',np.linspace(-0.3,0.3,100))
-]])
+staged_params = mh.TaggedMultiStageParams(tags,stage_names,d)
 
-stage_params = [SignalSource_params,TX_params]
+# SignalSource_params = mh.ParamProductJoin([[
+#     ('waveform',['square','saw']),
+#     ('sample_rate',20e6),
+#     ('frequency',[1e3,1e4,1e5]),
+#     ('number_samples',1e6),
+#     ('skip_samples',0)
+# ]])
 
+# TX_params = mh.ParamProductJoin([[
+#     ('frequency_offset',np.linspace(-0.3,0.3,100))
+# ]])
+
+# stage_params = [SignalSource_params,TX_params]
+
+if __name__ == '__main__':
+    print mh.LabeledParamValues('waveform',['square','triangle']).to_tuple()
+    for v in staged_params.get_iterable('sig_source','Tx'):
+        print v

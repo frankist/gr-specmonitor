@@ -26,29 +26,27 @@ import importlib
 import os
 import pickle
 from filename_utils import *
+import typesystem_utils as ts
+import collections
 
-def convert2list(v):
-    if not isinstance(v,Iterable) or type(v) is str:
-        return [v]
-    elif type(v) is tuple:
-        return list(v)
-    return v
-
-class LabelParam:
+# This object stores the label and value of a parameter
+class LabeledParamValues:
     def __init__(self,label,value):
         if type(label) is not str:
             raise ValueError('ERROR: expected a string as parameter name. Got {}'.format(label))
-        self.__val__ = (label,convert2list(value))
+        self.__val__ = (label,ts.convert2list(value))
     def label(self):
         return self.__val__[0]
-    def value(self):
+    def values(self):
         return self.__val__[1]
     def to_tuple(self): # for itertools flattening
         return ([self.__val__[0]],self.__val__[1])
     def to_dict(self): # for json conversion
         return {self.__val__[0]:self.__val__[1]}
-    def number_values(self):
-        return len(self.value())
+    def length(self):
+        return len(self.values())
+    def get_iterable(self):
+        return itertools.product(*self.to_tuple())
 
 def params_to_pickle(it,result_filename): # I use pickle instead of JSON to keep format at destiny
     # l = [param.to_dict() for param in it]
@@ -83,12 +81,79 @@ class ParamProductChain:
     def parse_list(cls,l):
         return cls(l[0],l[1])
 
+# this is a list of (param,possible_values) pairs
+class StageParams:
+    def __init__(self,param_list):
+        self.labeled_params = [LabeledParamValues(pair[0],pair[1]) for pair in param_list]
+        self.__product_size__ = np.cumprod([v.length() for v in self.labeled_params])[-1]
+
+    def length(self):
+        return self.__product_size__
+
+    def get_iterable(self):
+        prod_list = [pair.get_iterable() for pair in self.labeled_params]
+        return itertools.product(*prod_list)
+
+class MultiStageParams:
+    def __init__(self,stage_names,stage_params):
+        self.stage_names = stage_names
+        # I keep the order of the stages according to the stage_names list
+        self.stage_params = collections.OrderedDict([(k,StageParams(v)) for k,v in sorted(stage_params.items(),key=lambda x: self.stage_names.index(x[0]))])
+        self.__param_length__ = np.sum([v.length() for v in self.stage_params.values()])
+
+    def length(self):
+        return self.__param_length__
+
+    def get_iterable(self,stage=None):
+        if stage is not None:
+            stage_key = stage if type(stage) is str else self.stage_params[stage]
+            return self.stage_params[stage_key].get_iterable()
+        else:
+            return itertools.chain(*[v.get_iterable() for v in self.stage_params.values()])
+
+class TaggedMultiStageParams:
+    def __init__(self,tag_order,stage_order,stage_params):
+        self.tag_names = tag_order
+        self.multistage_params = collections.OrderedDict([(k,MultiStageParams(stage_order,v)) for k,v in sorted(stage_params.items(),key=lambda x: self.tag_names.index(x[0]))])
+        self.__param_length__ = np.sum([v.length() for v in self.multistage_params.values()])
+
+    def length(self):
+        return self.__param_length__
+
+    def get_iterable(self,tag=None,stage=None):
+        if tag is not None:
+            tag_key = tag if type(tag) is str else self.tag_names[tag]
+            # FIXME: Should I insert the tag in the iterable?
+            return self.multistage_params[tag].get_iterable(stage)
+        else:
+            return itertools.chain(*[v.get_iterable(stage) for v in self.multistage_params.values()])
+
+# class MultiStageParameters:
+#     def __init__(self,params,stage_order,tag_order):
+#         self.stage_names = stage_order
+#         self.tag_names = tag_order
+#         # make param_values an ordered Dict
+#         self.param_values = collections.OrderedDict(sorted(self.params.items(),key=lambda x: self.tag_names.index(x[0])))
+#         for k in self.tag_names:
+#             self.param_values[k] = collections.OrderedDict(sorted(self.param_values[k].items(),
+#                                                                   key=lambda x: self.stage_names.index(x[0])))
+
+#     def get_iterable(self):
+#         prod = []
+#         for tag,tag_values in self.param_values:
+#             for stage_name,stage_params in tag_values:
+#                 l = [('tag',tag)]
+#                 for pair in stage_params:
+#                     l.append(itertools.product(*pair.to_tuple()))
+#                 prod.append()
+
+
 class ParamProductJoin:
     def __init__(self,param_prod_list): # here not even the labels have to be the same
         self.product_size = 0
         self.param_prod_list = []
         for prod_list in param_prod_list:
-            l = [LabelParam(pair[0],pair[1]) for pair in prod_list]
+            l = [LabeledParamValues(pair[0],pair[1]) for pair in prod_list]
             self.product_size += np.cumprod([v.number_values() for v in l])[-1]
             self.param_prod_list.append(l)
 
@@ -108,11 +173,6 @@ class ParamProductJoin:
 class MultiStageParamHandler:
     def __init__(self,staged_params):
         self.staged_params = staged_params
-
-    # def possible_stage_combinations(self,stage):
-    #     p = self.staged_params[0:stage+1]
-    #     params_flattened = itertools.chain(p)
-    #     return params_flattened
 
     def stage_values(self,stage):
         return [a for a in self.staged_params[stage].param_list]

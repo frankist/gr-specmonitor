@@ -24,6 +24,7 @@ import os
 import pickle
 import importlib
 from filename_utils import *
+import time
 
 def get_run_all_stages_parameters(handler,filename):
     stage_number,stage_idxs = handler.filename_handler.parse_filename(filename)
@@ -54,10 +55,13 @@ class SessionCommandParser:
         return self.handler_type.load_handler(self.session_file)
 
     def parse_config(self,args):
-        if os.path.isfile(self.session_file): # If file already exists, do NOTHING
-            return
         session_name = args[0]
         cfg_file = args[1]
+        if os.path.isfile(self.session_file): # if cfg file already exists
+            date_cfg = time.ctime(os.path.getmtime(cfg_file))
+            date_session = time.ctime(os.path.getmtime(self.session_file))
+            if date_cfg<date_session: # If cfg file is newer than the param file
+                return # do nothing
         session_handler = self.handler_type.load_cfg_file(self.session_file,session_name,cfg_file)
         session_handler.save(self.session_file)
 

@@ -26,10 +26,14 @@ PRECIOUSFILES := $(WAVEFORM_DATASET)
 # END PREPROCESSING STAGE
 
 .PRECIOUS: $(WAVEFORM_DATASET)
+#$(SIMPATH)/%
+#$(WAVEFORM_DATASET)
 # .SECONDARY:
 .SECONDEXPANSION:
 
-all: $(SESSION_HANDLER_FILE) $(Tx_DATASET)
+all: plot
+
+plot: $(Tx_DATASET)
 
 clean:
 	@echo Cleaning Simulation Files
@@ -46,6 +50,7 @@ $(SIMPATH)/waveform/data_%.pkl: $(SESSION_HANDLER_FILE)
 	$(RUN_CMD) generate_waveform $@
 
 $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
+# sim0/Tx/data_%.pkl: $$(patsubst %,,$$@)sim0/waveform/data_.pkl
 	$(RUN_CMD) apply_transformations $@
 
 #$(shell $(RUN_CMD) get_filenames waveform) $(SESSION_HANDLER_FILE)
