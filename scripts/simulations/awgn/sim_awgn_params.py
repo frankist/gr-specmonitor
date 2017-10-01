@@ -44,8 +44,9 @@ stage_params = {
         ],
         'Tx':
         [
-            ('frequency_offset',np.linspace(-0.3,0.3,10)),
-            ('time_offset',range(10))
+            ('frequency_offset',np.linspace(-0.45,0.45,10)),
+            ('time_offset',range(0,1000,10)),
+            ('section_size',1000)
         ]
     }
     # 'wlan':

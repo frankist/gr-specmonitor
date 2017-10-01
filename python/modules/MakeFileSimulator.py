@@ -50,9 +50,18 @@ class SessionCommandParser:
     def __init__(self,session_file,handler_type):
         self.session_file = session_file
         self.handler_type = handler_type
+        self.handler = None
 
     def __get_handler__(self):
-        return self.handler_type.load_handler(self.session_file)
+        if self.handler is not None:
+            return self.handler
+        else:
+            return self.handler_type.load_handler(self.session_file)
+
+    def __get_dependency_file__(self,this_file):
+        handler = self.__get_handler__()
+        stage_number,stage_idxs = handler.filename_handler.parse_filename(this_file)
+        return handler.filename_handler.get_stage_filename(stage_idxs[0:-1])
 
     def parse_config(self,args):
         session_name = args[0]
@@ -79,9 +88,7 @@ class SessionCommandParser:
         if len(args)==0:
             raise ValueError('You must provide a filename from where to derive dependencies')
         fname = args[0]
-        handler = self.__get_handler__()
-        stage_number,stage_idxs = handler.filename_handler.parse_filename(fname)
-        print handler.filename_handler.get_stage_filename(stage_idxs[0:-1])
+        print __get_dependency_file__(self,fname)
 
     def apply_transformations(self,args):
         handler = self.__get_handler__()

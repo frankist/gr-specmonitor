@@ -35,6 +35,16 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
              'targetfilename':targetfilename}
         import waveform_generator
         waveform_generator.waveform_gen_launcher(d)
+    
+    def apply_tx_transformations(self,args):
+        handler = self.__get_handler__()
+        targetfilename = args[0]
+        sourcefilename = self.__get_dependency_file__(targetfilename)
+        run_parameters = MakeFileSimulator.get_run_stage_parameters(handler,targetfilename)
+        d = {'parameters':dict(run_parameters),'targetfolder':handler.filename_handler.get_session_path(),
+             'targetfilename':targetfilename,'sourcefilename':sourcefilename}
+        import Tx_transformations
+        Tx_transformations.apply_Tx_tranformations(d)
 
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)

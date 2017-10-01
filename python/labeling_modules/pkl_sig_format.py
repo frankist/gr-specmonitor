@@ -19,7 +19,18 @@
 # Boston, MA 02110-1301, USA.
 #
 
+class WaveformPklReader:
+    def __init__(self,fname):
+        self.wavdata = pickle.load(fname)
 
+    def number_samples(self):
+        return self.wavdata['IQsamples'].size
 
-if __name__ == '__main__':
-    pass
+    def parameters(self):
+        return self.wavdata['parameters']
+
+    def read_section(self,startidx=0,endidx=None):
+        if endidx is None:
+            return self.wavdata['IQsamples'][startidx::]
+        else:
+            return self.wavdata['IQsamples'][startidx:endidx]

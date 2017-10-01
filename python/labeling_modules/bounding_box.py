@@ -57,6 +57,10 @@ class BoundingBox:
             return None
         return BoundingBox(tintersect,fintersect)
 
+    def add(self,time=0,freq=0):
+        self.time_bounds += time
+        self.freq_bounds += freq
+
 def find_tx_intervals(x):
     thres = 1e-5
     stepups=[i+1 for i in range(len(x)-1) if x[i]<thres and x[i+1]>=thres]

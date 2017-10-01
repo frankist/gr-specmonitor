@@ -144,7 +144,8 @@ class SessionParamsHandler:
         cfg_module = importlib.import_module(fbase)
         # TODO: Parse the module to see if every variable is initialized
         sp = session_params.TaggedMultiStageParams(cfg_module.tags,cfg_module.stage_names,
-                                                   cfg_module.stage_params) # MultiStageParamHandler(cfg_module.stage_params)
+                                                   cfg_module.stage_params)
+        # MultiStageParamHandler(cfg_module.stage_params)
         sfh = SessionFilenamesHandler(session_file,session_name,cfg_module.stage_names)
         session_handler = cls(sp,sfh)
         return session_handler
@@ -154,55 +155,11 @@ class SessionParamsHandler:
         with open(session_file,'r') as f:
             return pickle.load(f)
 
-
-# class FilenameUtils:
-#     @staticmethod
-#     def get_stage_format(stage_names,stage_number):
-#         fmt_str = '{0}/data'.format(stage_names[stage_number])
-#         fmt_str += '_{}'*(stage_number+1)
-#         fmt_str += '.pkl'
-#         # fmt_str += '.{}'.format(format_extension)
-#         return fmt_str
-
-#     @staticmethod
-#     def get_stage_filename(stage_number,stage_run_idxs):
-#         fmt_str = FilenameUtils.get_stage_format(stage_number)
-#         fmt_str.format(*stage_run_idxs)
-#         return fmt_str
-
-#     @staticmethod
-#     def get_stage_filename_list(stage_names,stage_sizes):
-#         stage_number = len(stage_sizes)-1
-#         fmt_str = FilenameUtils.get_stage_format(stage_names,stage_number)
-#         prod_file_idxs = itertools.product(*[range(a) for a in stage_sizes])
-#         return [fmt_str.format(*v) for v in prod_file_idxs]
-
-#     @staticmethod
-#     def parse_filename():
-#         pass
-
 ########### TESTING #############
 
 def test_fileutils():
     l = FilenameUtils.get_stage_filename_list([5,4,3])
     print l
-
-# def test_product_and_chain():
-#     pchain = ParamProductChain(
-#         ('type','fileno'),
-#         [(['lte'],range(5)),
-#          (['wifi'],range(3))
-#         ])
-#     pprod = ParamProduct([
-#         ('type',['lte','wifi']),
-#         ('fileno',range(5))
-#     ],[lambda x : not (x[0]=='wifi' and x[1]>=3)])
-#     # print pprod.param_list
-#     l = list(pchain.get_iterable())
-#     l2 = list(pprod.get_iterable())
-#     assert l == l2
-#     assert l[0]==('lte',0)
-#     # print l
 
 # def test_product_join():
 #     pprod1 = [
