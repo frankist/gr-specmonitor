@@ -28,16 +28,16 @@ import time
 
 def get_run_all_stages_parameters(handler,filename):
     stage_number,stage_idxs = handler.filename_handler.parse_filename(filename)
-    params_per_stage = [list(handler.stage_iterable(s,stage_idxs[s]))[0] for s in range(stage_number)]
+    params_per_stage = [list(handler.get_stage_iterable(s,stage_idxs[s]))[0] for s in range(stage_number)]
     return params_per_stage
 
 def get_run_stage_parameters(handler,filename):
     stage_number,stage_idxs = handler.filename_handler.parse_filename(filename)
-    return list(handler.stage_params.stage_iterable(stage_number,stage_idxs[stage_number]))[0]
+    return list(handler.stage_params.get_stage_iterable(stage_number,stage_idxs[stage_number]))[0]
 
 def generate_filenames(handler,level_list):
     def generate_stage_filenames(handler,lvl):
-        stage_sizes = [handler.stage_params.get_stage_size(a) for a in range(lvl+1)]
+        stage_sizes = [handler.stage_params.length(stage=a) for a in range(lvl+1)]
         return handler.filename_handler.get_stage_filename_list(stage_sizes)
     return [generate_stage_filenames(handler,v) for v in level_list]
 
@@ -112,20 +112,6 @@ class SessionCommandParser:
         #     raise ValueError('IOERROR for command: "'+strcmd+'"')
 
 ############# COMMANDS PARSER #################
-
-# def run_cmd(command_strs):
-#     filehandler = command_strs[0]
-#     methodname = command_strs[1]
-#     args = command_strs[2::]
-
-#     s = SessionCommandParser(filehandler)
-#     method = getattr(s, methodname)
-#     # possibles = globals().copy()
-#     # possibles.update(locals())
-#     # method = possibles.get()
-#     if not method:
-#         raise NotImplementedError('Method %s not implemented' % methodname)
-#     method(args)
 
 if __name__ =='__main__':
     run_cmd(sys.argv[1])

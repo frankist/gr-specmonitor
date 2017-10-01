@@ -26,7 +26,7 @@ sys.path.append('../../../python/modules/waveform_generators')
 import signal_source as sc
 
 def waveform_gen_launcher(params):
-    if params['parameters']['waveform'] in ['square','saw']:
+    if params['parameters']['session_tag']=='sig_source':
         sc.run_signal_source(params)
     else:
         raise ValueError('ERROR: Do not recognize this waveform')

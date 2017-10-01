@@ -24,32 +24,42 @@ sys.path.append('../../../python/modules')
 sys.path.append('../../../python/labeling_modules')
 sys.path.append('../../../python/utils')
 import metadata_handler as mh
+import session_params as sparams
 import numpy as np
 
 # format_extension = 'pkl'
 stage_names = ['waveform','Tx'] # order matters
-tags = ['sig_source','wlan']
+tags = ['sig_source']#,'wlan']
 
-d = {'sig_source':
-     {'waveform':
-      [
-          ('waveform',['square','saw']),
-          ('frequency',[1e3,1e4,1e5]),
-      ],
-      'Tx':
-      [
-          ('frequency_offset',np.linspace(-0.3,0.3,100))
-      ]
-     },
-     'wlan':
-     {'waveform':
-      [
-          ('waveform',['wlan']),
-      ]
-     }
+stage_params = {
+    'sig_source':
+    {
+        'waveform':
+        [
+            ('waveform',['square','saw']),
+            ('frequency',[1e3,1e4,1e5]),
+            ('sample_rate',20e6),
+            ('number_samples',1e6),
+            ('skip_samples',0)
+        ],
+        'Tx':
+        [
+            ('frequency_offset',np.linspace(-0.3,0.3,10)),
+            ('time_offset',range(10))
+        ]
+    }
+    # 'wlan':
+    # {
+    #     'waveform':
+    #     [
+    #         ('waveform',['wlan']),
+    #     ],
+    #     'Tx':
+    #     [
+    #         ('frequency_offset',np.linspace(-0.4,0.4,100))
+    #     ]
+    # }
 }
-
-staged_params = mh.TaggedMultiStageParams(tags,stage_names,d)
 
 # SignalSource_params = mh.ParamProductJoin([[
 #     ('waveform',['square','saw']),
@@ -66,6 +76,6 @@ staged_params = mh.TaggedMultiStageParams(tags,stage_names,d)
 # stage_params = [SignalSource_params,TX_params]
 
 if __name__ == '__main__':
-    print mh.LabeledParamValues('waveform',['square','triangle']).to_tuple()
+    # print mh.LabeledParamValues('waveform',['square','triangle']).to_tuple()
     for v in staged_params.get_iterable('sig_source','Tx'):
         print v

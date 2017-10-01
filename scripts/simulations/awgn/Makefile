@@ -33,7 +33,8 @@ PRECIOUSFILES := $(WAVEFORM_DATASET)
 
 all: plot
 
-plot: $(Tx_DATASET)
+plot: Tx
+	@echo add a plot script here!
 
 clean:
 	@echo Cleaning Simulation Files
@@ -41,6 +42,10 @@ clean:
 
 restart: clean $(SESSION_HANDLER_FILE)
 	@echo Making new session file
+
+waveform: $(WAVEFORM_DATASET)
+
+Tx: $(Tx_DATASET)
 
 $(SESSION_HANDLER_FILE):
 	@echo New session is being generated
