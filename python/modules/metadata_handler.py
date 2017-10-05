@@ -141,7 +141,11 @@ class SessionParamsHandler:
     @classmethod
     def load_cfg_file(cls,session_file,session_name,cfg_file):
         fbase = os.path.splitext(os.path.basename(cfg_file))[0]
-        cfg_module = importlib.import_module(fbase)
+        try:
+            cfg_module = importlib.import_module(fbase)
+        except Exception, e:
+            print 'Error while opening config file: ',str(e)
+            exit()
         # TODO: Parse the module to see if every variable is initialized
         sp = session_params.TaggedMultiStageParams(cfg_module.tags,cfg_module.stage_names,
                                                    cfg_module.stage_params)

@@ -4,11 +4,9 @@ SIM_NAME = sim0
 SIMPATH = ./$(SIM_NAME)
 SESSION_HANDLER_FILE = $(SIMPATH)/$(SIM_NAME)_handler.pkl
 SIM_PARAM_FILE = sim_awgn_params.py
-SIM_EXEC = python sim_awgn.py
 
-RUN_CMD = $(SIM_EXEC) $(SESSION_HANDLER_FILE)
-Tx_DATASET = $(shell $(RUN_CMD) get_filenames Tx)
-WAVEFORM_DATASET = $(shell $(RUN_CMD) get_filenames waveform)
+SIM_EXEC = /usr/bin/python2 -u sim_awgn.py
+RUN_CMD = $(SIM_EXEC) $(SESSION_HANDLER_FILE) $(SIM_PARAM_FILE)
 
 # PREPROCESSING STAGE
 # NOTE: I needed to do this, bc makefile prerequisites do not allow stipulating an order.
@@ -18,45 +16,41 @@ define SESSIONPRERUN
 mkdir -p $(SIMPATH);
 mkdir -p $(SIMPATH)/waveform;
 mkdir -p $(SIMPATH)/Tx;
-$(RUN_CMD) parse_config $(SIM_NAME) $(SIM_PARAM_FILE)
+$(RUN_CMD) check_handler
 endef
 PRERUN:=$(shell $(SESSIONPRERUN))
+Tx_DATASET := $(shell $(RUN_CMD) get_filenames Tx)
+WAVEFORM_DATASET := $(shell $(RUN_CMD) get_filenames waveform)
 PRECIOUSFILES := $(WAVEFORM_DATASET)
 
 # END PREPROCESSING STAGE
 
-.PRECIOUS: $(WAVEFORM_DATASET)
-#$(SIMPATH)/%
-#$(WAVEFORM_DATASET)
+.PRECIOUS: PRECIOUSFILES
 # .SECONDARY:
 .SECONDEXPANSION:
 
-all: plot
-
-plot: Tx
-	@echo add a plot script here!
+all: Tx
 
 clean:
 	@echo Cleaning Simulation Files
 	rm -rf $(SIMPATH)/*
 
-restart: clean $(SESSION_HANDLER_FILE)
+restart: clean
 	@echo Making new session file
+	$(RUNCMD) setup_new_session
 
 waveform: $(WAVEFORM_DATASET)
 
 Tx: $(Tx_DATASET)
 
-$(SESSION_HANDLER_FILE):
-	@echo New session is being generated
-	$(SESSIONPRERUN)
-
-$(SIMPATH)/waveform/data_%.pkl: $(SESSION_HANDLER_FILE)
+$(SIMPATH)/waveform/data_%.pkl:
 	$(RUN_CMD) generate_waveform $@
 
 $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 # sim0/Tx/data_%.pkl: $$(patsubst %,,$$@)sim0/waveform/data_.pkl
-	$(RUN_CMD) apply_transformations $@
+	$(RUN_CMD) apply_tx_transformations $@
+	mkdir -p $(SIMPATH)/Tx/img
+	$(RUN_CMD) get_spectrogram_img $@ True True
 
 #$(shell $(RUN_CMD) get_filenames waveform) $(SESSION_HANDLER_FILE)
 #@echo $(shell $(RUN_CMD) get_dependencies $@)

@@ -24,12 +24,15 @@ import matplotlib.pyplot as plt
 
 class BoundingBox:
     def __init__(self,time_bounds,freq_bounds):
-        if len(time_bounds)!=2 or type(time_bounds[0]) is not int:
-            raise ValueError('ERROR: The time interval {} does not have integer bounds'.format(time_bounds))
         self.time_bounds = time_bounds
-        if len(freq_bounds)!=2 or np.max(freq_bounds)>0.5 or np.min(freq_bounds)<-0.5:
-            raise ValueError('ERROR: The frequency bounds have to be normalized')
         self.freq_bounds = freq_bounds
+        self.assert_validity()
+
+    def assert_validity(self):
+        assert len(self.time_bounds)==2
+        assert type(self.time_bounds[0]) is int and type(self.time_bounds[1]) is int
+        assert len(self.freq_bounds)==2 and np.max(self.freq_bounds)<=0.5 and np.min(self.freq_bounds)>=-0.5
+        assert self.time_bounds[1]>self.time_bounds[0] and self.freq_bounds[1]>self.freq_bounds[0]
 
     def is_equal(self,box):
         return box.time_bounds==self.time_bounds and box.freq_bounds==self.freq_bounds
@@ -58,8 +61,12 @@ class BoundingBox:
         return BoundingBox(tintersect,fintersect)
 
     def add(self,time=0,freq=0):
-        self.time_bounds += time
-        self.freq_bounds += freq
+        tvec = (self.time_bounds[0]+time,self.time_bounds[1]+time)
+        fvec = (self.freq_bounds[0]+freq,self.freq_bounds[1]+freq)
+        return BoundingBox(tvec,fvec)
+
+    def __str__(self):
+        return '[({},{}),({},{})]'.format(self.time_bounds[0],self.time_bounds[1],self.freq_bounds[0],self.freq_bounds[1])
 
 def find_tx_intervals(x):
     thres = 1e-5
@@ -97,7 +104,7 @@ def find_tx_intervals_old(x): # NOTE: For some reason this version although simp
         i = i2+1
     return l
 
-def find_frequency_bounds(x,fftsize,thres=0.05):
+def find_frequency_bounds(x,fftsize,thres=0.01):
     X=np.fft.fftshift(np.abs(np.fft.fft(x,fftsize))**2)
     Xcentre = np.sum(np.arange(X.size)*X)/np.sum(X)
 
@@ -146,3 +153,30 @@ def compute_bounding_box(x):
     # print 'elapsed time(freq intervals):',time.time()-start_time
     boxes = [BoundingBox(i,finterv) for i in tinterv_list]
     return boxes
+
+def select_boxes_that_intersect_section(box_list,section_interv):
+    return (b for b in box_list if b.time_intersection(section_interv)!=None)
+
+def add_offset(box_list,toffset=0,foffset=0):
+    return (b.add(toffset,foffset) for b in box_list)
+
+def intersect_boxes_with_section(box_list,section_interv):
+    w = BoundingBox(section_interv,(-0.5,0.5))
+    return (w.box_intersection(b) for b in box_list if w.box_intersection(b)!=None)
+
+def intersect_and_offset_box(box_list,section_interv):
+    blist = intersect_boxes_with_section(box_list,section_interv)
+    return add_offset(blist,toffset=-section_interv[0])
+
+# def partition_boxes_into_sections(box_list,section_bounds):
+#     l = [find_boxes_in_section(box_list,s) for s in section_bounds] # NOTE: Optimization can be done
+#     return l
+
+def get_box_limits_in_image(box,section_size,dims):
+    # NOTE: section_size is needed for overlapping windows
+    xmin = int(np.round(box.time_bounds[0]*dims[0]/float(section_size)))
+    xmax = int(np.round(box.time_bounds[1]*dims[0]/float(section_size)))
+    ymin = int(np.round((box.freq_bounds[0]+0.5)*dims[1]))
+    ymax = int(np.round((box.freq_bounds[1]+0.5)*dims[1]))
+    assert xmin>=0 and xmax<=dims[0] and ymin>=0 and ymax<=dims[1]
+    return xmin,xmax,ymin,ymax

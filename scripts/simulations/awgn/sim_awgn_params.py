@@ -27,6 +27,12 @@ import metadata_handler as mh
 import session_params as sparams
 import numpy as np
 
+num_sections = 2
+section_size = 10000
+toffset_range = range(10,1000,100)
+skip_samps = 0
+wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
+
 # format_extension = 'pkl'
 stage_names = ['waveform','Tx'] # order matters
 tags = ['sig_source']#,'wlan']
@@ -37,16 +43,22 @@ stage_params = {
         'waveform':
         [
             ('waveform',['square','saw']),
-            ('frequency',[1e3,1e4,1e5]),
+            ('frequency',[1e4,1e5]),
             ('sample_rate',20e6),
-            ('number_samples',1e6),
-            ('skip_samples',0)
+            ('number_samples',wf_gen_samps),
+            ('skip_samples',skip_samps)
         ],
         'Tx':
         [
             ('frequency_offset',np.linspace(-0.45,0.45,10)),
-            ('time_offset',range(0,1000,10)),
-            ('section_size',1000)
+            ('time_offset',toffset_range),
+            ('section_size',section_size),
+            ('num_sections',num_sections),
+            ('soft_gain',10**np.arange(-2,1.0)),
+            ('noise_voltage',[0])
+        ],
+        'Rx':
+        [
         ]
     }
     # 'wlan':

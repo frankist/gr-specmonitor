@@ -41,23 +41,76 @@ class preamble_params:
         return pnorm
 
     def generate_preamble(self):
-        preamble = np.zeros(self.preamble_len,dtype='complex64')
+        y = np.zeros(self.preamble_len,dtype='complex64')
         n=0
-        for i,p in enumerate(pseq_list_seq):
-            preamble[n:n+self.pseq_list[p].size] = self.pseq_list[p] * self.pseq_list_coef[i]
+        for i,p in enumerate(self.pseq_list_seq):
+            y[n:n+self.pseq_list[p].size] = self.pseq_list[p] * self.pseq_list_coef[i]
             n = n+self.pseq_list[p].size
-        preamble /= np.sqrt(np.mean(np.abs(self.preamble)**2))
-        return preamble
+        y /= np.sqrt(np.mean(np.abs(y)**2))
+        return y
 
+    def length(self):
+        return self.preamble.size
+
+# example: params -> [5,11], 4 --> [zc(5) zc(5) -zc(5) zc(5) zc(11)]
 def generate_preamble_type1(pseq_len_list, barker_len):
-    pseq_list = []
-    for i,v in enumerate(pseq_len_list):
-        pseq_list.append(zadoffchu.generate_sequence(v,1,0))
-        pseq_len_coef = zadoffchu.barker_codes[barker_len]
-        pseq_len_coef.append(1)
-        pseq_len_seq = [0]*barker_len
-        pseq_len_seq.append(1)
+    assert len(pseq_len_list)==2
+    pseq_list = [zadoffchu.generate_sequence(p,1,0) for p in pseq_len_list]
+    pseq_list_coef = zadoffchu.barker_codes[barker_len]+[1]
+    pseq_len_seq = [0]*barker_len+[1]
     return preamble_params(pseq_list,pseq_len_seq,pseq_list_coef)
+
+class frame_params:
+    def __init__(self,preamble_params,guard_len,awgn_len):
+        self.preamble_params = preamble_params
+        self.guard_len = guard_len
+        self.awgn_len = awgn_len
+        self.preamble_size = preamble_params.length()
+
+    # [0|1,2,3,4|5],[4|5,6,7,8|9],...
+    # def make_sections(self,x,num_sections,section_size):
+    #     return [x[i*section_size+self.guard_len:(i+1)*section_size+self.guard_len] for i in range(len(num_sections))]
+
+    def framed_section_size(self,section_samples):
+        return section_samples + 4*self.guard_len + self.preamble_size + self.awgn_len
+
+    # def generate_framed_section(self,x,section_size):
+    #     section = np.zeros(self.framed_section_size(section_size))
+    #     twin = (self.awgn_len,self.awgn_len+self.preamble_size)
+    #     section[twin[0]:twin[1]] = self.preamble_params.preamble
+    #     twin = (twin[1]+self.guard_len,twin[1]+3*self.guard_len+section_size)
+    #     section[twin[0],twin[1]] = xsection[0:(twin[1]-twin[0])]
+    #     return section
+
+    def make_framed_section(self,section):
+        framed_section = np.zeros(section.size+2*self.guard_len+self.preamble_size+self.awgn_len,dtype=np.complex64)
+        t = (self.awgn_len,self.awgn_len+self.preamble_size)
+        framed_section[t[0]:t[1]] = self.preamble_params.preamble
+        t = (t[1]+self.guard_len,t[1]+self.guard_len+section.size)
+        framed_section[t[0]:t[1]] = section
+        return framed_section
+
+    def get_framed_section_ranges(self,num_sections,framed_section_size):
+        T = framed_section_size
+        toff = self.awgn_len+self.preamble_params.length()+self.guard_len*2
+        return [(i*T+toff,(i+1)*T-self.guard_len*2) for i in range(num_sections)]
+
+    # frame: [[0]*awgn_len | preamble | [0]*guard_len | [x]*(section_size+2*guard_len) | [0]*guard_len]
+    def frame_signal(self,x,num_sections,section_size):
+        nread = section_size*num_sections+2*self.guard_len
+        writtensection_size = self.framed_section_size(section_size)
+        nwritten = writtensection_size*num_sections
+        assert x.size >= nread
+
+        T = writtensection_size
+        T0 = section_size
+        # sections = self.make_sections(x,num_sections,section_size)
+        framed_signal = np.zeros(nwritten,np.complex64)
+        for i in range(num_sections):
+            framed_signal[i*T:(i+1)*T] = self.make_framed_section(x[i*T0:(i+1)*T0+2*self.guard_len])
+        section_ranges = self.get_framed_section_ranges(num_sections,writtensection_size)
+
+        return (framed_signal,section_ranges)
 
 def get_schmidl_sequence(crosscorr_seq):
     schmidl_seq = [1]*(len(crosscorr_seq)-1)

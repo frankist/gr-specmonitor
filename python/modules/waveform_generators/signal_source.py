@@ -42,28 +42,34 @@ def run_signal_source(args):
 
     tb = gr.top_block()
 
-    source = analog.sig_source_c(d['sample_rate'],wf,
+    source = analog.sig_source_f(d['sample_rate'],wf,
                                     d['frequency'],amp,offset)
+    float2cplx = blocks.float_to_complex()
     head = blocks.head(gr.sizeof_gr_complex, int(d['number_samples']))
     dst = blocks.vector_sink_c()
     # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
 
-    tb.connect(source,head)
+    tb.connect(source,float2cplx)
+    tb.connect(float2cplx,head)
     tb.connect(head,dst)
 
-    print 'STATUS: Starting GR waveform generator script'
+    print 'STATUS: Starting GR waveform generator script for waveform',d['waveform']
     tb.run()
     print 'STATUS: GR script finished'
 
     # TODO: read file to insert bounding boxes and params
     gen_data = np.array(dst.data())
+    # plt.plot(np.abs(gen_data))
+    # plt.show()
+
     print 'STATUS: Going to compute Bounding Boxes'
     box_list = compute_bounding_box(gen_data)
     print 'STATUS: Finished computing the Bounding Boxes'
     # print [(b.time_bounds,b.freq_bounds) for b in box_list]
 
-    v = {'parameters':args['parameters'],'IQsamples':gen_data}
-    v['parameters']['bounding_boxes'] = box_list
+    v = {'parameters':{},'IQsamples':gen_data}
+    v['bounding_boxes'] = box_list
+    v['parameters'][args['stage_name']] = args['parameters']
     fname=args['targetfilename']
     with open(fname,'wb') as f:
         pickle.dump(v,f)

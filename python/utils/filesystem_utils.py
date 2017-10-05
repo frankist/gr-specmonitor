@@ -19,29 +19,18 @@
 # Boston, MA 02110-1301, USA.
 #
 
-import pickle
+import os
 
-class WaveformPklReader:
-    def __init__(self,fname):
-        with open(fname,'r') as f:
-            self.wavdata = pickle.load(f)
-
-    def number_samples(self):
-        return self.wavdata['IQsamples'].size
-
-    def parameters(self):
-        return self.wavdata['parameters']
-
-    def data(self):
-        return self.wavdata
-
-    def read_section(self,startidx=0,endidx=None):
-        if endidx is None:
-            return self.wavdata['IQsamples'][startidx::]
+def check_dependency_met(dep_filename,this_filename=None):
+    if os.path.isfile(dep_filename): # if dep file already exists
+        if this_filename is not None and os.path.isfile(this_filename):
+            dep_date = time.ctime(os.path.getmtime(dep_filename))
+            this_date = time.ctime(os.path.getmtime(this_filename))
+            if dep_date<this_date: # If dep file is older than this file
+                return True
+            else:
+                return False
         else:
-            return self.wavdata['IQsamples'][startidx:endidx]
-
-    def is_framed(self):
-        if 'section_bounds' in self.wavdata:
             return True
-        return False
+    return False
+

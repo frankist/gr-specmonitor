@@ -56,5 +56,16 @@ class SessionFilenamesHandler:
         tokens = fbase[pos::].split('_')
         return (len(tokens)-2,[int(i) for i in tokens[1::]])
 
+    def get_stage_name(self,stage_number):
+        return self.stage_name_list[stage_number]
+
+    def get_file_stage_name(self,filename):
+        stage_number,_ = self.parse_filename(filename)
+        return self.get_stage_name(stage_number)
+
+    def get_dependency_filename(self,filename):
+        stage_number,stage_idxs = self.parse_filename(filename)
+        return self.get_stage_filename(stage_idxs[0:-1])
+    
 if __name__ == '__main__':
     pass

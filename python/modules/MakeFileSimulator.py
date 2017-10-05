@@ -25,6 +25,7 @@ import pickle
 import importlib
 from filename_utils import *
 import time
+import visualization_modules
 
 def get_run_all_stages_parameters(handler,filename):
     stage_number,stage_idxs = handler.filename_handler.parse_filename(filename)
@@ -41,42 +42,45 @@ def generate_filenames(handler,level_list):
         return handler.filename_handler.get_stage_filename_list(stage_sizes)
     return [generate_stage_filenames(handler,v) for v in level_list]
 
-# NOTE: you should create this metafile in a subfolder to avoid collisions with other running sims
-handler_filename = 'handler_params.pkl'
-
 ############## COMMANDS ###############
 
 class SessionCommandParser:
-    def __init__(self,session_file,handler_type):
-        self.session_file = session_file
+    def __init__(self,session_file,cfg_file,handler_type):
+        self.session_file = session_file#os.path.abspath(session_file)
+        dirname = os.path.dirname(self.session_file)
+        self.session_name = os.path.split(dirname)[1]
+        self.cfg_filename = cfg_file
         self.handler_type = handler_type
         self.handler = None
 
     def __get_handler__(self):
-        if self.handler is not None:
-            return self.handler
-        else:
-            return self.handler_type.load_handler(self.session_file)
+        if self.handler is None:
+            if os.path.isfile(self.session_file):
+                self.handler = self.handler_type.load_handler(self.session_file)
+            else:
+                self.handler = self.setup_new_session()
+        return self.handler
 
     def __get_dependency_file__(self,this_file):
         handler = self.__get_handler__()
-        stage_number,stage_idxs = handler.filename_handler.parse_filename(this_file)
-        return handler.filename_handler.get_stage_filename(stage_idxs[0:-1])
+        return handler.filename_handler.get_dependency_filename(this_file)
+        # stage_number,stage_idxs = handler.filename_handler.parse_filename(this_file)
+        # return handler.filename_handler.get_stage_filename(stage_idxs[0:-1])
 
-    def parse_config(self,args):
-        session_name = args[0]
-        cfg_file = args[1]
-        if os.path.isfile(self.session_file): # if cfg file already exists
-            date_cfg = time.ctime(os.path.getmtime(cfg_file))
-            date_session = time.ctime(os.path.getmtime(self.session_file))
-            if date_cfg<date_session: # If cfg file is newer than the param file
-                return # do nothing
-        session_handler = self.handler_type.load_cfg_file(self.session_file,session_name,cfg_file)
+    def setup_new_session(self):
+        if not os.path.isfile(self.cfg_filename):
+            raise IOError('Config file does not exist')
+        session_handler = self.handler_type.load_cfg_file(self.session_file,self.session_name,self.cfg_filename)
         session_handler.save(self.session_file)
+        return session_handler
+
+    def check_handler(self,args):
+        handler = self.__get_handler__()
 
     def get_filenames(self,args):
         if len(args)==0:
-            raise ValueError('You must provide a stage name')
+            print 'You must provide a stage name'
+            exit(-1)
         handler = self.__get_handler__()
         stage_nums = [int(handler.stage_name_list().index(args[0]))]
         fnames = generate_filenames(handler,stage_nums)
@@ -86,34 +90,36 @@ class SessionCommandParser:
 
     def get_dependencies(self,args):
         if len(args)==0:
-            raise ValueError('You must provide a filename from where to derive dependencies')
+            print 'You must provide a filename from where to derive dependencies'
+            exit(-1)
         fname = args[0]
-        print __get_dependency_file__(self,fname)
+        print self.__get_dependency_file__(fname)
 
-    def apply_transformations(self,args):
-        handler = self.__get_handler__()
-        print 'gonna apply the transformation for file ',args[0]
-        fname = args[0]#handler.filename_handler.get_session_path()+'/'+args[0]
-        f = open(fname,'w')
-        f.close()
+    def get_spectrogram_img(self,args):
+        # FIXME: Make this more elegant
+        sourcefilename = args[0]
+        is_signal_insync = args[1]=='True'
+        mark_box = args[1]=='True'
+        visualization_modules.save_spectrograms(sourcefilename,is_signal_insync, mark_box)
 
     @classmethod
     def run_cmd(cls,argv,handler_type=mh.SessionParamsHandler):
         session_file = argv[1]
-        methodname = argv[2]
-        args = argv[3::]
-        s = cls(session_file,handler_type)
+        cfg_file = argv[2]
+        methodname = argv[3]
+        args = argv[4::]
+        s = cls(session_file,cfg_file,handler_type)
         method = getattr(s,methodname)
         # possibles = globals().copy()
         # possibles.update(locals())
         # method = possibles.get()
         if not method:
             raise NotImplementedError('Method %s not implemented' % methodname)
-        try:
-            ret = method(args)
-        except ValueError:
-            strcmd = ' '.join(argv)
-            raise ValueError('ERROR for command: "'+strcmd+'"')
+        # try:
+        ret = method(args)
+        # except ValueError:
+        #     strcmd = ' '.join(argv)
+        #     raise ValueError('ERROR for command: "'+strcmd+'"')
         # except IOError:
         #     strcmd = ' '.join(argv)
         #     raise ValueError('IOERROR for command: "'+strcmd+'"')
