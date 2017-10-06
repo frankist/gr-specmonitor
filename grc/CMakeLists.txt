@@ -19,7 +19,7 @@
 
 install(FILES
     specmonitor_framer_c.xml
-    specmonitor_corr_est_norm_cc.xml
+    #specmonitor_corr_est_norm_cc.xml
     specmonitor_framer_snr_est_cc.xml
     specmonitor_frame_sync_cc.xml DESTINATION share/gnuradio/grc/blocks
 )

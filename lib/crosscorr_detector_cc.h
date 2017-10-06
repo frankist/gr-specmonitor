@@ -147,7 +147,7 @@ namespace gr {
                                     const utils::hist_array_view<const gr_complex>& in_h,
                                     float *xcorr_ptr, int tidx) {
       // find maximum to the right within d_max_margin
-      unsigned short umidx;
+      unsigned umidx;
       volk_32f_index_max_16u(&umidx, xcorr_ptr + 1, d_max_margin-1);
       midx = (int)umidx+1;
 

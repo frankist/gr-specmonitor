@@ -52,6 +52,10 @@ $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 	mkdir -p $(SIMPATH)/Tx/img
 	$(RUN_CMD) get_spectrogram_img $@ True True
 
+$(SIMPATH)/RF/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
+	$(RUN_CMD) run_RF_channel $@
+# Need to make a while loop that goes on until the file is generated
+
 #$(shell $(RUN_CMD) get_filenames waveform) $(SESSION_HANDLER_FILE)
 #@echo $(shell $(RUN_CMD) get_dependencies $@)
 #$$(shell $(RUN_CMD) get_filenames $$@)

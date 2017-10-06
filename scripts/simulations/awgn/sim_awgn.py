@@ -49,6 +49,17 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
         Tx_transformations.apply_framing_and_offsets(d)
         print 'done.'
 
+    def run_RF_channel(self,args):
+        handler = self.__get_handler__()
+        targetfilename = args[0]
+        sourcefilename = self.__get_dependency_file__(targetfilename)
+        run_parameters = MakeFileSimulator.get_run_stage_parameters(handler,targetfilename)
+        d = {'parameters':dict(run_parameters),'targetfolder':handler.filename_handler.get_session_path(),
+             'targetfilename':targetfilename,'sourcefilename':sourcefilename,
+             'stage_name':'RF','previous_stage_name':'Tx'}
+        import simRF_scripts
+        RF_scripts.run_RF_channel(d)
+        
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)
     AWGNSessionCmdParser.run_cmd(sys.argv)

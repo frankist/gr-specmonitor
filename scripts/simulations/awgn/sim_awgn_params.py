@@ -32,9 +32,10 @@ section_size = 10000
 toffset_range = range(10,1000,100)
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
+settle_time = 1.0
 
 # format_extension = 'pkl'
-stage_names = ['waveform','Tx'] # order matters
+stage_names = ['waveform','Tx','RF'] # order matters
 tags = ['sig_source']#,'wlan']
 
 stage_params = {
@@ -56,6 +57,14 @@ stage_params = {
             ('num_sections',num_sections),
             ('soft_gain',10**np.arange(-2,1.0)),
             ('noise_voltage',[0])
+        ],
+        'RF':
+        [
+            ('tx_gain',range(0,30,5)),
+            ('PLdB',-70),
+            ('settle_time',1.0),
+            ('awgndBm',-120),
+            ('rx_gain',range(0,30,5))
         ],
         'Rx':
         [
