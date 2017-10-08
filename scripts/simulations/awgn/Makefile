@@ -53,7 +53,16 @@ $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 	$(RUN_CMD) get_spectrogram_img $@ True True
 
 $(SIMPATH)/RF/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
-	$(RUN_CMD) run_RF_channel $@
+	i = 0
+	while [ $@  ]
+	do
+		if [ $i -ht 0 ]
+		then
+			@echo 'Repeating the RF+sync for $@'
+		fi
+		$(RUN_CMD) run_RF_channel $@
+		i = `expr $i + 1`
+	done
 # Need to make a while loop that goes on until the file is generated
 
 #$(shell $(RUN_CMD) get_filenames waveform) $(SESSION_HANDLER_FILE)

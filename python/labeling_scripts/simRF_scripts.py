@@ -26,36 +26,37 @@ from bounding_box import *
 import pkl_sig_format
 import preamble_utils
 
-def setup_tx2file_flowgraph(self,x,linear_att,awgn_sigma,freq_offset,outputfile):
-    tb = gr.top_block()
-    source = blocks.vector_source_c(x, False)
-    attenuation = blocks.multiply_const_cc(linear_att+0*1j)
-    channel = channels.channel_model(awgn_sigma,freq_offset)
-    fsink = blocks.file_sink_c(outputfile)
+class RF2FileFlowgraph:
+    def __init__(self,xsource,linear_att,awgn_sigma,freq_offset,outputfile):
+        self.tb = gr.top_block()
 
-    tb.connect(source,attenuation)
-    tb.connect(attenuation,channel)
-    tb.connect(channel,fsink)
+        self.source = blocks.vector_source_c(xsource,False)
+        self.attenuation = blocks.multiply_const_cc(linear_att+0*1j)
+        self.channel = channels.channel_model(awgn_sigma,freq_offset)
+        self.fsink = blocks.file_sink_c(outputfile)
 
-    return tb
+        self.tb.connect(self.source,self.attenuation)
+        self.tb.connect(self.attenuation,self.channel)
+        self.tb.connect(self.channel,self.fsink)
 
-def setup_file2sync_flowgraph(fname):
-    tb = gr.top_block()
+    def run(self):
+        self.tb.run()
 
-    source = blocks.file_source_c(fname,False)
-    framesync = specmonitor.frame_sync_cc(blablabla)
-    dst = blocks.vector_source_c()
+class File2FrameSyncFlowgraph:
+    def __init__(self,sourcefilename,targetfilename,frame_params):
+        self.tb = gr.top_block()
 
-    tb.connect(source,framesync)
-    tb.connect(framesync,null)
+        self.source = blocks.file_source_c(sourcefilename,False)
+        self.framesync = specmonitor.frame_sync_cc(blablabla)
+        self.dst = blocks.vector_source_c()
 
-    return tb
+        self.tb.connect(self.source,self.framesync)
+        self.tb.connect(self.framesync,self.dst)
 
-class File2FrameSyncGraph:
-    def __init__(self):
-        pass
+    def run(self):
+        self.tb.run()
 
-    def setup(self):
+        # check how many preambles were detected. If enough, we are fine. We can write the pickle
         pass
 
     def run(self):
@@ -84,11 +85,10 @@ def run_RF_channel(args):
     x_with_settle = np.append(np.zeros(num_samples_settle,np.complex64),x)
     x_with_settle = np.append(x_with_settle,np.zeros(num_samples_settle/2,np.complex64)) # padding at the end
 
-    tb = setup_tx2file_flowgraph(self,x_with_settle,tot_linear_gain,
-                              noise_voltage,freq_offset,tmp_file)
+    rf_flowgraph = RF2FileFlowgraph(x_with_settle,tot_linear_gain,noise_voltage,freq_offset,tmp_file)
 
-    tb.run() # this will stop after a while
+    rf_flowgraph.run() # this will stop after a while
 
-    tb = setup_file2sync_flowgraph()
+    sync_flowgraph = File2FrameSyncFlowgraph(tmp_file,targetfilename,frame_params)
 
-    tb.run() # this will stop after the file ends.
+    sync_flowgraph.run() # this will stop after the file ends.

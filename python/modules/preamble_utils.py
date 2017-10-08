@@ -60,55 +60,62 @@ def generate_preamble_type1(pseq_len_list, barker_len):
     pseq_len_seq = [0]*barker_len+[1]
     return preamble_params(pseq_list,pseq_len_seq,pseq_list_coef)
 
+# Frame structure: [awgn_len | preamble | guard0 | guard1 | section | guard2 | guard3]
+# guard0 and guard3 are zeros.
 class frame_params:
-    def __init__(self,preamble_params,guard_len,awgn_len):
-        self.preamble_params = preamble_params
+    def __init__(self,pparams,guard_len,awgn_len,frame_period):
+        self.preamble_params = pparams
         self.guard_len = guard_len
         self.awgn_len = awgn_len
-        self.preamble_size = preamble_params.length()
+        self.frame_period = frame_period
+        assert self.section_duration()>0
 
-    # [0|1,2,3,4|5],[4|5,6,7,8|9],...
-    # def make_sections(self,x,num_sections,section_size):
-    #     return [x[i*section_size+self.guard_len:(i+1)*section_size+self.guard_len] for i in range(len(num_sections))]
+    def section_duration(self):
+        return self.frame_period - (self.preamble_params.length()+self.guard_len*4+self.awgn_len)
 
-    def framed_section_size(self,section_samples):
-        return section_samples + 4*self.guard_len + self.preamble_size + self.awgn_len
+    def guarded_section_duration(self):
+        return self.frame_period - (self.preamble_params.length()+self.guard_len*2+self.awgn_len)
 
-    # def generate_framed_section(self,x,section_size):
-    #     section = np.zeros(self.framed_section_size(section_size))
-    #     twin = (self.awgn_len,self.awgn_len+self.preamble_size)
-    #     section[twin[0]:twin[1]] = self.preamble_params.preamble
-    #     twin = (twin[1]+self.guard_len,twin[1]+3*self.guard_len+section_size)
-    #     section[twin[0],twin[1]] = xsection[0:(twin[1]-twin[0])]
-    #     return section
+    def guarded_section_interval(self):
+        return (self.awgn_len+self.preamble_params.length()+self.guard_len,self.frame_period-self.guard_len)
 
-    def make_framed_section(self,section):
-        framed_section = np.zeros(section.size+2*self.guard_len+self.preamble_size+self.awgn_len,dtype=np.complex64)
-        t = (self.awgn_len,self.awgn_len+self.preamble_size)
-        framed_section[t[0]:t[1]] = self.preamble_params.preamble
-        t = (t[1]+self.guard_len,t[1]+self.guard_len+section.size)
-        framed_section[t[0]:t[1]] = section
+    def section_interval(self):
+        return (self.awgn_len+self.preamble_params.length()+self.guard_len*2,self.frame_period-self.guard_len*2)
+
+    def preamble_interval(self):
+        return (self.awgn_len,self.awgn_len+self.preamble_params.length())
+
+# [0|1,2,3,4|5],[4|5,6,7,8|9],...
+class SignalFramer:
+    def __init__(self,fparams):
+        self.frame_params = fparams
+
+    def generate_framed_section(self,xsection):
+        assert xsection.size == self.frame_params.guarded_section_duration()
+        framed_section = np.zeros(self.frame_params.frame_period,dtype=np.complex64)
+        t = self.frame_params.preamble_interval()
+        framed_section[t[0]:t[1]] = self.frame_params.preamble_params.preamble
+        t = self.frame_params.guarded_section_interval()
+        framed_section[t[0]:t[1]] = xsection
         return framed_section
 
-    def get_framed_section_ranges(self,num_sections,framed_section_size):
-        T = framed_section_size
-        toff = self.awgn_len+self.preamble_params.length()+self.guard_len*2
-        return [(i*T+toff,(i+1)*T-self.guard_len*2) for i in range(num_sections)]
+    def get_framed_section_ranges(self,num_sections):
+        T = self.frame_params.frame_period
+        I = self.frame_params.section_interval()
+        return [(i*T+I[0],i*T+I[1]) for i in range(num_sections)]
 
     # frame: [[0]*awgn_len | preamble | [0]*guard_len | [x]*(section_size+2*guard_len) | [0]*guard_len]
-    def frame_signal(self,x,num_sections,section_size):
-        nread = section_size*num_sections+2*self.guard_len
-        writtensection_size = self.framed_section_size(section_size)
-        nwritten = writtensection_size*num_sections
-        assert x.size >= nread
+    def frame_signal(self,x,num_sections):
+        nread = self.frame_params.section_duration()*num_sections+2*self.frame_params.guard_len
+        nwritten = self.frame_params.frame_period*num_sections
+        assert x.size>=nread
 
-        T = writtensection_size
-        T0 = section_size
-        # sections = self.make_sections(x,num_sections,section_size)
+        T = self.frame_params.frame_period
+        T0 = self.frame_params.section_duration()
         framed_signal = np.zeros(nwritten,np.complex64)
         for i in range(num_sections):
-            framed_signal[i*T:(i+1)*T] = self.make_framed_section(x[i*T0:(i+1)*T0+2*self.guard_len])
-        section_ranges = self.get_framed_section_ranges(num_sections,writtensection_size)
+            framed_signal[i*T:(i+1)*T] = self.generate_framed_section(x[i*T0:(i+1)*T0+2*self.frame_params.guard_len])
+        section_ranges = self.get_framed_section_ranges(num_sections)
 
         return (framed_signal,section_ranges)
 
@@ -127,13 +134,14 @@ class tracked_peak:
         self.preamble_mag2 = xmag2
         self.awgn_mag2 = awgn_estim
 
-class preamble_type1_detector:
-    def __init__(self, params, awgn_len):
-        self.params = params
+class PreambleDetectorType1:
+    def __init__(self, fparams):#params, awgn_len):
+        self.frame_params = fparams
+        self.params = self.frame_params.preamble_params
         self.barker_len = len(self.params.pseq_list_seq)-1
         self.barker_vec = self.params.pseq_list_seq[0:-1]
         self.barker_diff = get_schmidl_sequence(self.barker_vec)
-        self.pseq0 = self.params.pseq_list_norm[0]
+        self.pseq0 = self.frame_params.preamble.pseq_list_norm[0]
         self.pseq0_tot_len = self.pseq0.size*self.barker_len
         self.awgn_len = awgn_len
         self.hist_len = self.awgn_len + self.params.preamble_len
@@ -168,6 +176,7 @@ class preamble_type1_detector:
         self.xcorr_filt = np.zeros(max_n)
         for i in range(max_n):
             v = xcorr[i:i+self.pseq0_tot_len:self.pseq0.size]
+            assert v.size == self.barker_len
             self.xcorr_filt[i] = np.sum(v*self.barker_len)
         max_i = np.argmax(np.abs(self.xcorr_filt))
 
