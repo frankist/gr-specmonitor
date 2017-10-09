@@ -72,7 +72,7 @@ def test2():
     small_pseq_len = 5
 
     cfo = 0.45/small_pseq_len
-    print 'cfo:',cfo
+    amp=1.4
 
     pparams = preamble_utils.generate_preamble_type1([small_pseq_len,61],barker_len)
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
@@ -81,7 +81,7 @@ def test2():
 
     x = np.ones(fparams.section_duration()+guard_len*2,dtype=np.complex64)
     y,section_ranges = sframer.frame_signal(x,1)
-    y = preamble_utils.apply_cfo(y,cfo)
+    y = preamble_utils.apply_cfo(y,cfo)*amp
 
     def test_partitioning(toffset,partition_part):
         pdetec = preamble_utils.PreambleDetectorType1(fparams)
@@ -103,6 +103,8 @@ def test2():
         xschmidl2 = np.append(xschmidl2,pdetec2.xschmidl[0:pdetec2.xschmidl.size])
         xschmidl_filt2 = np.append(xschmidl_filt2,pdetec2.xschmidl_filt[0:pdetec2.xschmidl_filt.size])
 
+        detector_transform_visualizations(pdetec)
+        
         assert np.mean(np.abs(x_h2-x_h))<0.0001
         assert np.mean(np.abs(xschmidl2-xschmidl))<0.0001
         # plt.plot(xschmidl_filt)
@@ -118,7 +120,6 @@ def test2():
         assert np.abs(p.xcorr-1.0)<0.0001
         assert np.abs(p.xautocorr-1.0)<0.0001
 
-        # detector_transform_visualizations(pdetec)
 
     for toffset in range(0,y.size):
         for partition in [y.size/16,y.size/8,y.size/4,y.size/2,y.size*3/4]:
@@ -138,7 +139,7 @@ def detector_transform_visualizations(pdetec):
     nout = pdetec.x_h.size
     plt.plot(np.abs(pdetec.x_h[0::])**2)
     plt.plot([np.mean(pdetec.xmag2_h[i:i+pdetec.pseq0_tot_len]) for i in range(pdetec.xmag2_h.size-pdetec.pseq0_tot_len)])#moving avg
-    plt.plot(np.abs(pdetec.xschmidl[pdetec.xschmidl_delay::])**2)
+    plt.plot(np.abs(pdetec.xschmidl[pdetec.xschmidl_delay::]))
     plt.plot(pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay::])
     plt.plot(preamble_utils.compute_schmidl_cox_cfo(pdetec.xschmidl_filt[pdetec.xschmidl_filt_delay::],pdetec.pseq0.size),'o')
     maxautocorr = np.argmax(pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay::])
@@ -147,9 +148,9 @@ def detector_transform_visualizations(pdetec):
     print maxautocorr,cfo
     xcorr = np.correlate(pdetec.x_h[0::],pdetec.params.preamble)
     xcorr_cfo_corrected = np.correlate(preamble_utils.compensate_cfo(pdetec.x_h[0::],cfo),pdetec.params.preamble)
-    corrmax = max(np.max(np.abs(xcorr_cfo_corrected)**2),np.max(np.abs(xcorr)**2))
-    plt.plot(np.abs(xcorr)**2/corrmax,':')
-    plt.plot(np.abs(xcorr_cfo_corrected)**2/corrmax,':')
+    corrmax = max(np.max(np.abs(xcorr_cfo_corrected)),np.max(np.abs(xcorr)))
+    plt.plot(np.abs(xcorr)/corrmax,':')
+    plt.plot(np.abs(xcorr_cfo_corrected)/corrmax,':')
     plt.show()
 
 if __name__=='__main__':

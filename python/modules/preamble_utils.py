@@ -263,7 +263,7 @@ class PreambleDetectorType1:
         xcorr = np.abs(ycorr[maxi])/self.params.length()
         tnew = tpeak + maxi-self.margin
         if tnew!=tpeak:
-            cfo = compute_schmidl_cox_cfo(self.xschmidl_filt[tnew+self.xschmidl_delay],self.pseq0_size)
+            cfo = compute_schmidl_cox_cfo(self.xschmidl_filt[tnew+self.xschmidl_delay],self.pseq0.size)
         # plt.plot(np.abs(ycorr))
         # plt.show()
         # visualization: compare preamble with signal to see if they match in shape
@@ -281,7 +281,7 @@ class PreambleDetectorType1:
         self.xmag2_h.push(np.abs(x)**2)
         self.xschmidl.push(compute_schmidl_cox_with_hist(self.x_h,self.pseq0.size)/self.pseq0.size)
         self.xschmidl_filt.push(interleaved_crosscorrelate_with_hist(self.xschmidl,self.barker_diff,self.pseq0.size))
-        self.xschmidl_filt_mag2.push(np.abs(self.xschmidl_filt[0:self.xschmidl_filt.size]/len(self.barker_diff))**2)
+        self.xschmidl_filt_mag2.push(np.abs(self.xschmidl_filt[0:self.xschmidl_filt.size]/len(self.barker_diff)))
         # if self.xschmidl_filt.size>=self.xschmidl_filt_delay:
         #     xtmp = offset_array_view(self.xschmidl_filt[0::]/len(self.barker_diff),self.xschmidl_filt_delay)
         #     assert np.max(np.abs(np.abs(xtmp[0::])**2-self.xschmidl_filt_mag2[self.xschmidl_filt_delay::]))<0.00001
@@ -294,7 +294,7 @@ class PreambleDetectorType1:
             t = i-self.xschmidl_filt_delay
             peak0_mag2 = np.mean(self.xmag2_h[t:t+self.pseq0_tot_len])
             xautocorr = self.xschmidl_filt_mag2[i]
-            # print 'time:',t+self.nread
+            print 'time:',t+self.nread, self.thres1*peak0_mag2, xautocorr
             if xautocorr>self.thres1*peak0_mag2:
                 tpeak,xcorr,cfo = self.find_crosscorr_peak(t)
                 # recompute values for the new peak
