@@ -33,6 +33,65 @@ class moving_average:
         self.xhist = xtot[xtot.size-self.size+1::]
         return y
 
+# Find the local maximum within boundaries defined by "margin": [-margin,margin]
+
+# tested.
+def compute_local_maxima(x,margin): # does not consider history
+    i = 0
+    i_end = x.size-margin
+    l = []
+    while i < i_end:
+        maxi = np.argmax(x[i+1:i+margin])
+        maxi += (i+1)
+        if x[maxi]>=x[i]:
+            i = maxi
+            continue
+        l.append(i)
+        i += margin
+    return (l,i) # I pass the local max position and the point where it stopped evaluating.
+
+# untested
+class sliding_window_max: # this works with any array but keeps a buffer
+    def __init__(self,margin,dtype=np.float32):
+        self.xhist = np.zeros(margin-1,dtype=dtype)
+        self.margin = margin
+
+    def work(self,x):
+        xtot = np.append(self.xhist,x)
+        i = 0
+        i_end = xtot.size-self.margin+1
+        l = []
+        while i < i_end:
+            maxi = np.argmax(xtot[i+1:i+margin])
+            maxi += (i+1)
+            if x[maxi]>=x[i]:
+                i = maxi
+                continue
+            l.append((i-self.margin+1,x[i]))
+            i+=margin
+        self.xhist = xtot[i::]
+        return l
+
+#tested
+class sliding_window_max_hist: # this only works with an array with history
+    def __init__(self,margin,dtype=np.float32):
+        self.margin = margin
+        self.xidx = 0
+
+    def work(self,x_h):
+        assert x_h.hist_len>=self.margin
+        i_end = x_h.size-self.margin
+        l = []
+        while self.xidx < i_end:
+            maxi = np.argmax(x_h[self.xidx+1:self.xidx+self.margin])
+            maxi += (self.xidx+1)
+            if x_h[maxi]>=x_h[self.xidx]:
+                self.xidx = maxi
+                continue
+            l.append(self.xidx)
+            self.xidx+=self.margin
+        self.xidx -= x_h.size # starts from a negative point, most of the time at "-margin"
+        return l
 
 class filter_ccc:
     def __init__(self,taps):

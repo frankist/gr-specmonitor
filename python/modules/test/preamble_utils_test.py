@@ -69,44 +69,62 @@ def test2():
     awgn_len=50
     frame_period = 1000
     barker_len = 13
+    small_pseq_len = 5
 
-    cfo = 0.45/5
+    cfo = 0.45/small_pseq_len
     print 'cfo:',cfo
 
-    pparams = preamble_utils.generate_preamble_type1([5,61],barker_len)
+    pparams = preamble_utils.generate_preamble_type1([small_pseq_len,61],barker_len)
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
     sframer = preamble_utils.SignalFramer(fparams)
-    pdetec = preamble_utils.PreambleDetectorType1(fparams)
-    pdetec2 = preamble_utils.PreambleDetectorType1(fparams)
 
-    assert all([pdetec.barker_vec[i]==zadoffchu.barker_codes[barker_len][i] for i in range(barker_len)])
 
     x = np.ones(fparams.section_duration()+guard_len*2,dtype=np.complex64)
     y,section_ranges = sframer.frame_signal(x,1)
     y = preamble_utils.apply_cfo(y,cfo)
 
-    # test if partitioning does not cause issues
-    interr = y.size/8
-    pdetec.work(y)
-    x_h = pdetec.x_h[-pdetec.x_h.hist_len:pdetec.x_h.size]
-    xschmidl = pdetec.xschmidl[-pdetec.xschmidl.hist_len:pdetec.xschmidl.size]
-    xschmidl_filt = pdetec.xschmidl_filt[-pdetec.xschmidl_filt.hist_len:pdetec.xschmidl_filt.size]
-    pdetec2.work(y[0:interr])
-    x_h2 = np.array(pdetec2.x_h[-pdetec2.x_h.hist_len:pdetec2.x_h.size])
-    xschmidl2 = np.array(pdetec2.xschmidl[-pdetec2.xschmidl.hist_len:pdetec2.xschmidl.size])
-    xschmidl_filt2 = np.array(pdetec2.xschmidl_filt[-pdetec2.xschmidl_filt.hist_len:pdetec2.xschmidl_filt.size])
-    pdetec2.work(y[interr:y.size])
-    x_h2 = np.append(x_h2,pdetec2.x_h[0:pdetec2.x_h.size])
-    xschmidl2 = np.append(xschmidl2,pdetec2.xschmidl[0:pdetec2.xschmidl.size])
-    xschmidl_filt2 = np.append(xschmidl_filt2,pdetec2.xschmidl_filt[0:pdetec2.xschmidl_filt.size])
-    assert np.mean(np.abs(x_h2-x_h))<0.0001
-    assert np.mean(np.abs(xschmidl2-xschmidl))<0.0001
-    # plt.plot(xschmidl_filt)
-    # plt.plot(xschmidl_filt2,':')
-    # plt.show()
-    assert np.mean(np.abs(xschmidl_filt2-xschmidl_filt))<0.0001
+    def test_partitioning(toffset,partition_part):
+        pdetec = preamble_utils.PreambleDetectorType1(fparams)
+        pdetec2 = preamble_utils.PreambleDetectorType1(fparams)
+        assert all([pdetec.barker_vec[i]==zadoffchu.barker_codes[barker_len][i] for i in range(barker_len)])
 
-    pdetec.work(y)
+        y_with_offset = np.append(np.zeros(toffset,dtype=y.dtype),y)
+        pdetec.work(y_with_offset)
+        x_h = pdetec.x_h[-pdetec.x_h.hist_len:pdetec.x_h.size]
+        xschmidl = pdetec.xschmidl[-pdetec.xschmidl.hist_len:pdetec.xschmidl.size]
+        xschmidl_filt = pdetec.xschmidl_filt[-pdetec.xschmidl_filt.hist_len:pdetec.xschmidl_filt.size]
+
+        pdetec2.work(y_with_offset[0:partition_part])
+        x_h2 = np.array(pdetec2.x_h[-pdetec2.x_h.hist_len:pdetec2.x_h.size])
+        xschmidl2 = np.array(pdetec2.xschmidl[-pdetec2.xschmidl.hist_len:pdetec2.xschmidl.size])
+        xschmidl_filt2 = np.array(pdetec2.xschmidl_filt[-pdetec2.xschmidl_filt.hist_len:pdetec2.xschmidl_filt.size])
+        pdetec2.work(y_with_offset[partition_part:y_with_offset.size])
+        x_h2 = np.append(x_h2,pdetec2.x_h[0:pdetec2.x_h.size])
+        xschmidl2 = np.append(xschmidl2,pdetec2.xschmidl[0:pdetec2.xschmidl.size])
+        xschmidl_filt2 = np.append(xschmidl_filt2,pdetec2.xschmidl_filt[0:pdetec2.xschmidl_filt.size])
+
+        assert np.mean(np.abs(x_h2-x_h))<0.0001
+        assert np.mean(np.abs(xschmidl2-xschmidl))<0.0001
+        # plt.plot(xschmidl_filt)
+        # plt.plot(xschmidl_filt2,':')
+        # plt.show()
+        assert np.mean(np.abs(xschmidl_filt2-xschmidl_filt))<0.0001
+        assert len(pdetec.peaks)==1 and len(pdetec2.peaks)==1
+        p = pdetec2.peaks[0]
+        assert p.tidx == fparams.awgn_len+toffset and pdetec.peaks[0].is_equal(p)
+        assert p.awgn_mag2==0.0
+        assert p.preamble_mag2==1.0
+        assert np.abs(p.cfo-cfo)<0.0001
+        assert np.abs(p.xcorr-1.0)<0.0001
+        assert np.abs(p.xautocorr-1.0)<0.0001
+
+        # detector_transform_visualizations(pdetec)
+
+    for toffset in range(0,y.size):
+        for partition in [y.size/16,y.size/8,y.size/4,y.size/2,y.size*3/4]:
+            test_partitioning(toffset,partition)
+    
+    # pdetec.work(y)
 
     # plt.plot(np.abs(pdetec.x_h))
     # plt.plot(np.abs(pdetec.xmag2_h))
@@ -115,6 +133,24 @@ def test2():
     # plt.plot(np.abs(pdetec.xcorr_filt),':')
     # plt.show()
 
+
+def detector_transform_visualizations(pdetec):
+    nout = pdetec.x_h.size
+    plt.plot(np.abs(pdetec.x_h[0::])**2)
+    plt.plot([np.mean(pdetec.xmag2_h[i:i+pdetec.pseq0_tot_len]) for i in range(pdetec.xmag2_h.size-pdetec.pseq0_tot_len)])#moving avg
+    plt.plot(np.abs(pdetec.xschmidl[pdetec.xschmidl_delay::])**2)
+    plt.plot(pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay::])
+    plt.plot(preamble_utils.compute_schmidl_cox_cfo(pdetec.xschmidl_filt[pdetec.xschmidl_filt_delay::],pdetec.pseq0.size),'o')
+    maxautocorr = np.argmax(pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay::])
+    plt.plot(maxautocorr,pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay+maxautocorr],'x')
+    cfo = preamble_utils.compute_schmidl_cox_cfo(pdetec.xschmidl_filt[pdetec.xschmidl_filt_delay+maxautocorr],pdetec.pseq0.size)
+    print maxautocorr,cfo
+    xcorr = np.correlate(pdetec.x_h[0::],pdetec.params.preamble)
+    xcorr_cfo_corrected = np.correlate(preamble_utils.compensate_cfo(pdetec.x_h[0::],cfo),pdetec.params.preamble)
+    corrmax = max(np.max(np.abs(xcorr_cfo_corrected)**2),np.max(np.abs(xcorr)**2))
+    plt.plot(np.abs(xcorr)**2/corrmax,':')
+    plt.plot(np.abs(xcorr_cfo_corrected)**2/corrmax,':')
+    plt.show()
 
 if __name__=='__main__':
     #test1()

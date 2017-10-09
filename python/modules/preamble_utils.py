@@ -147,16 +147,15 @@ class array_with_hist(object):# need to base it on object for negative slices
         if siz+self.hist_len > self.capacity():
             diff = siz+self.hist_len-self.capacity()
             self.array_h = np.append(self.array_h,np.zeros(diff,dtype=self.array_h.dtype))
-            self.size = siz
 
     # def __len__(self):
     #     return self.size+self.hist_len
 
     def __getitem__(self,idx):
-        # print 'wololo:',idx, self.size,self.size+self.hist_len
         if type(idx) is slice:
             start = idx.start+self.hist_len if idx.start is not None else None
             stop = idx.stop+self.hist_len if idx.stop is not None else None
+            # print stop,self.size+self.hist_len,start,idx
             assert stop<=self.size+self.hist_len and start>=0
             return self.array_h[start:stop:idx.step]
             # assert idx.stop <= self.size
@@ -180,7 +179,27 @@ class array_with_hist(object):# need to base it on object for negative slices
         assert x.dtype==self.array_h.dtype
         self.advance()
         self.resize(x.size)
+        self.size = x.size
         self.array_h[self.hist_len:self.hist_len+len(x)] = x
+
+class offset_array_view(object):
+    def __init__(self,array,offset):
+        if type(array) is np.ndarray:
+            self.array = array
+            self.size = self.array.size-offset
+            self.hist_len = offset
+        elif type(array) is array_with_hist:
+            self.array = array.array_h
+            self.hist_len = array.hist_len+offset
+            self.size = array.size-toffset
+        assert self.size>=0
+
+    def __getitem__(self,idx):
+        if type(idx) is slice:
+            start = idx.start+self.hist_len if idx.start is not None else None
+            stop = idx.stop+self.hist_len if idx.stop is not None else None
+            return self.array[start:stop:idx.step]
+        return self.array[idx+self.hist_len]
 
 class tracked_peak:
     def __init__(self, tidx, xcorr_peak, xautocorr, cfo, xmag2, awgn_estim):
@@ -193,6 +212,9 @@ class tracked_peak:
 
     def __str__(self):
         return '[{}, {}, {}, {}, {}, {}]'.format(self.tidx,self.xcorr,self.xautocorr,self.cfo,self.preamble_mag2,self.awgn_mag2)
+
+    def is_equal(self,t):
+        return self.tidx==t.tidx and self.xcorr==t.xcorr and self.xautocorr==t.xautocorr and self.cfo==t.cfo and self.preamble_mag2==t.preamble_mag2 and self.awgn_mag2==t.awgn_mag2
 
 class PreambleDetectorType1:
     def __init__(self, fparams):#params, awgn_len):
@@ -218,82 +240,72 @@ class PreambleDetectorType1:
         # self.xmag2_h = []
         self.xcorr_filt = np.array([],np.complex64)
         self.__max_margin__ = self.pseq0_tot_len
+        self.hist_len2 = self.hist_len+self.__max_margin__
+        self.xschmidl_delay = self.pseq0.size*2-1
+        self.xschmidl_filt_delay = self.xschmidl_delay+len(self.barker_diff)*self.pseq0.size
         # self.xmag2_mavg = []
         self.xschmidlmag2_h = []
-        self.x_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)
-        self.xmag2_h = array_with_hist(np.array([],dtype=np.float32),self.hist_len)
-        self.xschmidl = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)
-        self.xschmidl_filt = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)
-        self.xschmidl_filt_mag2 = array_with_hist(np.array([],dtype=np.float32),self.hist_len)
-        self.xschmidl_filt_cfo = array_with_hist(np.array([],dtype=np.float32),self.hist_len)
-        # self.mavg1_nodelay = no_delay_moving_average_ccc(self.pseq0_tot_len)
+        self.x_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
+        self.xmag2_h = array_with_hist(np.array([],dtype=np.float32),self.hist_len2)# check if this size is fine
+        self.xschmidl = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)# check if this size is fine
+        self.xschmidl_filt = array_with_hist(np.array([],dtype=np.complex64),self.__max_margin__)
+        self.xschmidl_filt_mag2 = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__)
+
+        self.local_max_finder_h = sliding_window_max_hist(self.__max_margin__)
+
+
+    def find_crosscorr_peak(self,tpeak): # this is for high precision time sync
+        # compensate CFO
+        cfo = compute_schmidl_cox_cfo(self.xschmidl_filt[tpeak+self.xschmidl_filt_delay],self.pseq0.size)
+        y = compensate_cfo(self.x_h[tpeak-self.margin:tpeak+self.params.length()+self.margin],cfo)
+        ycorr = np.correlate(y,self.params.preamble)
+        maxi = np.argmax(np.abs(ycorr))
+        xcorr = np.abs(ycorr[maxi])/self.params.length()
+        tnew = tpeak + maxi-self.margin
+        if tnew!=tpeak:
+            cfo = compute_schmidl_cox_cfo(self.xschmidl_filt[tnew+self.xschmidl_delay],self.pseq0_size)
+        # plt.plot(np.abs(ycorr))
+        # plt.show()
+        # visualization: compare preamble with signal to see if they match in shape
+        # print xcorr,maxi,tpeak,tnew,cfo
+        # plt.plot(self.params.preamble)
+        # ytmp = y[maxi:maxi+self.params.length()]
+        # ytmp = ytmp*np.exp(-1j*np.angle(ytmp[0]/self.params.preamble[0])) # align phase for comparison
+        # plt.plot(ytmp,'x')
+        # plt.show()
+        return (tnew,xcorr,cfo)
 
     def work(self,x):
+        # print 'window:',self.nread,self.nread+x.size
         self.x_h.push(x) # [hist | x]
         self.xmag2_h.push(np.abs(x)**2)
         self.xschmidl.push(compute_schmidl_cox_with_hist(self.x_h,self.pseq0.size)/self.pseq0.size)
-        xschmidl_delay = self.pseq0.size*2-1
         self.xschmidl_filt.push(interleaved_crosscorrelate_with_hist(self.xschmidl,self.barker_diff,self.pseq0.size))
         self.xschmidl_filt_mag2.push(np.abs(self.xschmidl_filt[0:self.xschmidl_filt.size]/len(self.barker_diff))**2)
-        self.xschmidl_filt_cfo.push(-np.angle(self.xschmidl_filt[0:self.xschmidl_filt.size])/(2*np.pi*self.pseq0.size))
-        xschmidl_filt_delay = xschmidl_delay+len(self.barker_diff)*self.pseq0.size
+        # if self.xschmidl_filt.size>=self.xschmidl_filt_delay:
+        #     xtmp = offset_array_view(self.xschmidl_filt[0::]/len(self.barker_diff),self.xschmidl_filt_delay)
+        #     assert np.max(np.abs(np.abs(xtmp[0::])**2-self.xschmidl_filt_mag2[self.xschmidl_filt_delay::]))<0.00001
 
         assert self.xschmidl_filt.size == x.size
         assert self.xschmidl_filt_mag2.size == x.size
-        start = -self.__max_margin__
-        argmax_list = compute_local_maxima(self.xschmidl_filt_mag2[start:x.size],self.__max_margin__)
-        argmax_list = [i+start for i in argmax_list]
-        plt.plot(self.xschmidl_filt_mag2[start::])
-        plt.show()
+        local_peaks = self.local_max_finder_h.work(self.xschmidl_filt_mag2)
 
-        plt.plot(np.abs(self.x_h[0:x.size])**2)
-        plt.plot(np.abs(self.xmag2_h[0:x.size]),':')
-        plt.plot([np.mean(self.xmag2_h[i:i+self.pseq0_tot_len]) for i in range(self.xmag2_h.size-self.pseq0_tot_len)])#moving avg
-        plt.plot(np.abs(self.xschmidl[xschmidl_delay::]))
-        plt.plot(self.xschmidl_filt_mag2[xschmidl_filt_delay::])
-        plt.plot(self.xschmidl_filt_cfo[xschmidl_filt_delay::],'o')
-        if len(argmax_list)>0:
-            ymax_list = [self.xschmidl_filt_mag2[i] for i in argmax_list]
-            plt.plot(np.array(argmax_list)-xschmidl_filt_delay,ymax_list/np.max(ymax_list),'x')
-        plt.show()
-
-        for i in argmax_list:
-            t = i-xschmidl_filt_delay
-            xmag2_mavg = np.mean(self.xmag2_h[t:t+self.pseq0_tot_len])
+        for i in local_peaks:
+            t = i-self.xschmidl_filt_delay
+            peak0_mag2 = np.mean(self.xmag2_h[t:t+self.pseq0_tot_len])
+            xautocorr = self.xschmidl_filt_mag2[i]
             # print 'time:',t+self.nread
-            if self.xschmidl_filt_mag2[i]>self.thres1*xmag2_mavg:
-                # print 'peak:',self.xschmidl_filt_mag2[i], self.thres1*xmag2_mavg
-                # compensate cfo
-                cfo = self.xschmidl_filt_cfo[i]
-                y=compensate_cfo(self.x_h[t-self.margin:t+self.params.length()+self.margin],cfo)
-                ycorr = np.correlate(y,self.params.preamble)
-                plt.show()
-                maxi = np.argmax(np.abs(ycorr))
-                xcorr = np.abs(ycorr[maxi])/self.params.length()
-                # print xcorr,maxi
-                # plt.plot(y[maxi::])
-                # plt.plot(self.params.preamble,':')
-                # plt.show()
-                xautocorr = self.xschmidl_filt_mag2[i]
-                awgn_estim = np.mean(self.xmag2_h[t-self.awgn_len:t])
-                p = tracked_peak(t+self.nread,xcorr,xautocorr,cfo,xmag2_mavg,awgn_estim)
+            if xautocorr>self.thres1*peak0_mag2:
+                tpeak,xcorr,cfo = self.find_crosscorr_peak(t)
+                # recompute values for the new peak
+                if tpeak!=t:
+                    xautocorr = self.xschmidl_filt_mag2[tpeak+self.xschmidl_filt_delay]
+                xmag2_mavg = np.mean(self.xmag2_h[tpeak:tpeak+self.params.length()]) # for the whole preamble
+                awgn_estim = np.mean(self.xmag2_h[tpeak-self.awgn_len:tpeak])
+                p = tracked_peak(tpeak+self.nread,xcorr,xautocorr,cfo,xmag2_mavg,awgn_estim)
                 self.peaks.append(p)
                 print p
         self.nread += x.size
-
-def compute_local_maxima(x,margin):
-    i = 0
-    i_end = x.size-margin
-    l = []
-    while i < i_end:
-        maxi = np.argmax(x[i+1:i+margin])
-        maxi += (i+1)
-        if x[maxi]>=x[i]:
-            i = maxi
-            continue
-        l.append(i)
-        i += margin
-    return l
 
 def compute_schmidl_cox_peak(x,nBins_half):
     dim = x.size-2*nBins_half+1
@@ -301,6 +313,9 @@ def compute_schmidl_cox_peak(x,nBins_half):
     for k in range(dim):
         delayed_xmult[k] = np.sum(x[k:k+nBins_half]*np.conj(x[k+nBins_half:k+2*nBins_half]))
     return delayed_xmult
+
+def compute_schmidl_cox_cfo(cplx_vec,nBins_half):
+    return -np.angle(cplx_vec)/(2*np.pi*nBins_half)
 
 def compute_schmidl_cox_with_hist(x_h,nBins_half):
     return compute_schmidl_cox_peak(x_h[-nBins_half*2+1:x_h.size],nBins_half)
@@ -339,8 +354,8 @@ def apply_cfo(x,cfo):
     return x * np.exp(1j*2*np.pi*cfo*np.arange(x.size),dtype=np.complex64)
 
 def compensate_cfo(x,cfo):
-    return x * np.exp(-1j*2*np.pi*cfo*np.arange(x.size))
+    return x * np.exp(-1j*2*np.pi*cfo*np.arange(x.size),dtype=np.complex64)
 
-def estimate_cfo(x,maxi,halfBins):
-    xcopy_peak = np.sum(x[maxi:maxi+halfBins]*np.conj(x[maxi+halfBins:maxi+2*halfBins]))
-    return -np.angle(xcopy_peak)/(2*halfBins*np.pi)
+# def estimate_cfo(x,maxi,halfBins):
+#     xcopy_peak = np.sum(x[maxi:maxi+halfBins]*np.conj(x[maxi+halfBins:maxi+2*halfBins]))
+#     return -np.angle(xcopy_peak)/(2*halfBins*np.pi)

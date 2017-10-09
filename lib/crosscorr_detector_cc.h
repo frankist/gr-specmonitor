@@ -146,7 +146,7 @@ namespace gr {
                                     const utils::hist_array_view<const gr_complex>& in_h,
                                     float *xcorr_ptr, int tidx) {
       // find maximum to the right within d_max_margin
-      unsigned short umidx;
+      unsigned umidx;
       volk_32f_index_max_16u(&umidx, xcorr_ptr + 1, d_max_margin-1);
       midx = (int)umidx+1;
 
@@ -242,7 +242,7 @@ namespace gr {
       d_smooth_corr_h.advance(noutput_items);
       d_xmag2_h.advance(noutput_items);
 
-      double ratio = std::accumulate(&tvec[0],&tvec[2],0.0);
+      // double ratio = std::accumulate(&tvec[0],&tvec[2],0.0);
     }
 
     bool crosscorr_detector_cc::is_existing_peak(long new_idx) {
