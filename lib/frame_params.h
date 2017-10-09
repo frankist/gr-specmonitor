@@ -27,6 +27,12 @@
 namespace gr {
   namespace specmonitor {
 
+    // class preamble_params {
+    //   std::vector<volk_utils::volk_array<gr_complex> > pseq_list;
+    //   std::vector<size_t> pseq_sequence;
+
+    // }
+
     class frame_params {
     public:
       std::vector<volk_utils::volk_array<gr_complex> > pseq_vec;
