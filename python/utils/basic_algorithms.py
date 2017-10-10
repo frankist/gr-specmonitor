@@ -33,6 +33,13 @@ class moving_average:
         self.xhist = xtot[xtot.size-self.size+1::]
         return y
 
+def moving_average_with_hist(x_h,mavgsize):
+    assert x_h.hist_len>=mavgsize
+    xmavg = np.zeros(x_h.size,dtype=x_h.dtype)
+    for i in range(x_h.size):
+        xmavg[i] = np.mean(x_h[i-mavgsize:i])
+    return xmavg
+
 # Find the local maximum within boundaries defined by "margin": [-margin,margin]
 
 # tested.
