@@ -226,7 +226,7 @@ class tracked_peak:
         return self.tidx==t.tidx and self.xcorr==t.xcorr and self.xautocorr==t.xautocorr and self.cfo==t.cfo and self.preamble_mag2==t.preamble_mag2 and self.awgn_mag2_nodc==t.awgn_mag2_nodc and self.dc_offset==t.dc_offset
 
 class PreambleDetectorType1:
-    def __init__(self, fparams, thres1=0.4, thres2=0.3):#params, awgn_len):
+    def __init__(self, fparams, thres1=0.3, thres2=0.3):#params, awgn_len):
         self.frame_params = fparams
         self.thres1 = thres1
         self.thres2 = thres2
@@ -240,11 +240,10 @@ class PreambleDetectorType1:
         self.pseq0_tot_len = self.pseq0.size*self.barker_len
         self.awgn_len = self.frame_params.awgn_len
         self.hist_len = self.awgn_len + self.params.preamble_len
-        self.margin = 4
+        self.margin = 16
 
         self.nread = 0
         self.peaks = []
-        # self.max_peak = tracked_peak(-1,-1,-1,-1,-1,-1)
 
         # i keep these vars in mem for debug
         # self.x_h = []
@@ -269,6 +268,8 @@ class PreambleDetectorType1:
     def find_crosscorr_peak(self,tpeak): # this is for high precision time sync
         # compensate CFO
         cfo = compute_schmidl_cox_cfo(self.xschmidl_filt_nodc[tpeak+self.delay_cum[2]],self.pseq0.size)
+        if np.abs(tpeak-75)<4:
+            print '(t,cfo):',tpeak,cfo
         twin = (tpeak-self.margin,tpeak+self.params.length()+self.margin)
         # dc_mavg2 = np.array([np.mean(self.x_h[i:i+self.params.length()]) for i in range(twin[0],twin[1])])
         # print twin[0]-self.awgn_len, self.x_h.hist_len
@@ -311,6 +312,7 @@ class PreambleDetectorType1:
         #     assert np.max(np.abs(np.abs(xtmp[0::])**2-self.xschmidl_filt_mag2[self.xschmidl_filt_delay::]))<0.00001
 
         local_peaks = self.local_max_finder_h.work(self.xschmidl_filt_mag2_nodc)
+        print 'peaks:',[p-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
             t = i-self.delay_cum[2]
@@ -333,7 +335,7 @@ class PreambleDetectorType1:
                 # awgn_estim = np.mean(self.xmag2_h[tpeak-self.awgn_len:tpeak])
                 p = tracked_peak(tpeak+self.nread,xcorr,xautocorr_nodc,cfo,xmag2_mavg_nodc,awgn_estim_nodc,dc_offset)
                 self.peaks.append(p)
-                print p
+                # print p
         self.nread += x.size
 
 def compute_schmidl_cox_peak(x,nBins_half):
@@ -383,7 +385,10 @@ def apply_cfo(x,cfo):
     return x * np.exp(1j*2*np.pi*cfo*np.arange(x.size),dtype=np.complex64)
 
 def compensate_cfo(x,cfo):
-    return x * np.exp(-1j*2*np.pi*cfo*np.arange(x.size),dtype=np.complex64)
+    if type(cfo) is not list and type(cfo) is not np.ndarray:
+        return x * np.exp(-1j*2*np.pi*cfo*np.arange(x.size),dtype=np.complex64)
+    assert x.size==cfo.size
+    return x * np.exp(-1j*2*np.pi*cfo,dtype=np.complex64)
 
 # def estimate_cfo(x,maxi,halfBins):
 #     xcopy_peak = np.sum(x[maxi:maxi+halfBins]*np.conj(x[maxi+halfBins:maxi+2*halfBins]))

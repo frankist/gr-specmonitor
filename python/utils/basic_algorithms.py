@@ -40,6 +40,9 @@ def moving_average_with_hist(x_h,mavgsize):
         xmavg[i] = np.mean(x_h[i-mavgsize:i])
     return xmavg
 
+def moving_average_no_hist(x,size):
+    return np.array([np.mean(x[i:i+size]) for i in range(x.size-size)])
+
 # Find the local maximum within boundaries defined by "margin": [-margin,margin]
 
 # tested.
