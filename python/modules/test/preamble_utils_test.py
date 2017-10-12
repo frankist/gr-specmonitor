@@ -138,12 +138,12 @@ def test3():
 
     guard_len=5
     awgn_len=75
-    frame_period = 1000
+    frame_period = 1500
     barker_len = 13
-    pseq_len = [21,61]
+    pseq_len = [13,61]
 
     dc_offset = 0.1
-    cfo = 0#0.45/pseq_len[0]
+    cfo = -0.49/pseq_len[0]
 
     pparams = preamble_utils.generate_preamble_type1(pseq_len,barker_len)
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
@@ -232,12 +232,15 @@ def detector_transform_visualizations(pdetec):
     assert np.array_equal(xschmidl_no_dc[hl::],pdetec.xschmidl_nodc[pdetec.delay_cum[1]::])
     assert np.array_equal(xschmidl_filt_no_dc[hl::],pdetec.xschmidl_filt_nodc[pdetec.delay_cum[2]::])
     assert np.array_equal(np.abs(xschmidl_filt_no_dc[hl::]),pdetec.xschmidl_filt_mag2_nodc[pdetec.delay_cum[2]::])
+    print 'cfo:',cfo,-0.49/pdetec.params.pseq_list_norm[0].size
+    # cfo = -0.49/pdetec.params.pseq_list_norm[0].size
 
     # compute the crosscorrelation function
-    xcorr0 = np.correlate(x,pdetec.params.pseq_list_norm[0])/l0
+    xcorr0 = np.correlate(preamble_utils.compensate_cfo(x,cfo),pdetec.params.pseq_list_norm[0])/l0
     xcorr0_mavg = preamble_utils.interleaved_crosscorrelate(np.abs(xcorr0)**2,np.ones(pdetec.barker_len),l0)/pdetec.barker_len
     print xcorr0.size, cfo_no_dc.size
-    xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),pdetec.barker_vec,l0)/pdetec.barker_len)**2
+    xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,pdetec.barker_vec,l0)/pdetec.barker_len)**2
+    # xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),np.ones(pdetec.barker_len),l0)/pdetec.barker_len)**2
     xcorr = np.correlate(x,pdetec.params.preamble)/L
     xcorr_cfo_correct = np.correlate(preamble_utils.compensate_cfo(x,cfo),pdetec.params.preamble)/L
     xcorr_cfo_dc_correct = np.correlate(preamble_utils.compensate_cfo(x_no_dc2,cfo),pdetec.params.preamble)/L
@@ -255,11 +258,14 @@ def detector_transform_visualizations(pdetec):
     ax0.plot(np.abs(xschmidl_filt[hl::]))
     ax0.plot(np.abs(xschmidl_filt_no_dc[hl::]),'--')
     # ax0.plot(maxautocorr,pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay+maxautocorr],'o')
-    ax0.plot(np.abs(xcorr[hl::])**2,'.')
-    ax0.plot(np.abs(xcorr_cfo_correct[hl::])**2,'.-')
+    ax0.plot(np.abs(xcorr[hl::])**2,'.',color=colors.cnames['silver'])
+    ax0.plot(np.abs(xcorr_cfo_correct[hl::])**2,'.-',color=colors.cnames['silver'])
     ax0.plot(np.abs(xcorr_cfo_dc_correct[hl::])**2,'o--')
     ax0.plot(np.real(xmag2_mavg_no_dc[hl::]),color=colors.cnames['limegreen'])
     ax0.plot(np.abs(xcorr0_filt[hl::]),'o--')
+    # ax0.plot(np.abs(xcorr0[hl::])**2,'x--')
+    # ax0.plot(np.abs(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc))**2,'x--')
+    # ax0.plot(preamble_utils.compute_schmidl_cox_cfo(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),l0),'x--')
     # ax0.plot(np.abs(pdetec.xschmidl_filt_nodc[L0+pdetec.xschmidl_filt_delay::]),'x')
 
     # ax0.plot(np.abs(x_no_dc[hl::]),'o--')
@@ -270,13 +276,14 @@ def detector_transform_visualizations(pdetec):
     ax0.legend(['|.|^2','MovAvg','autocorr','autocorr_dc_correct','autocorr_filt','autocorr_filt_dc_correct'])
 
     # ax1.plot(pdetec.xschmidl_filt_mag2[d2::]/mavg_vec[0:nout-d2])
-    ax1.plot(np.abs(xschmidl_filt[hl::])/xmag2_mavg1[hl:xschmidl_filt.size])
+    ax1.plot(np.abs(xschmidl_filt[hl::])/xmag2_mavg1[hl:xschmidl_filt.size],color=colors.cnames['silver'])
     ax1.plot(np.abs(xcorr[hl:xmag2_mavg2.size])**2/xmag2_mavg2[hl::])
     ax1.plot(np.abs(xcorr_cfo_correct[hl:xmag2_mavg2.size])**2/xmag2_mavg2[hl::])
     ax1.plot(np.abs(xcorr_cfo_dc_correct[hl::])**2/xmag2_mavg_no_dc2[hl::],color=colors.cnames['tomato'],linewidth=2,linestyle=':',marker='o')
-    ax1.plot(np.abs(xcorr_cfo_dc_correct_alt[hl-pdetec.awgn_len:xmag2_mavg_no_dc2.size-pdetec.awgn_len])**2/xmag2_mavg_no_dc2[hl::],'x-')
+    ax1.plot(np.abs(xcorr_cfo_dc_correct_alt[hl-pdetec.awgn_len:xmag2_mavg_no_dc2.size-pdetec.awgn_len])**2/xmag2_mavg_no_dc2[hl::],'x-',color=colors.cnames['silver'])
     ax1.plot(np.abs(xschmidl_filt_no_dc[hl::])/xmag2_mavg_no_dc[hl:xschmidl_filt_no_dc.size])
     ax1.plot(np.abs(xcorr0_filt[hl:xmag2_mavg_no_dc.size])/xmag2_mavg_no_dc[hl:xcorr0_filt.size],'.:')
+    ax1.plot(cfo_no_dc[hl::],'o--')
     # ax1.legend(['autocorr_filt','xcorr_filt_no_cfo_correct','xcorr_filt','xcorr_filt_dc_correct','autocorr_dc_correct'])
     plt.show()
 
