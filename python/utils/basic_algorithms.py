@@ -115,6 +115,160 @@ class filter_ccc:
         self.xhist = xtot[xtot.size-self.size+1::]
         return y
 
+# tested 
+def compute_schmidl_cox_peak(x,nBins_half):
+    dim = x.size-2*nBins_half+1
+    delayed_xmult = np.zeros(dim,dtype='complex64')
+    for k in range(dim):
+        delayed_xmult[k] = np.sum(x[k:k+nBins_half]*np.conj(x[k+nBins_half:k+2*nBins_half]))
+    return delayed_xmult
+
+def compute_schmidl_cox_cfo(cplx_vec,nBins_half):
+    return -np.angle(cplx_vec)/(2*np.pi*nBins_half)
+
+def compute_schmidl_cox_with_hist(x_h,nBins_half):
+    return compute_schmidl_cox_peak(x_h[-nBins_half*2+1:x_h.size],nBins_half)
+
+# tested
+def interleaved_crosscorrelate(x1,x2,interleav_len):
+    winsize = interleav_len*len(x2)
+    y = np.zeros(x1.size-winsize, dtype=np.complex64)
+    for i in range(y.size):
+        xx = x1[i:i+winsize:interleav_len]
+        y[i] = np.sum(xx*x2)
+    return y
+
+# tested
+def interleaved_crosscorrelate_with_hist(x_h,x2,interleav_len):
+    winsize = interleav_len*len(x2)
+    x = x_h[-winsize:x_h.size]
+    return interleaved_crosscorrelate(x,x2,interleav_len)
+
+def interleaved_sum(x1,num_sums,interleav_len):
+    winsize = interleav_len*num_sums
+    y = np.zeros(x1.size-winsize,dtype=np.complex64)
+    for i in range(y.size):
+        xx = x1[i:i+winsize:interleav_len]
+        y[i] = np.sum(np.abs(xx))
+    return y
+
+# arguments are in the freq domain
+def zc_cfo_estimation_freq(X,PSEQ): # works with ZadoffChu
+    Xdot = X*np.conj(PSEQ)
+    # plt.plot(np.angle(Xdot*np.conj(np.roll(Xdot,1))))
+    Xshift = np.sum(Xdot*np.conj(np.roll(Xdot,1)))
+    return -np.angle(Xshift)/(2*np.pi)
+
+def interleaved_zc_cfo_estimation(x,pseq,Ntimes):
+    import matplotlib.pyplot as plt
+    PSEQ = np.fft.fft(pseq)
+    cfo_list = []
+    for i in range(Ntimes):
+        cfo_list.append(zc_cfo_estimation_freq(x[i*PSEQ.size:(i+1)*PSEQ.size],PSEQ))
+    # plt.plot(cfo_list)
+    # plt.show()
+    return np.mean(cfo_list)
+
+# obsolete
+def interleaved_crosscorrelate_rotated(x1,x2,interleav_len):
+    winsize = interleav_len*len(x2)
+    y = np.zeros(x1.size-winsize, dtype=np.complex64)
+    xangleshift = np.zeros(x1.size-winsize)
+    for i in range(y.size):
+        xx = x1[i:i+winsize:interleav_len]
+        xmult = xx*np.conj(x2)
+        xangleshift[i] = np.angle(np.sum(xmult[1::]*np.conj(xmult[0:-1])))
+        y[i] = np.sum(xx*np.exp(-1j*xangleshift[i]*np.arange(xx.size),dtype=np.complex64)*np.conj(x2))
+    return (np.abs(y/len(x2))**2,xangleshift/(np.pi*2*interleav_len))
+
+# obsolete
+class no_delay_moving_average_ccc:
+    def __init__(self,size):
+        self.mavg = moving_average_ccc(size)
+        self.out = array_with_hist([],size-1)
+
+    def work(self,x):
+        self.out.resize(x.size)
+        self.out[-self.out.hist_len:-self.out.hist_len+x.size] = self.mavg.work(x)
+
+# tested
+class array_with_hist(object):# need to base it on object for negative slices
+    def __init__(self,array,hist_len):
+        self.hist_len = hist_len
+        self.size = len(array)
+        if type(array) is np.ndarray:
+            self.array_h = np.append(np.zeros(hist_len,dtype=array.dtype),array)
+        else:
+            self.array_h = np.append(np.zeros(hist_len),array)
+        self.dtype = array.dtype
+
+    def __str__(self):
+        return '[{}]'.format(', '.join(str(i) for i in self.array_h[0:self.size]))
+
+    def capacity(self):
+        return len(self.array_h)
+
+    def reserve(self,siz):
+        if siz+self.hist_len > self.capacity():
+            diff = siz+self.hist_len-self.capacity()
+            self.array_h = np.append(self.array_h,np.zeros(diff,dtype=self.array_h.dtype))
+
+    # def __len__(self):
+    #     return self.size+self.hist_len
+
+    def __getitem__(self,idx):
+        if type(idx) is slice:
+            start = idx.start+self.hist_len if idx.start is not None else 0
+            stop = idx.stop+self.hist_len if idx.stop is not None else self.size+self.hist_len
+            # print stop,self.size+self.hist_len,start,idx
+            assert stop<=self.size+self.hist_len and start>=0
+            return self.array_h[start:stop:idx.step]
+            # assert idx.stop <= self.size
+            # start = idx.start+self.hist_len if idx.start <= self.size else idx.start-self.size
+            # stop = idx.stop+self.hist_len if idx.stop <= self.size else idx.stop-self.size
+            # print 'wololo2:',start,stop
+            # return self.array_h[start:stop]
+        assert idx<=self.size+self.hist_len
+        return self.array_h[idx+self.hist_len]
+
+    def data(self):
+        return self.array_h[0:self.hist_len+self.size]
+
+    # def __setitem__(self,idx,value):
+    #     if type(idx) is slice:
+    #         self.array_h[idx.start+self.hist_len:idx.stop+self.hist_len:idx.step] = value
+    #     else:
+    #         self.array_h[idx+self.hist_len] = value
+
+    def advance(self):
+        self.array_h[0:self.hist_len] = self.array_h[self.size:self.size+self.hist_len]
+
+    def push(self,x):
+        assert x.dtype==self.array_h.dtype
+        self.advance()
+        self.reserve(x.size)
+        self.size = x.size
+        self.array_h[self.hist_len:self.hist_len+len(x)] = x
+
+# not tested
+class offset_array_view(object):
+    def __init__(self,array,offset):
+        if type(array) is np.ndarray:
+            self.array = array
+            self.size = self.array.size-offset
+            self.hist_len = offset
+        elif type(array) is array_with_hist:
+            self.array = array.array_h
+            self.hist_len = array.hist_len+offset
+            self.size = array.size-toffset
+        assert self.size>=0
+
+    def __getitem__(self,idx):
+        if type(idx) is slice:
+            start = idx.start+self.hist_len if idx.start is not None else None
+            stop = idx.stop+self.hist_len if idx.stop is not None else None
+            return self.array[start:stop:idx.step]
+        return self.array[idx+self.hist_len]
 def test1():
     mavg = moving_average_ccc(5)
     x = [1,1,1,1,1]

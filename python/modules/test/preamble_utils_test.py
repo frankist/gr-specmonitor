@@ -143,7 +143,7 @@ def test3():
     pseq_len = [13,61]
 
     dc_offset = 0.1
-    cfo = -0.49/pseq_len[0]
+    cfo = -0.45/pseq_len[0]
 
     pparams = preamble_utils.generate_preamble_type1(pseq_len,barker_len)
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
@@ -161,15 +161,85 @@ def test3():
             xlen = fparams.section_duration()+guard_len*2
             x = (np.random.randn(xlen)+np.random.randn(xlen)*1j)*0.1/np.sqrt(2)
             y,section_ranges = sframer.frame_signal(x,1)
+            y *= amp # the preamble has amplitude 1
             y = preamble_utils.apply_cfo(y,cfo)+dc_offset*np.exp(1j*np.random.rand()*2*np.pi)
-            y *= amp
 
             T = 1000
             toffset = 0#np.random.randint(0,T)
             yoffset = np.append(np.zeros(toffset,dtype=np.complex64),y)
             yoffset = np.append(yoffset,np.zeros(T-toffset,dtype=np.complex64))
             awgn = (np.random.randn(yoffset.size)+np.random.randn(yoffset.size)*1j)/np.sqrt(2)
+            y_pwr = amp**2
+            awgn_pwr = np.mean(np.abs(awgn)**2)
             yoffset += awgn
+            print 'AWGN pwr [dB]:',10*np.log10(awgn_pwr)
+            print 'actual SNRdB:',10*np.log10(y_pwr/awgn_pwr)
+            # plt.plot(yoffset)
+            # plt.show()
+
+            pdetec.work(yoffset)
+
+            test1 = False
+            if len(pdetec.peaks)>0:
+                max_el = np.argmax([np.abs(p.xcorr) for p in pdetec.peaks])
+                test1 = pdetec.peaks[max_el].tidx == toffset+awgn_len
+                print s,pdetec.peaks[0].tidx,toffset+awgn_len,test1
+            num_fa = len(pdetec.peaks)-1 if test1 else len(pdetec.peaks)
+            Pdetec[si] += test1
+            FalseAlarmRate[si] += num_fa
+
+            print 'result:',test1
+            detector_transform_visualizations(pdetec)
+    Pdetec /= float(num_runs)
+    FalseAlarmRate /= float(num_runs)
+
+    plt.plot(SNRdB_range,Pdetec,'x-')
+    plt.plot(SNRdB_range,FalseAlarmRate,'o-')
+    plt.show()
+
+def test4():
+    print 'Test sync against SNR'
+    np.random.seed(4)
+
+    guard_len=5
+    awgn_len=75
+    frame_period = 3000
+    barker_len = 13
+    pseq_len = [13,199]
+    nrepeats0 = 4
+
+    dc_offset = 0.1
+    cfo = -0.45/pseq_len[0]
+
+    pparams = preamble_utils.generate_preamble_type2(pseq_len,barker_len,nrepeats0)
+    fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
+
+    num_runs = 10
+    SNRdB_range = [-10]#range(-10,10)
+    FalseAlarmRate = np.zeros(len(SNRdB_range))
+    Pdetec = np.zeros(len(SNRdB_range))
+    for si,s in enumerate(SNRdB_range):
+        amp = 10**(s/20.0)
+        for r in range(num_runs):
+            sframer = preamble_utils.SignalFramer(fparams)
+            pdetec = preamble_utils.PreambleDetectorType2(fparams,0.08,0.04)
+
+            xlen = fparams.section_duration()+guard_len*2
+            x = (np.random.randn(xlen)+np.random.randn(xlen)*1j)*0.1/np.sqrt(2)
+            y,section_ranges = sframer.frame_signal(x,1)
+            y *= amp # the preamble has amplitude 1
+            y = preamble_utils.apply_cfo(y,cfo)+dc_offset*np.exp(1j*np.random.rand()*2*np.pi)
+
+            T = 1000
+            toffset = 0#np.random.randint(0,T)
+            yoffset = np.append(np.zeros(toffset,dtype=np.complex64),y)
+            yoffset = np.append(yoffset,np.zeros(T-toffset,dtype=np.complex64))
+            awgn = (np.random.randn(yoffset.size)+np.random.randn(yoffset.size)*1j)/np.sqrt(2)
+            y_pwr = amp**2
+            awgn_pwr = np.mean(np.abs(awgn)**2)
+            yoffset += awgn
+            print 'AWGN pwr [dB]:',10*np.log10(awgn_pwr)
+            print 'actual SNRdB:',10*np.log10(y_pwr/awgn_pwr)
             # plt.plot(yoffset)
             # plt.show()
 
@@ -200,7 +270,12 @@ def detector_transform_visualizations(pdetec):
     l0 = pdetec.pseq0.size
     nout = pdetec.x_h.size
     hl = pdetec.x_h.hist_len
-    assert pdetec.xschmidl_filt_mag2_nodc.size==nout
+    barker_vec = pdetec.params.pseq_list_coef[0:-1]
+    barker_len = len(barker_vec)
+    barker_diff = preamble_utils.get_schmidl_sequence(barker_vec)
+    real_cfo = -0.45/l0
+    # assert pdetec.xschmidl_filt_mag2_nodc.size==nout:
+    print 'hist:',hl,'preamble len:',preamble_len,'barker:',len(barker_vec)
 
     # create x without dc
     x = pdetec.x_h[-pdetec.x_h.hist_len::]
@@ -213,7 +288,7 @@ def detector_transform_visualizations(pdetec):
     x_no_dc2 = x[0:x.size-L]-dc_mavg2
     x_no_dc3 = x[pdetec.awgn_len:x.size]-dc_mavg3
     assert np.array_equal(pdetec.x_h[0::],x[hl::])
-    assert np.array_equal(x_no_dc[hl::],pdetec.xnodc_h[L0::])
+    # assert np.array_equal(x_no_dc[hl::],pdetec.xnodc_h[L0::])
 
     xmag2_mavg1 = balg.moving_average_no_hist(np.abs(x)**2,L0)
     xmag2_mavg2 = balg.moving_average_no_hist(np.abs(x)**2,L)
@@ -224,49 +299,72 @@ def detector_transform_visualizations(pdetec):
     # compute the schmidl&cox autocorrelation signal
     xschmidl = preamble_utils.compute_schmidl_cox_peak(x,l0)/l0
     xschmidl_no_dc = preamble_utils.compute_schmidl_cox_peak(x_no_dc,l0)/l0
-    xschmidl_filt = preamble_utils.interleaved_crosscorrelate(xschmidl,pdetec.barker_diff,l0)/len(pdetec.barker_diff)
-    xschmidl_filt_no_dc = preamble_utils.interleaved_crosscorrelate(xschmidl_no_dc,pdetec.barker_diff,l0)/len(pdetec.barker_diff)
+    xschmidl_filt = preamble_utils.interleaved_crosscorrelate(xschmidl,np.array(barker_diff),l0)/len(barker_diff)
+    xschmidl_filt_no_dc = preamble_utils.interleaved_crosscorrelate(xschmidl_no_dc,np.array(barker_diff),l0)/len(barker_diff)
     cfo_no_dc = preamble_utils.compute_schmidl_cox_cfo(xschmidl_filt_no_dc,l0)
+    # cfo_no_dc_no_filt = balg.moving_average_no_hist(preamble_utils.compute_schmidl_cox_cfo(xschmidl_no_dc,l0),l0)
     maxautocorr = 75#np.argmax(np.abs(xschmidl_filt[hl::]))
     cfo = preamble_utils.compute_schmidl_cox_cfo(xschmidl_filt_no_dc[hl+maxautocorr],pdetec.pseq0.size)
-    assert np.array_equal(xschmidl_no_dc[hl::],pdetec.xschmidl_nodc[pdetec.delay_cum[1]::])
-    assert np.array_equal(xschmidl_filt_no_dc[hl::],pdetec.xschmidl_filt_nodc[pdetec.delay_cum[2]::])
-    assert np.array_equal(np.abs(xschmidl_filt_no_dc[hl::]),pdetec.xschmidl_filt_mag2_nodc[pdetec.delay_cum[2]::])
-    print 'cfo:',cfo,-0.49/pdetec.params.pseq_list_norm[0].size
+    x_no_cfo = preamble_utils.compensate_cfo(x,cfo)
+    # assert np.array_equal(xschmidl_no_dc[hl::],pdetec.xschmidl_nodc[pdetec.delay_cum[1]::])
+    # assert np.array_equal(xschmidl_filt_no_dc[hl::],pdetec.xschmidl_filt_nodc[pdetec.delay_cum[2]::])
+    # assert np.array_equal(np.abs(xschmidl_filt_no_dc[hl::]),pdetec.xschmidl_filt_mag2_nodc[pdetec.delay_cum[2]::])
     # cfo = -0.49/pdetec.params.pseq_list_norm[0].size
+    # cfo3 = balg.interleaved_zc_cfo_estimation(x[hl+75::],pdetec.params.pseq_list_norm[0],barker_len)
 
     # compute the crosscorrelation function
-    xcorr0 = np.correlate(preamble_utils.compensate_cfo(x,cfo),pdetec.params.pseq_list_norm[0])/l0
-    xcorr0_mavg = preamble_utils.interleaved_crosscorrelate(np.abs(xcorr0)**2,np.ones(pdetec.barker_len),l0)/pdetec.barker_len
+    xcorr0 = np.correlate(x_no_cfo,pdetec.params.pseq_list_norm[0])/l0
+    xcorr0_mavg = preamble_utils.interleaved_crosscorrelate(np.abs(xcorr0)**2,np.ones(barker_len),l0)/barker_len
+    xcorr0_mavg2,xcfo0 = preamble_utils.interleaved_crosscorrelate_rotated(np.correlate(x,pdetec.params.pseq_list_norm[0])/l0,pdetec.barker_vec,l0)
+    xcorr00 = np.abs(preamble_utils.interleaved_crosscorrelate(np.correlate(preamble_utils.compensate_cfo(x,xcfo0[hl+75]),pdetec.params.pseq_list_norm[0])/l0,pdetec.barker_vec,l0)/pdetec.barker_len)**2
+    print 'cfo:',cfo,real_cfo,xcfo0[75+hl]#,cfo3
+    # xcorr0_mavg2 = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,pdetec.barker_vec,l0)/pdetec.barker_len)**2#+np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0[l0*4::],pdetec.barker_vec[4:6],l0)/2)**2#,np.ones(pdetec.barker_len-1),l0)/(pdetec.barker_len-1)
+    def compute_partial_xcorr0(d,siz):
+        return np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0[d*l0::],pdetec.barker_vec[d:d+siz],l0)/siz)**2
+    def func1(num,siz):
+        assert num>1
+        return np.mean([compute_partial_xcorr0(i,siz)[0:-(num-i)*l0] for i in range(num)],0)
+    xcorr1_mavg2 = compute_partial_xcorr0(0,4)[0:-4*l0]+compute_partial_xcorr0(4,4)#func1(pdetec.barker_len-5,5)#compute_partial_xcorr0(0,5)[0:-l0]#+compute_partial_xcorr0(1,2)
     print xcorr0.size, cfo_no_dc.size
-    xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,pdetec.barker_vec,l0)/pdetec.barker_len)**2
+    xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,barker_vec,l0)/barker_len)**2
     # xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),np.ones(pdetec.barker_len),l0)/pdetec.barker_len)**2
     xcorr = np.correlate(x,pdetec.params.preamble)/L
     xcorr_cfo_correct = np.correlate(preamble_utils.compensate_cfo(x,cfo),pdetec.params.preamble)/L
     xcorr_cfo_dc_correct = np.correlate(preamble_utils.compensate_cfo(x_no_dc2,cfo),pdetec.params.preamble)/L
     xcorr_cfo_dc_correct_alt = np.correlate(preamble_utils.compensate_cfo(x_no_dc3,cfo),pdetec.params.preamble)/L
+    xcorr1 = np.abs(np.correlate(preamble_utils.compensate_cfo(x,cfo),pdetec.params.pseq_list_norm[1])/len(pdetec.params.pseq_list_norm[1]))**2
+    xcrossauto = xcorr0_mavg[0:xschmidl_filt_no_dc.size]*np.abs(xschmidl_filt_no_dc[0:xcorr0_mavg.size])
+    xcrossauto2 = xcorr1[L0:xschmidl_filt_no_dc.size+L0]*np.abs(xschmidl_filt_no_dc[0:xcorr1.size-L0])
     corrmax = max(np.max(np.abs(xcorr_cfo_correct)),np.max(np.abs(xcorr)))
+
 
     fig, (ax0,ax1) = plt.subplots(nrows=2)
 
     # ax0.plot(np.abs(x[hl::])**2,color=colors.cnames['silver'])
-    ax0.plot(xmag2_mavg1[hl::])
-    ax0.plot(np.abs(xschmidl[hl::]),':')
-    # ax0.plot(np.abs(pdetec.xschmidl[d1::]),':')
-    ax0.plot(np.abs(xschmidl_no_dc[hl::]),':')
+    # ax0.plot(xmag2_mavg1[hl::])
+    # ax0.plot(np.abs(xschmidl[hl::]),':')
+    # # ax0.plot(np.abs(pdetec.xschmidl[d1::]),':')
+    # ax0.plot(np.abs(xschmidl_no_dc[hl::]),':')
     # ax0.plot(pdetec.xschmidl_filt_mag2[d2::])
-    ax0.plot(np.abs(xschmidl_filt[hl::]))
+    # ax0.plot(np.abs(xschmidl_filt[hl::]),'--')
     ax0.plot(np.abs(xschmidl_filt_no_dc[hl::]),'--')
-    # ax0.plot(maxautocorr,pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay+maxautocorr],'o')
-    ax0.plot(np.abs(xcorr[hl::])**2,'.',color=colors.cnames['silver'])
-    ax0.plot(np.abs(xcorr_cfo_correct[hl::])**2,'.-',color=colors.cnames['silver'])
+    # # ax0.plot(maxautocorr,pdetec.xschmidl_filt_mag2[pdetec.xschmidl_filt_delay+maxautocorr],'o')
+    # ax0.plot(np.abs(xcorr[hl::])**2,'.',color=colors.cnames['silver'])
+    # ax0.plot(np.abs(xcorr_cfo_correct[hl::])**2,'.-',color=colors.cnames['silver'])
     ax0.plot(np.abs(xcorr_cfo_dc_correct[hl::])**2,'o--')
-    ax0.plot(np.real(xmag2_mavg_no_dc[hl::]),color=colors.cnames['limegreen'])
-    ax0.plot(np.abs(xcorr0_filt[hl::]),'o--')
-    # ax0.plot(np.abs(xcorr0[hl::])**2,'x--')
-    # ax0.plot(np.abs(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc))**2,'x--')
-    # ax0.plot(preamble_utils.compute_schmidl_cox_cfo(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),l0),'x--')
-    # ax0.plot(np.abs(pdetec.xschmidl_filt_nodc[L0+pdetec.xschmidl_filt_delay::]),'x')
+    # ax0.plot(np.real(xmag2_mavg_no_dc[hl::]),color=colors.cnames['limegreen'])
+    # ax0.plot(np.abs(xcorr0_filt[hl::]),'o--')
+    ax0.plot(np.abs(xcorr0_mavg[hl::]),'x:')
+    ax0.plot(np.abs(xcorr1[hl+L0::]),'d:')
+    # ax0.plot(np.abs(xcorr0_mavg2[hl::]),'d--')
+    # ax0.plot(np.abs(xcorr00[hl::]),'d--')
+    # ax0.plot(np.abs(xcorr1_mavg2[hl::]),'d--')
+    # # ax0.plot(np.abs(xcorr0[hl::])**2,'x--')
+    # # ax0.plot(np.abs(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc))**2,'x--')
+    # # ax0.plot(preamble_utils.compute_schmidl_cox_cfo(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),l0),'x--')
+    # # ax0.plot(np.abs(pdetec.xschmidl_filt_nodc[L0+pdetec.xschmidl_filt_delay::]),'x')
+    ax0.plot(np.abs(xcrossauto[hl::]),'d-')
+    # ax0.plot(np.abs(xcrossauto2[hl::]),'d-')
 
     # ax0.plot(np.abs(x_no_dc[hl::]),'o--')
     # ax0.plot(np.abs(dc_mavg1[hl::]),'.-')
@@ -274,21 +372,29 @@ def detector_transform_visualizations(pdetec):
 
     # ax0.plot(preamble_utils.compute_schmidl_cox_cfo(pdetec.xschmidl_filt[pdetec.xschmidl_filt_delay::],pdetec.pseq0.size),'.')
     ax0.legend(['|.|^2','MovAvg','autocorr','autocorr_dc_correct','autocorr_filt','autocorr_filt_dc_correct'])
+    print 'maxi:',np.argmax(np.abs(xcrossauto[hl::])),np.argmax(np.abs(xcorr1[hl+L0::])),np.argmax(np.abs(xcrossauto2[hl::]))
 
-    # ax1.plot(pdetec.xschmidl_filt_mag2[d2::]/mavg_vec[0:nout-d2])
-    ax1.plot(np.abs(xschmidl_filt[hl::])/xmag2_mavg1[hl:xschmidl_filt.size],color=colors.cnames['silver'])
-    ax1.plot(np.abs(xcorr[hl:xmag2_mavg2.size])**2/xmag2_mavg2[hl::])
-    ax1.plot(np.abs(xcorr_cfo_correct[hl:xmag2_mavg2.size])**2/xmag2_mavg2[hl::])
-    ax1.plot(np.abs(xcorr_cfo_dc_correct[hl::])**2/xmag2_mavg_no_dc2[hl::],color=colors.cnames['tomato'],linewidth=2,linestyle=':',marker='o')
-    ax1.plot(np.abs(xcorr_cfo_dc_correct_alt[hl-pdetec.awgn_len:xmag2_mavg_no_dc2.size-pdetec.awgn_len])**2/xmag2_mavg_no_dc2[hl::],'x-',color=colors.cnames['silver'])
-    ax1.plot(np.abs(xschmidl_filt_no_dc[hl::])/xmag2_mavg_no_dc[hl:xschmidl_filt_no_dc.size])
-    ax1.plot(np.abs(xcorr0_filt[hl:xmag2_mavg_no_dc.size])/xmag2_mavg_no_dc[hl:xcorr0_filt.size],'.:')
-    ax1.plot(cfo_no_dc[hl::],'o--')
-    # ax1.legend(['autocorr_filt','xcorr_filt_no_cfo_correct','xcorr_filt','xcorr_filt_dc_correct','autocorr_dc_correct'])
+    # # ax1.plot(pdetec.xschmidl_filt_mag2[d2::]/mavg_vec[0:nout-d2])
+    # ax1.plot(np.abs(xschmidl_filt[hl::])/xmag2_mavg1[hl:xschmidl_filt.size],color=colors.cnames['silver'])
+    # ax1.plot(np.abs(xcorr[hl:xmag2_mavg2.size])**2/xmag2_mavg2[hl::])
+    # ax1.plot(np.abs(xcorr_cfo_correct[hl:xmag2_mavg2.size])**2/xmag2_mavg2[hl::])
+    # ax1.plot(np.abs(xcorr_cfo_dc_correct[hl::])**2/xmag2_mavg_no_dc2[hl::],color=colors.cnames['tomato'],linewidth=2,linestyle=':',marker='o')
+    # ax1.plot(np.abs(xcorr_cfo_dc_correct_alt[hl-pdetec.awgn_len:xmag2_mavg_no_dc2.size-pdetec.awgn_len])**2/xmag2_mavg_no_dc2[hl::],'x-',color=colors.cnames['silver'])
+    ax1.plot(np.abs(xschmidl_filt_no_dc[hl::])/xmag2_mavg_no_dc[hl:xschmidl_filt_no_dc.size],':')
+    # ax1.plot(np.abs(xcorr0_filt[hl:xmag2_mavg_no_dc.size])/xmag2_mavg_no_dc[hl:xcorr0_filt.size],'.:')
+    # ax1.plot(cfo_no_dc[hl::],'--')
+    # ax1.plot(xcfo0[hl::],'--')
+    # ax1.plot(np.abs(xcorr1_mavg2[hl:xmag2_mavg_no_dc.size])/3/xmag2_mavg_no_dc[hl::],'d:')
+    ax1.plot(np.abs(xcorr0_mavg[hl:xmag2_mavg_no_dc.size])/xmag2_mavg_no_dc[hl::],'x:')
+    ax1.plot(np.abs(xcorr1[hl+L0:xmag2_mavg_no_dc.size+L0])/xmag2_mavg_no_dc[hl::],'d:')
+    # # ax1.plot(cfo_no_dc_no_filt[hl::],'.--')
+    # # ax1.legend(['autocorr_filt','xcorr_filt_no_cfo_correct','xcorr_filt','xcorr_filt_dc_correct','autocorr_dc_correct'])
+    ax1.plot(np.sqrt(np.abs(xcrossauto[hl::]))/xmag2_mavg_no_dc[hl:xcrossauto.size])
     plt.show()
 
 if __name__=='__main__':
     #test1()
     # test2()
-    test3()
+    # test3()
+    test4()
     print 'Test completed sucessfully'
