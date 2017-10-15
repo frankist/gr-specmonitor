@@ -222,7 +222,7 @@ def test4():
         amp = 10**(s/20.0)
         for r in range(num_runs):
             sframer = preamble_utils.SignalFramer(fparams)
-            pdetec = preamble_utils.PreambleDetectorType2(fparams,0.08,0.04)
+            pdetec = preamble_utils.PreambleDetectorType2(fparams,barker_len,0.08,0.04)
 
             xlen = fparams.section_duration()+guard_len*2
             x = (np.random.randn(xlen)+np.random.randn(xlen)*1j)*0.1/np.sqrt(2)
@@ -266,7 +266,7 @@ def test4():
 def detector_transform_visualizations(pdetec):
     preamble_len = pdetec.params.length()
     L = pdetec.params.length()
-    L0 = pdetec.pseq0_tot_len
+    L0 = pdetec.pseq0_lvl2_len
     l0 = pdetec.pseq0.size
     nout = pdetec.x_h.size
     hl = pdetec.x_h.hist_len
@@ -389,7 +389,7 @@ def detector_transform_visualizations(pdetec):
     ax1.plot(np.abs(xcorr1[hl+L0:xmag2_mavg_no_dc.size+L0])/xmag2_mavg_no_dc[hl::],'d:')
     # # ax1.plot(cfo_no_dc_no_filt[hl::],'.--')
     # # ax1.legend(['autocorr_filt','xcorr_filt_no_cfo_correct','xcorr_filt','xcorr_filt_dc_correct','autocorr_dc_correct'])
-    ax1.plot(np.sqrt(np.abs(xcrossauto[hl::]))/xmag2_mavg_no_dc[hl:xcrossauto.size])
+    ax1.plot(np.sqrt(np.abs(xcrossauto[hl::]))/xmag2_mavg_no_dc[hl:xcrossauto.size],':')
     plt.show()
 
 if __name__=='__main__':

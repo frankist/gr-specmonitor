@@ -159,6 +159,7 @@ def zc_cfo_estimation_freq(X,PSEQ): # works with ZadoffChu
     Xshift = np.sum(Xdot*np.conj(np.roll(Xdot,1)))
     return -np.angle(Xshift)/(2*np.pi)
 
+# something seems wrong here
 def interleaved_zc_cfo_estimation(x,pseq,Ntimes):
     import matplotlib.pyplot as plt
     PSEQ = np.fft.fft(pseq)

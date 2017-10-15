@@ -280,8 +280,9 @@ class PreambleDetectorType1:
         self.nread += x.size
 
 class PreambleDetectorType2:
-    def __init__(self, fparams, thres1=0.3, thres2=0.3):#params, awgn_len):
+    def __init__(self, fparams, barker_seq0, thres1=0.3, thres2=0.3):#params, awgn_len):
         self.frame_params = fparams
+        self.barker_seq0 = barker_seq0
         self.thres1 = thres1
         self.thres2 = thres2
 
@@ -304,19 +305,19 @@ class PreambleDetectorType2:
         self.x_h = []
 #         # # self.xmag2_h = []
 #         # self.xcorr_filt = np.array([],np.complex64)
-        self.__max_margin__ = self.pseq0_tot_len
-        self.delay = [self.pseq0_tot_len, self.pseq0.size*2-1, len(self.barker_diff)*self.pseq0.size]
+        self.__max_margin__ = self.barker_seq0*self.pseq0.size
+        self.delay = [self.pseq0_lvl2_len, self.pseq0.size*2-1, len(self.barker_diff)*self.pseq0.size]
         self.delay_cum = np.cumsum(self.delay)
 #         # # self.hist_len2 = self.hist_len+self.__max_margin__+self.delay_cum[0]
         self.hist_len2 = np.sum(self.delay_cum[1:3])+self.params.length()+self.awgn_len+2*self.margin
 #         # # self.xmag2_mavg = []
 #         # self.xschmidlmag2_h = []
         self.x_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
-#         # self.xdc_mavg_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
-#         # self.xnodc_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)
-#         # self.xschmidl_nodc = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)# check if this size is fine
-#         # self.xschmidl_filt_nodc = array_with_hist(np.array([],dtype=np.complex64),self.__max_margin__)
-#         # self.xschmidl_filt_mag2_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__)
+        self.xdc_mavg_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
+        self.xnodc_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)
+        self.xschmidl_nodc = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)# check if this size is fine
+        self.xschmidl_filt_nodc = array_with_hist(np.array([],dtype=np.complex64),self.__max_margin__)
+        self.xschmidl_filt_mag_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__)
 
         self.local_max_finder_h = sliding_window_max_hist(self.__max_margin__)
 
