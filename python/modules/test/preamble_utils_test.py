@@ -90,7 +90,7 @@ def test2():
     def test_partitioning(toffset,partition_part):
         pdetec = preamble_utils.PreambleDetectorType1(fparams)
         pdetec2 = preamble_utils.PreambleDetectorType1(fparams)
-        assert all([pdetec.barker_vec[i]==zadoffchu.barker_codes[barker_len][i] for i in range(barker_len)])
+        assert all([pdetec.lvl2_seq[i]==zadoffchu.barker_codes[barker_len][i] for i in range(barker_len)])
 
         y_with_offset = np.append(np.zeros(toffset,dtype=y.dtype),y)
         pdetec.work(y_with_offset)
@@ -202,13 +202,13 @@ def test4():
     np.random.seed(4)
 
     guard_len=5
-    awgn_len=75
+    awgn_len=200
     frame_period = 3000
     pseq_lvl2_len = len(zadoffchu.generate_MLS(13*4))
     pseq_len = [13,199]
     nrepeats0 = 1
 
-    dc_offset = 0#1
+    dc_offset = 2.0
     cfo = -0.45/pseq_len[0]
 
     pparams = preamble_utils.generate_preamble_type2(pseq_len,pseq_lvl2_len,nrepeats0)
@@ -219,10 +219,13 @@ def test4():
     FalseAlarmRate = np.zeros(len(SNRdB_range))
     Pdetec = np.zeros(len(SNRdB_range))
     amp_stats = []
-    param_prod_len = len(SNRdB_range)
-    estim_stats = {'SNRdB':{'sum':np.zeros(param_prod_len),'mse_sum':np.zeros(param_prod_len)},
+    N = len(SNRdB_range)
+    estim_stats = {'SNRdB':{'sum':np.zeros(N),'mse_sum':np.zeros(N)},
                    'detect_count':np.zeros(len(SNRdB_range)),
-                   'amplitude':{'sum':np.zeros(param_prod_len),'mse_sum':np.zeros(param_prod_len)}}
+                   'amplitude':{'sum':np.zeros(N),'mse_sum':np.zeros(N)},
+                   'awgn_mag2':{'sum':np.zeros(N),'mse_sum':np.zeros(N)},
+                   'cfo':{'sum':np.zeros(N),'mse_sum':np.zeros(N)},
+                   'dc_offset':{'abs_sum':np.zeros(N),'mse_sum':np.zeros(N)}}
     for si,s in enumerate(SNRdB_range):
         amp_stats.append([0.0,0.0,0])
         amp = 10**(s/20.0)
@@ -235,18 +238,23 @@ def test4():
             x = (np.random.randn(xlen)+np.random.randn(xlen)*1j)*0.1/np.sqrt(2)
             y,section_ranges = sframer.frame_signal(x,1)
             y *= amp # the preamble has amplitude 1
-            y = preamble_utils.apply_cfo(y,cfo)+dc_offset*np.exp(1j*np.random.rand()*2*np.pi)
+            y = preamble_utils.apply_cfo(y,cfo)
 
             T = 1000
             toffset = 0#np.random.randint(0,T)
+            preamble_start = toffset+awgn_len
             yoffset = np.append(np.zeros(toffset,dtype=np.complex64),y)
             yoffset = np.append(yoffset,np.zeros(T-toffset,dtype=np.complex64))
             awgn = (np.random.randn(yoffset.size)+np.random.randn(yoffset.size)*1j)/np.sqrt(2)
             y_pwr = amp**2
             awgn_pwr = np.mean(np.abs(awgn)**2)
             yoffset += awgn
+            yawgn_nodc_pwr = np.mean(np.abs(yoffset[preamble_start:preamble_start+fparams.preamble_params.length()])**2)
+            dc_offset_with_phase = dc_offset*np.exp(1j*np.random.rand()*2*np.pi)
+            yoffset += dc_offset_with_phase
             print 'AWGN pwr [dB]:',10*np.log10(awgn_pwr)
             print 'actual SNRdB:',10*np.log10(y_pwr/awgn_pwr)
+            print 'amplitude:',yawgn_nodc_pwr
             # plt.plot(yoffset)
             # plt.show()
 
@@ -257,39 +265,56 @@ def test4():
                 max_el = np.argmax([np.abs(p.xcorr) for p in pdetec.peaks])
                 test1 = np.abs(pdetec.peaks[max_el].tidx-(toffset+awgn_len))<2
                 if test1:
-                    amp_stats[si][0] += pdetec.peaks[max_el].preamble_mag2
-                    amp_stats[si][1] += (pdetec.peaks[max_el].preamble_mag2-amp**2)**2
+                    p = pdetec.peaks[max_el]
+                    amp_stats[si][0] += p.preamble_mag2
+                    amp_stats[si][1] += (p.preamble_mag2-amp**2)**2
                     amp_stats[si][2] += 1
-                    estim_stats['amplitude']['sum'][si] += pdetec.peaks[max_el].preamble_mag2
-                    estim_stats['amplitude']['mse_sum'][si] += (pdetec.peaks[max_el].preamble_mag2-y_pwr-1)**2
-                    estim_stats['SNRdB']['sum'][si] += pdetec.peaks[max_el].SNRdB()
-                    estim_stats['SNRdB']['mse_sum'][si] += (pdetec.peaks[max_el].SNRdB()-10*np.log10(y_pwr/awgn_pwr))**2
+                    estim_stats['amplitude']['sum'][si] += p.preamble_mag2
+                    estim_stats['amplitude']['mse_sum'][si] += np.abs(p.preamble_mag2-yawgn_nodc_pwr)**2#(10**(s/10.0)+1))**2
+                    estim_stats['SNRdB']['sum'][si] += p.SNRdB()
+                    estim_stats['SNRdB']['mse_sum'][si] += np.abs(p.SNRdB()-10*np.log10(y_pwr/awgn_pwr))**2
+                    estim_stats['awgn_mag2']['sum'][si] += p.awgn_mag2_nodc
+                    estim_stats['awgn_mag2']['mse_sum'][si] += (p.awgn_mag2_nodc-awgn_pwr)**2
+                    estim_stats['dc_offset']['abs_sum'][si] += np.abs(p.dc_offset)
+                    estim_stats['dc_offset']['mse_sum'][si] += np.abs(p.dc_offset-dc_offset_with_phase)**2
+                    estim_stats['cfo']['sum'][si] += p.cfo
+                    estim_stats['cfo']['mse_sum'][si] += np.abs(p.cfo-cfo)**2
                     estim_stats['detect_count'][si] += 1
                 print s,pdetec.peaks[0].tidx,toffset+awgn_len,test1
             num_fa = len(pdetec.peaks)-1 if test1 else len(pdetec.peaks)
             Pdetec[si] += test1
             FalseAlarmRate[si] += num_fa
             # if test1 is False or num_fa>0:
-            #     detector_transform_visualizations(pdetec)
+            # detector_transform_visualizations(pdetec)
             print 'result:',test1
     Pdetec /= float(num_runs)
     FalseAlarmRate /= float(num_runs)
+    counts = np.array([max(estim_stats['detect_count'][i],1) for i in range(N)])
+    preamble_amp_avg = estim_stats['amplitude']['sum']/counts
+    preamble_amp_real = np.array([10**(s/10.0)+1 for s in SNRdB_range])
 
     fig, (ax0,ax1,ax2) = plt.subplots(nrows=3)
     ax0.plot(SNRdB_range,Pdetec,'x-')
     ax0.plot(SNRdB_range,FalseAlarmRate,'o-')
-    # ax1.plot(SNRdB_range,[np.sqrt(a[1]/max(1,a[2])) for a in amp_stats])
-    ax1.plot(SNRdB_range,[np.sqrt(estim_stats['amplitude']['mse_sum'][i]/max(1,estim_stats['detect_count'][si])) for i in range(param_prod_len)])
-    ax1.plot(SNRdB_range,[np.sqrt(estim_stats['SNRdB']['mse_sum'][i]/max(1,estim_stats['detect_count'][si])) for i in range(len(SNRdB_range))])
+    ax1.plot(SNRdB_range,np.sqrt(estim_stats['amplitude']['mse_sum']/counts))
+    ax1.plot(SNRdB_range,np.sqrt(estim_stats['SNRdB']['mse_sum']/counts))
+    ax1.plot(SNRdB_range,np.sqrt(estim_stats['dc_offset']['mse_sum']/counts))
+    ax1.plot(SNRdB_range,np.sqrt(estim_stats['awgn_mag2']['mse_sum']/counts),':')
+    ax1.plot(SNRdB_range,np.sqrt(estim_stats['cfo']['mse_sum']/counts),':')
     ax1.set_ylabel('RMSE')
-    ax2.plot(SNRdB_range,[estim_stats['SNRdB']['sum'][i]/max(1,estim_stats['detect_count'][i])-SNRdB_range[i] for i in range(len(SNRdB_range))])
+    
+    ax2.plot(SNRdB_range,preamble_amp_avg-preamble_amp_real)
+    ax2.plot(SNRdB_range,estim_stats['SNRdB']['sum']/counts-SNRdB_range)
+    ax2.plot(SNRdB_range,estim_stats['dc_offset']['abs_sum']/counts-dc_offset,':')
+    ax2.plot(SNRdB_range,estim_stats['awgn_mag2']['sum']/counts-1,'.-')
+    ax2.plot(SNRdB_range,estim_stats['cfo']['sum']/counts-cfo)
     ax2.set_ylabel('bias')
     plt.show()
 
 def detector_transform_visualizations(pdetec):
     preamble_len = pdetec.params.length()
     L = pdetec.params.length()
-    L0 = pdetec.pseq0_lvl2_len
+    L0 = pdetec.pseq0_tot_len
     l0 = pdetec.pseq0.size
     nout = pdetec.x_h.size
     hl = pdetec.x_h.hist_len
@@ -325,7 +350,7 @@ def detector_transform_visualizations(pdetec):
     xschmidl_filt_no_dc = preamble_utils.interleaved_crosscorrelate(xschmidl_no_dc,np.array(barker_diff),l0)/len(barker_diff)
     cfo_no_dc = preamble_utils.compute_schmidl_cox_cfo(xschmidl_filt_no_dc,l0)
     # cfo_no_dc_no_filt = balg.moving_average_no_hist(preamble_utils.compute_schmidl_cox_cfo(xschmidl_no_dc,l0),l0)
-    maxautocorr = 75#np.argmax(np.abs(xschmidl_filt[hl::]))
+    maxautocorr = 200#np.argmax(np.abs(xschmidl_filt[hl::]))
     cfo = preamble_utils.compute_schmidl_cox_cfo(xschmidl_filt_no_dc[hl+maxautocorr],pdetec.pseq0.size)
     x_no_cfo = preamble_utils.compensate_cfo(x,cfo)
     assert np.array_equal(xschmidl_no_dc[hl::],pdetec.xschmidl_nodc[pdetec.delay_cum[1]::])
@@ -335,7 +360,7 @@ def detector_transform_visualizations(pdetec):
     # plt.show()
     # assert np.array_equal(np.abs(xschmidl_filt_no_dc[hl::]),pdetec.xschmidl_filt_mag2_nodc[pdetec.delay_cum[2]::])
     # cfo = -0.49/pdetec.params.pseq_list_norm[0].size
-    # cfo3 = balg.interleaved_zc_cfo_estimation(x[hl+75::],pdetec.params.pseq_list_norm[0],barker_len)
+    cfo3 = balg.interleaved_zc_cfo_estimation(x[hl+200::],pdetec.params.pseq_list_norm[0],barker_len)
 
     # compute the crosscorrelation function
     xcorr0 = np.correlate(x_no_dc,pdetec.params.pseq_list_norm[0])/l0
@@ -347,18 +372,18 @@ def detector_transform_visualizations(pdetec):
     assert np.max(np.abs(xcrossauto[hl::]-pdetec.xcrossautocorr_nodc[pdetec.delay2_cum[2]::]))<1.0e-5
 
     # attempts
-    xcorr0_mavg2,xcfo0 = preamble_utils.interleaved_crosscorrelate_rotated(np.correlate(x,pdetec.params.pseq_list_norm[0])/l0,pdetec.barker_vec,l0)
-    xcorr00 = np.abs(preamble_utils.interleaved_crosscorrelate(np.correlate(preamble_utils.compensate_cfo(x,xcfo0[hl+75]),pdetec.params.pseq_list_norm[0])/l0,pdetec.barker_vec,l0)/pdetec.barker_len)**2
-    print 'cfo:',cfo,real_cfo,xcfo0[75+hl]#,cfo3
-    # xcorr0_mavg2 = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,pdetec.barker_vec,l0)/pdetec.barker_len)**2#+np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0[l0*4::],pdetec.barker_vec[4:6],l0)/2)**2#,np.ones(pdetec.barker_len-1),l0)/(pdetec.barker_len-1)
+    xcorr0_mavg2,xcfo0 = preamble_utils.interleaved_crosscorrelate_rotated(np.correlate(x,pdetec.params.pseq_list_norm[0])/l0,pdetec.lvl2_seq,l0)
+    xcorr00 = np.abs(preamble_utils.interleaved_crosscorrelate(np.correlate(preamble_utils.compensate_cfo(x,xcfo0[hl+75]),pdetec.params.pseq_list_norm[0])/l0,pdetec.lvl2_seq,l0)/pdetec.lvl2_len)**2
+    print 'cfo:',cfo,real_cfo,xcfo0[75+hl],cfo3
+    # xcorr0_mavg2 = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,pdetec.lvl2_seq,l0)/pdetec.lvl2_len)**2#+np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0[l0*4::],pdetec.lvl2_seq[4:6],l0)/2)**2#,np.ones(pdetec.lvl2_len-1),l0)/(pdetec.lvl2_len-1)
     def compute_partial_xcorr0(d,siz):
-        return np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0[d*l0::],pdetec.barker_vec[d:d+siz],l0)/siz)**2
+        return np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0[d*l0::],pdetec.lvl2_seq[d:d+siz],l0)/siz)**2
     def func1(num,siz):
         assert num>1
         return np.mean([compute_partial_xcorr0(i,siz)[0:-(num-i)*l0] for i in range(num)],0)
-    xcorr1_mavg2 = compute_partial_xcorr0(0,4)[0:-4*l0]+compute_partial_xcorr0(4,4)#func1(pdetec.barker_len-5,5)#compute_partial_xcorr0(0,5)[0:-l0]#+compute_partial_xcorr0(1,2)
+    xcorr1_mavg2 = compute_partial_xcorr0(0,4)[0:-4*l0]+compute_partial_xcorr0(4,4)#func1(pdetec.lvl2_len-5,5)#compute_partial_xcorr0(0,5)[0:-l0]#+compute_partial_xcorr0(1,2)
     xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(xcorr0,barker_vec,l0)/barker_len)**2
-    # xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),np.ones(pdetec.barker_len),l0)/pdetec.barker_len)**2
+    # xcorr0_filt = np.abs(preamble_utils.interleaved_crosscorrelate(preamble_utils.compensate_cfo(xcorr0[0:cfo_no_dc.size],cfo_no_dc),np.ones(pdetec.lvl2_len),l0)/pdetec.lvl2_len)**2
     xcorr = np.correlate(x,pdetec.params.preamble)/L
     xcorr_cfo_correct = np.correlate(preamble_utils.compensate_cfo(x,cfo),pdetec.params.preamble)/L
     xcorr_cfo_dc_correct = np.correlate(preamble_utils.compensate_cfo(x_no_dc2,cfo),pdetec.params.preamble)/L
@@ -418,6 +443,7 @@ def detector_transform_visualizations(pdetec):
     # # ax1.plot(cfo_no_dc_no_filt[hl::],'.--')
     # # ax1.legend(['autocorr_filt','xcorr_filt_no_cfo_correct','xcorr_filt','xcorr_filt_dc_correct','autocorr_dc_correct'])
     ax1.plot(np.sqrt(np.abs(xcrossauto[hl::]))/xmag2_mavg_no_dc[hl:xcrossauto.size],':')
+    ax1.legend(['S&C_filt','Xcorr_mavg','Xcorr1','S&C*Xcorr'])
     plt.show()
 
 if __name__=='__main__':

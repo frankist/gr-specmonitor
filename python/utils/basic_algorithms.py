@@ -33,11 +33,13 @@ class moving_average:
         self.xhist = xtot[xtot.size-self.size+1::]
         return y
 
+# tested
 def moving_average_with_hist(x_h,mavgsize):
     assert x_h.hist_len>=mavgsize
     # xmavg = np.zeros(x_h.size,dtype=x_h.dtype)
     return moving_average_no_hist(x_h[-mavgsize+1::],mavgsize)
 
+# tested
 def moving_average_no_hist(x,size):
     return np.array([np.mean(x[i:i+size]) for i in range(x.size-size+1)])
 
@@ -205,13 +207,13 @@ class no_delay_moving_average_ccc:
 
 # tested
 class array_with_hist(object):# need to base it on object for negative slices
-    def __init__(self,array,hist_len):
+    def __init__(self,array,hist_len,val=0.0):
         self.hist_len = hist_len
         self.size = len(array)
         if type(array) is np.ndarray:
-            self.array_h = np.append(np.zeros(hist_len,dtype=array.dtype),array)
+            self.array_h = np.append(np.ones(hist_len,dtype=array.dtype)*val,array)
         else:
-            self.array_h = np.append(np.zeros(hist_len),array)
+            self.array_h = np.append(np.ones(hist_len)*val,array)
         self.dtype = array.dtype
 
     def __str__(self):
@@ -232,25 +234,23 @@ class array_with_hist(object):# need to base it on object for negative slices
         if type(idx) is slice:
             start = idx.start+self.hist_len if idx.start is not None else 0
             stop = idx.stop+self.hist_len if idx.stop is not None else self.size+self.hist_len
-            # print stop,self.size+self.hist_len,start,idx
-            assert stop<=self.size+self.hist_len and start>=0
+            assert stop<=self.size+self.hist_len
             return self.array_h[start:stop:idx.step]
-            # assert idx.stop <= self.size
-            # start = idx.start+self.hist_len if idx.start <= self.size else idx.start-self.size
-            # stop = idx.stop+self.hist_len if idx.stop <= self.size else idx.stop-self.size
-            # print 'wololo2:',start,stop
-            # return self.array_h[start:stop]
         assert idx<=self.size+self.hist_len
         return self.array_h[idx+self.hist_len]
 
     def data(self):
         return self.array_h[0:self.hist_len+self.size]
 
-    # def __setitem__(self,idx,value):
-    #     if type(idx) is slice:
-    #         self.array_h[idx.start+self.hist_len:idx.stop+self.hist_len:idx.step] = value
-    #     else:
-    #         self.array_h[idx+self.hist_len] = value
+    def __setitem__(self,idx,value):
+        if type(idx) is slice:
+            start = idx.start+self.hist_len if idx.start is not None else 0
+            stop = idx.stop+self.hist_len if idx.stop is not None else self.size+self.hist_len
+            assert stop<=self.size+self.hist_len
+            self.array_h[start:stop:idx.step] = value
+        else:
+            assert idx<=self.size
+            self.array_h[idx+self.hist_len] = value
 
     def advance(self):
         self.array_h[0:self.hist_len] = self.array_h[self.size:self.size+self.hist_len]
