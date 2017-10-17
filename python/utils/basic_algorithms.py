@@ -35,13 +35,11 @@ class moving_average:
 
 def moving_average_with_hist(x_h,mavgsize):
     assert x_h.hist_len>=mavgsize
-    xmavg = np.zeros(x_h.size,dtype=x_h.dtype)
-    for i in range(x_h.size):
-        xmavg[i] = np.mean(x_h[i-mavgsize:i])
-    return xmavg
+    # xmavg = np.zeros(x_h.size,dtype=x_h.dtype)
+    return moving_average_no_hist(x_h[-mavgsize+1::],mavgsize)
 
 def moving_average_no_hist(x,size):
-    return np.array([np.mean(x[i:i+size]) for i in range(x.size-size)])
+    return np.array([np.mean(x[i:i+size]) for i in range(x.size-size+1)])
 
 # Find the local maximum within boundaries defined by "margin": [-margin,margin]
 
@@ -115,6 +113,11 @@ class filter_ccc:
         self.xhist = xtot[xtot.size-self.size+1::]
         return y
 
+# the output is delayed by taps.size-1
+def correlate_with_hist(x_h,taps):
+    xtot = x_h[-taps.size+1:x_h.size]
+    return np.correlate(xtot,taps)
+
 # tested 
 def compute_schmidl_cox_peak(x,nBins_half):
     dim = x.size-2*nBins_half+1
@@ -126,13 +129,14 @@ def compute_schmidl_cox_peak(x,nBins_half):
 def compute_schmidl_cox_cfo(cplx_vec,nBins_half):
     return -np.angle(cplx_vec)/(2*np.pi*nBins_half)
 
+# NOTE: The output is delayed by nBins_half*2-1
 def compute_schmidl_cox_with_hist(x_h,nBins_half):
     return compute_schmidl_cox_peak(x_h[-nBins_half*2+1:x_h.size],nBins_half)
 
 # tested
 def interleaved_crosscorrelate(x1,x2,interleav_len):
     winsize = interleav_len*len(x2)
-    y = np.zeros(x1.size-winsize, dtype=np.complex64)
+    y = np.zeros(x1.size-winsize+1, dtype=np.complex64)
     for i in range(y.size):
         xx = x1[i:i+winsize:interleav_len]
         y[i] = np.sum(xx*x2)
@@ -140,17 +144,24 @@ def interleaved_crosscorrelate(x1,x2,interleav_len):
 
 # tested
 def interleaved_crosscorrelate_with_hist(x_h,x2,interleav_len):
+    assert type(x_h) is array_with_hist
     winsize = interleav_len*len(x2)
-    x = x_h[-winsize:x_h.size]
+    x = x_h[-winsize+1:x_h.size]
     return interleaved_crosscorrelate(x,x2,interleav_len)
 
-def interleaved_sum(x1,num_sums,interleav_len):
+def interleaved_sum(x1,num_sums,interleav_len, transform1 = lambda x : x):
     winsize = interleav_len*num_sums
-    y = np.zeros(x1.size-winsize,dtype=np.complex64)
+    y = np.zeros(x1.size-winsize+1,dtype=x1.dtype)
     for i in range(y.size):
         xx = x1[i:i+winsize:interleav_len]
-        y[i] = np.sum(np.abs(xx))
+        y[i] = np.sum(transform1(xx))
     return y
+
+def interleaved_sum_with_hist(x_h,num_sums,interleav_len, transform1 = lambda x : x):
+    assert type(x_h) is array_with_hist
+    winsize = interleav_len*num_sums
+    x = x_h[-winsize+1:x_h.size]
+    return interleaved_sum(x,num_sums,interleav_len, transform1)
 
 # arguments are in the freq domain
 def zc_cfo_estimation_freq(X,PSEQ): # works with ZadoffChu
@@ -245,7 +256,7 @@ class array_with_hist(object):# need to base it on object for negative slices
         self.array_h[0:self.hist_len] = self.array_h[self.size:self.size+self.hist_len]
 
     def push(self,x):
-        assert x.dtype==self.array_h.dtype
+        # assert x.dtype==self.array_h.dtype
         self.advance()
         self.reserve(x.size)
         self.size = x.size

@@ -20,6 +20,7 @@
 #
 
 import numpy as np
+from scipy.signal import max_len_seq
 
 def generate_sequence(zc_length, u, q, n_start = 0, num_samples = -1):
     if num_samples < 0:
@@ -48,3 +49,9 @@ def generate_noDC_sequence(zc_length, u, q, guard_len = 0):
 barker_codes = {2:[1,-1],3:[1,1,-1],4:[1,1,-1,1], \
                5:[1,1,1,-1,1],7:[1,1,1,-1,-1,1,-1],11:[1,1,1,-1,-1,-1,1,-1,-1,1,-1], \
               13:[1,1,1,1,1,-1,-1,1,1,-1,1,-1,1]}
+
+def generate_MLS(mlen):
+    nbits = int(np.ceil(np.log2(mlen+1)))
+    #actual_mlen = 2**nbits-1
+    pseq = max_len_seq(nbits)[0]*2 - 1
+    return pseq
