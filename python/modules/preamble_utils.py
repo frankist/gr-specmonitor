@@ -59,16 +59,16 @@ class preamble_params:
         return self.preamble.size
 
 # example: params -> [5,11], 4 --> [zc(5) zc(5) -zc(5) zc(5) zc(11)]
-def generate_preamble_type1(pseq_len_list, barker_len):
-    assert len(pseq_len_list)==2
-    pseq_list = [random_sequence.zadoffchu_sequence(p,1,0) for p in pseq_len_list]
-    # pseq_dc_list = [np.mean(pseq_list[i]) for i in range(len(pseq_len_list))]
-    # pseq_list = [pseq_list[i]-pseq_dc_list[i] for i in range(len(pseq_len_list))]
-    pseq_list_coef = random_sequence.barker_code[barker_len]+[1]
-    pseq_len_seq = [0]*barker_len+[1]
-    return preamble_params(pseq_list,pseq_len_seq,pseq_list_coef)
+# def generate_preamble_type1(pseq_len_list, barker_len):
+#     assert len(pseq_len_list)==2
+#     pseq_list = [random_sequence.zadoffchu_sequence(p,1,0) for p in pseq_len_list]
+#     # pseq_dc_list = [np.mean(pseq_list[i]) for i in range(len(pseq_len_list))]
+#     # pseq_list = [pseq_list[i]-pseq_dc_list[i] for i in range(len(pseq_len_list))]
+#     pseq_list_coef = random_sequence.barker_code[barker_len]+[1]
+#     pseq_len_seq = [0]*barker_len+[1]
+#     return preamble_params(pseq_list,pseq_len_seq,pseq_list_coef)
 
-def generate_preamble_type2(pseq_len_list, pseq_lvl2_len, num_repeats):
+def generate_preamble_type2(pseq_len_list, pseq_lvl2_len, num_repeats=1):
     assert len(pseq_len_list)==2
     pseq_list = [random_sequence.zadoffchu_noDC_sequence(p,1,0) for p in pseq_len_list]
     lvl2_code = random_sequence.maximum_length_sequence(pseq_lvl2_len)
@@ -82,15 +82,18 @@ def generate_preamble_type2(pseq_len_list, pseq_lvl2_len, num_repeats):
     return preamble_params(pseq_list,pseq_len_seq,pseq_list_coef)
 
 def get_schmidl_sequence(crosscorr_seq):
-    schmidl_seq = [1]*(len(crosscorr_seq)-1)
-    for i,p in enumerate(schmidl_seq):
+    schmidl_seq = np.ones(len(crosscorr_seq)-1,dtype=np.complex64)
+    for i in range(len(schmidl_seq)):
+        # schmidl_seq[i] = np.exp(1j*np.angle(crosscorr_seq[i+1]*crosscorr_seq[i]))
         schmidl_seq[i] = np.exp(1j*(np.angle(crosscorr_seq[i+1])-np.angle(crosscorr_seq[i])))
     return schmidl_seq
 
 def set_schmidl_sequence(autocorr_seq):
-    crosscorr_seq = [1]*(len(autocorr_seq)+1)
-    for i in range(1,len(autocorr_seq)):
-        crosscorr_seq[i] = np.exp(1j*(np.angle(crosscorr_seq[i-1])+np.angle(autocorr_seq[i-1])))
+    crosscorr_seq = np.ones(len(autocorr_seq)+1,dtype=np.complex64)
+    for i in range(len(autocorr_seq)):
+        crosscorr_seq[i+1] = np.exp(1j*(np.angle(crosscorr_seq[i])+np.angle(autocorr_seq[i])))
+        # crosscorr_seq[i+1] = np.exp(1j*(np.angle(crosscorr_seq[i]*autocorr_seq[i])))
+    # assert np.array_equal(np.real(get_schmidl_sequence(crosscorr_seq)),autocorr_seq)
     return crosscorr_seq
 
 # Frame structure: [awgn_len | preamble | guard0 | guard1 | section | guard2 | guard3]
@@ -265,15 +268,18 @@ class PreambleDetectorType2:
         self.xnodc_h.push(self.x_h[-L0+1:self.x_h.size-L0+1]-self.xdc_mavg_h[0::]) # delay_cum[0]
         # self.xnodc_h.push(self.x_h[0::]-self.xdc_mavg_h[0::]) # delay_cum[0]
         self.xschmidl_nodc.push(compute_schmidl_cox_with_hist(self.xnodc_h,l0)/l0) # delay_cum[1]
+        if self.nread<self.delay_cum[1]: # if first run, null the history to avoid transients
+            self.xschmidl_nodc[0:min((self.delay_cum[1]-self.nread),self.xschmidl_nodc.size)] = 0
         self.xschmidl_filt_nodc.push(interleaved_crosscorrelate_with_hist(self.xschmidl_nodc,self.lvl2_seq_diff,l0)/len(self.lvl2_seq_diff)) # delay d[2]
+
         self.xcorr_nodc.push(np.abs(correlate_with_hist(self.xnodc_h,self.params.pseq_list_norm[0])/l0)**2) #delay delay1_cum[0]
         self.xcorr_filt_nodc.push(interleaved_sum_with_hist(self.xcorr_nodc,self.lvl2_len,l0)/self.lvl2_len) # delay=delay1_cum[0]
         self.xcrossautocorr_nodc.push(np.abs(self.xschmidl_filt_nodc[0::])*self.xcorr_filt_nodc[0::])
 
-        if self.nread==0: # if first run, null the history to avoid transients
-            self.xcrossautocorr_nodc[-self.xcrossautocorr_nodc.hist_len:self.delay_cum[2]] = 0
+        # if self.nread<self.delay_cum[2]: # if first run, null the history to avoid transients
+        #     self.xcrossautocorr_nodc[-self.xcrossautocorr_nodc.hist_len:min((self.delay_cum[2]-self.nread),self.xcrossautocorr_nodc.size)] = 0
         local_peaks = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
-        print 'peaks:',[p-self.delay_cum[2] for p in local_peaks]
+        print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
             t = i-self.delay_cum[2]
@@ -283,7 +289,7 @@ class PreambleDetectorType2:
             xautocorr_nodc = np.sqrt(self.xcrossautocorr_nodc[i])#self.xschmidl_filt_mag_nodc[i]#np.sqrt(self.xcrossautocorr_nodc[i])#self.xschmidl_filt_mag_nodc[i]
 #             # print 'time:',t+self.nread, peak0_mag2_nodc, xautocorr_nodc
             if xautocorr_nodc>self.thres1*peak0_mag2_nodc:
-                print 'peak:',t,':',xautocorr_nodc,'>',self.thres1*peak0_mag2_nodc
+                print 'peak:',t+self.nread,':',i+self.nread,xautocorr_nodc,'>',self.thres1*peak0_mag2_nodc
                 tpeak,xcorr,cfo = self.find_crosscorr_peak(t)
                 dc_offset = np.mean(self.x_h[tpeak-self.awgn_len:tpeak])
                 xmag2_mavg_nodc = np.mean(np.abs(self.x_h[tpeak:tpeak+L]-dc_offset)**2) # for the whole preamble
