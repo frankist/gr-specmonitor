@@ -27,8 +27,8 @@ import metadata_handler as mh
 import session_params as sparams
 import numpy as np
 
-num_sections = 2
-section_size = 10000
+num_sections = 1
+section_size = 50000
 toffset_range = range(10,1000,100)
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
@@ -68,6 +68,7 @@ stage_params = {
         ],
         'Rx':
         [
+            ('num_subsections_per_section',5)
         ]
     }
     # 'wlan':

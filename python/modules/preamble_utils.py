@@ -142,7 +142,7 @@ class SignalFramer:
 
     # frame: [[0]*awgn_len | preamble | [0]*guard_len | [x]*(section_size+2*guard_len) | [0]*guard_len]
     def frame_signal(self,x,num_sections):
-        nread = self.frame_params.section_duration()*num_sections+2*self.frame_params.guard_len
+        nread = self.expected_nread_samples(num_sections)
         nwritten = self.frame_params.frame_period*num_sections
         assert x.size>=nread
 
@@ -154,6 +154,9 @@ class SignalFramer:
         section_ranges = self.get_framed_section_ranges(num_sections)
 
         return (framed_signal,section_ranges)
+
+    def expected_nread_samples(self,num_sections):
+        return self.frame_params.section_duration()*num_sections+2*self.frame_params.guard_len
 
 class tracked_peak:
     def __init__(self, tidx, xcorr_peak, xautocorr, cfo, xmag2, awgn_estim_nodc, dc_offset):

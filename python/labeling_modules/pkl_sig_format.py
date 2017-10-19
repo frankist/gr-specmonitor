@@ -20,9 +20,12 @@
 #
 
 import pickle
+import numpy as np
+import os
 
 class WaveformPklReader:
     def __init__(self,fname):
+        self.repeat_mode = False
         with open(fname,'r') as f:
             self.wavdata = pickle.load(f)
 
@@ -37,11 +40,19 @@ class WaveformPklReader:
 
     def read_section(self,startidx=0,endidx=None):
         if endidx is None:
-            return self.wavdata['IQsamples'][startidx::]
-        else:
-            return self.wavdata['IQsamples'][startidx:endidx]
+            endix = self.number_samples()
+        assert endix < self.number_samples() and startidx>=0
+        return self.wavdata['IQsamples'][startidx:endidx]
 
     def is_framed(self):
         if 'section_bounds' in self.wavdata:
             return True
         return False
+
+def read_fc32_file(fname,sample_offset=0,num_samples=-1):
+    f = open(fname, "rb")
+    with f:
+        byte_idx = sample_offset*8
+        f.seek(byte_idx, os.SEEK_SET)
+        samples = np.fromfile(f, dtype=np.complex64, num_samples)
+    return samples

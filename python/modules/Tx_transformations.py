@@ -51,11 +51,10 @@ def apply_framing_and_offsets(args):
     targetfilename = args['targetfilename']
     sourcefilename = args['sourcefilename']
 
+    ### Read parameters
     time_offset = params['time_offset']
     section_size = params['section_size']
     num_sections = params['num_sections']
-    guard_band = 5
-    awgn_guard_len = 100
     noise_voltage = 0#params.get('noise_voltage',0)
     freq_offset = params.get('frequency_offset',0)
     soft_gain = params.get('soft_gain',1)
@@ -65,21 +64,23 @@ def apply_framing_and_offsets(args):
     num_samples = num_sections*section_size
     hist_len = 3 # compensate for block history# channel is hier block with taps in it
 
-    # print_params(params)
+    ### Create preamble and frame structure
+    lvl2_diff_len = len(random_sequence.maximum_length_sequence(13))
+    pseq_len = [13,61]
+    guard_len = 5
+    awgn_guard_len = 100
+    pparams = preamble_utils.generate_preamble_type2(pseq_len,lvl2_diff_len)
+    fparams = preamble_utils.frame_params(pparams,guard_len,awgn_guard_len,section_size)
+    sframer = preamble_utils.SignalFramer(fparams)
 
+    ### Read IQsamples
     freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    twin = (time_offset-guard_band-hist_len,time_offset+num_samples+guard_band)
-    if twin[1]>=freader.number_samples():
-        print 'The file is not large enough for the requested number of samples.'
-        exit(-1)
-    if twin[0]<0:
-        print 'The beginning cannot be negative'
-        exit(-1)
+    twin = (time_offset-guard_len-hist_len,time_offset+num_samples+guard_len)
     xsections_with_hist = freader.read_section(twin[0],twin[1])
     prev_params = freader.parameters()
 
+    ### Create GR flowgraph that picks read samples, applies freq_offset, scaling, and stores in a vector_sink
     tb = gr.top_block()
-
     source = blocks.vector_source_c(xsections_with_hist, True)
     soft_amp = blocks.multiply_const_cc(np.sqrt(soft_gain)+0*1j)
     channel = channels.channel_model(noise_voltage,freq_offset)
@@ -103,9 +104,8 @@ def apply_framing_and_offsets(args):
     # plt.show()
     assert gen_data.size==xsections.size
 
-    pparams = preamble_utils.generate_preamble_type1([5,61],11)
-    fparams = preamble_utils.frame_params(pparams,guard_band,awgn_guard_len)
-    y,section_bounds = fparams.frame_signal(gen_data,num_sections,section_size)
+    ### Create preamble structure and frame the signal
+    y,section_bounds = sframer.frame_signal(gen_data,num_sections)
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
     box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,freader.data()['bounding_boxes'])

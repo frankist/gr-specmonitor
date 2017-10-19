@@ -42,31 +42,40 @@ class RF2FileFlowgraph:
     def run(self):
         self.tb.run()
 
-class File2FrameSyncFlowgraph:
-    def __init__(self,sourcefilename,targetfilename,frame_params):
-        self.tb = gr.top_block()
+def file2frame_sync(sourcefilename,targetfilename,frame_params,n_sections):
+    block_size = 1000
 
-        self.source = blocks.file_source_c(sourcefilename,False)
-        self.framesync = specmonitor.frame_sync_cc(blablabla)
-        self.dst = blocks.vector_source_c()
+    while True:
+        samples = pkl_sig_format.read_fc32_file(sourcefilename,i*block_size,block_size)
+        if len(samples)==0:
+            break
+        pdetec.work(samples)
 
-        self.tb.connect(self.source,self.framesync)
-        self.tb.connect(self.framesync,self.dst)
+    if len(pdetec.peaks)>=n_sections:
+        selected_peak_idxs = np.argsort([p.xcorr for p in pdetec.peaks])[-n_sections::]
+        # TODO: check if they are at equivalent distances
+        idx_sort = np.argsort([pdetec.peaks[i].tidx for i in selected_peak_idxs])
+        peaks_selected = [pdetec.peaks[selected_peak_idxs[i]] for i in idx_sort]
+        return (peaks_selected[0].tidx,peaks_selected)
 
-    def run(self):
-        self.tb.run()
+    return None
 
-        # check how many preambles were detected. If enough, we are fine. We can write the pickle
-        pass
+# class File2FrameSyncFlowgraph:
+#     def __init__(self,sourcefilename,targetfilename,frame_params):
+#         self.tb = gr.top_block()
 
-    def run(self):
-        # run
+#         self.source = blocks.file_source_c(sourcefilename,False)
+#         self.dst = blocks.vector_source_c()
 
-        # check if you got the expected number of subsections
+#         self.tb.connect(self.source,self.framesync)
+#         self.tb.connect(self.framesync,self.dst)
 
-        # if correct, save the sections into one file? This is fine. The spectrogram generator or final file cleaner
-        # will separate them later
-        pass
+#     def run(self):
+#         # run
+#         selt.tb.run()
+
+
+#         # if correct, save the sections into one file? This is fine. The spectrogram generator or final file cleaner
 
 def run_RF_channel(args):
     params = args['parameters']
@@ -74,6 +83,7 @@ def run_RF_channel(args):
     sourcefilename = args['sourcefilename']
     tmp_file = targetfolder + '/tmp.bin'
 
+    ### Read Signal already Framed and apply channel effects and settle time and writes to a temp file
     freader = pkl_sig_format.WaveformPklReader(sourcefilename)
     prev_params = freader.parameters()
     num_samples_settle = args['settle_time'] * freader['parameters']['waveform']['sample_rate']
@@ -85,10 +95,17 @@ def run_RF_channel(args):
     x_with_settle = np.append(np.zeros(num_samples_settle,np.complex64),x)
     x_with_settle = np.append(x_with_settle,np.zeros(num_samples_settle/2,np.complex64)) # padding at the end
 
-    rf_flowgraph = RF2FileFlowgraph(x_with_settle,tot_linear_gain,noise_voltage,freq_offset,tmp_file)
+    # keep running until we get a successful preamble sync
+    while True:
+        rf_flowgraph = RF2FileFlowgraph(x_with_settle,tot_linear_gain,noise_voltage,freq_offset,tmp_file)
+        rf_flowgraph.run() # this will stop after a while
 
-    rf_flowgraph.run() # this will stop after a while
+        ### Read the temporary file, syncs, and writes the pickle
+        ret = file2frame_sync(tmp_file,targetfilename,frame_params,n_sections)
+        if ret is not None:
+            # write file and discard padding samples
+            break
+        print 'Preamble sync has failed. Going to repeat transmission'
 
-    sync_flowgraph = File2FrameSyncFlowgraph(tmp_file,targetfilename,frame_params)
 
-    sync_flowgraph.run() # this will stop after the file ends.
+    # Note: The separation into multiple subsections happens later
