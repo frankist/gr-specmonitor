@@ -121,6 +121,10 @@ class frame_params:
     def preamble_interval(self):
         return (self.awgn_len,self.awgn_len+self.preamble_params.length())
 
+    @staticmethod
+    def compute_frame_period(section_size,preamble_len,guard_len,awgn_len):
+        return section_size + 4*guard_len + awgn_len + preamble_len
+
 # [0|1,2,3,4|5],[4|5,6,7,8|9],...
 class SignalFramer:
     def __init__(self,fparams):

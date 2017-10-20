@@ -20,6 +20,7 @@ $(RUN_CMD) check_handler
 endef
 PRERUN:=$(shell $(SESSIONPRERUN))
 Tx_DATASET := $(shell $(RUN_CMD) get_filenames Tx)
+RF_DATASET := $(shell $(RUN_CMD) get_filenames RF)
 WAVEFORM_DATASET := $(shell $(RUN_CMD) get_filenames waveform)
 PRECIOUSFILES := $(WAVEFORM_DATASET)
 
@@ -29,7 +30,7 @@ PRECIOUSFILES := $(WAVEFORM_DATASET)
 # .SECONDARY:
 .SECONDEXPANSION:
 
-all: Tx
+all: RF
 
 clean:
 	@echo Cleaning Simulation Files
@@ -43,6 +44,8 @@ waveform: $(WAVEFORM_DATASET)
 
 Tx: $(Tx_DATASET)
 
+RF: $(RF_DATASET)
+
 $(SIMPATH)/waveform/data_%.pkl:
 	$(RUN_CMD) generate_waveform $@
 
@@ -53,16 +56,19 @@ $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 	$(RUN_CMD) get_spectrogram_img $@ True True
 
 $(SIMPATH)/RF/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
-	i = 0
-	while [ $@  ]
-	do
-		if [ $i -ht 0 ]
-		then
-			@echo 'Repeating the RF+sync for $@'
-		fi
-		$(RUN_CMD) run_RF_channel $@
-		i = `expr $i + 1`
-	done
+	IDX="0" ; \
+	if [ IDX -ht 0 ]; then \
+		echo 'hello'; \
+	fi
+
+# while [ ! -f $@ ]; do \
+# 	@if [ $(idx) -ht 0 ]; then \
+# 		@echo 'Repeating the RF+sync for $@' ; \
+# 	fi \
+# 	$(RUN_CMD) run_RF_channel $@ ; \
+# 	idx=`expr $(idx) + 1` ; \
+# done
+
 # Need to make a while loop that goes on until the file is generated
 
 #$(shell $(RUN_CMD) get_filenames waveform) $(SESSION_HANDLER_FILE)

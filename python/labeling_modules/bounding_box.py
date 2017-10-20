@@ -174,9 +174,15 @@ def intersect_and_offset_box(box_list,section_interv):
 
 def get_box_limits_in_image(box,section_size,dims):
     # NOTE: section_size is needed for overlapping windows
-    xmin = int(np.round(box.time_bounds[0]*dims[0]/float(section_size)))
-    xmax = int(np.round(box.time_bounds[1]*dims[0]/float(section_size)))
-    ymin = int(np.round((box.freq_bounds[0]+0.5)*dims[1]))
-    ymax = int(np.round((box.freq_bounds[1]+0.5)*dims[1]))
-    assert xmin>=0 and xmax<=dims[0] and ymin>=0 and ymax<=dims[1]
+    xmin = int(np.floor(box.time_bounds[0]*dims[0]/float(section_size)))
+    xmax = max(int(np.round(box.time_bounds[1]*dims[0]/float(section_size))),xmin+1)
+    ymin = int(np.floor((box.freq_bounds[0]+0.5)*dims[1]))
+    ymax = max(int(np.round((box.freq_bounds[1]+0.5)*dims[1])),ymin+1)
+    # assert xmin>=0 and xmax<=dims[0] and ymin>=0 and ymax<=dims[1]
+    if xmin<0 or xmax>dims[0] or ymin<0 or ymax>dims[1]:
+        print 'this should not have happened'
+        print box
+        print xmin,xmax,ymin,ymax
+        print dims, section_size
+        assert 0 
     return xmin,xmax,ymin,ymax

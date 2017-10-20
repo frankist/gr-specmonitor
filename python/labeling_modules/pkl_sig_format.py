@@ -40,8 +40,8 @@ class WaveformPklReader:
 
     def read_section(self,startidx=0,endidx=None):
         if endidx is None:
-            endix = self.number_samples()
-        assert endix < self.number_samples() and startidx>=0
+            endidx = self.number_samples()
+        assert endidx <= self.number_samples() and startidx>=0
         return self.wavdata['IQsamples'][startidx:endidx]
 
     def is_framed(self):
@@ -54,5 +54,5 @@ def read_fc32_file(fname,sample_offset=0,num_samples=-1):
     with f:
         byte_idx = sample_offset*8
         f.seek(byte_idx, os.SEEK_SET)
-        samples = np.fromfile(f, dtype=np.complex64, num_samples)
+        samples = np.fromfile(f, dtype=np.complex64, count=num_samples)
     return samples

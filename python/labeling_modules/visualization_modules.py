@@ -26,6 +26,7 @@ from scipy import misc
 import numpy as np
 import matplotlib.pyplot as plt
 import bounding_box
+import filedata_handling as fdh
 from PIL import Image
 from pylab import cm
 
@@ -36,13 +37,21 @@ def generate_img(S):
     return im
 
 def box_pixels(rowlims,collims,dims):
+    assert rowlims[0]>=0 and collims[0]>=0
+    assert rowlims[0]<rowlims[1] and collims[0]<collims[1]
+    assert rowlims[1]<=dims[0] and collims[1]<=dims[1]
     # print 'dims:',dims,'rowlims:',rowlims,'collims:',collims
-    uplims = (min(rowlims[1]+1,dims[0]),min(collims[1]+1,dims[1]))
-    l1 = [(e,collims[0]) for e in range(rowlims[0],uplims[0])]
-    l2 = [(e,uplims[1]-1) for e in range(rowlims[0],uplims[0])]
-    l3 = [(rowlims[0],e) for e in range(collims[0],uplims[1])]
-    l4 = [(uplims[0]-1,e) for e in range(collims[0],uplims[1])]
-    return set(l1) | set(l2) | set(l3) | set(l4)
+    # uplims = (min(rowlims[1]+1,dims[0]),min(collims[1]+1,dims[1]))
+    # l1 = [(e,collims[0]) for e in range(rowlims[0],uplims[0])]
+    # l2 = [(e,uplims[1]-1) for e in range(rowlims[0],uplims[0])]
+    # l3 = [(rowlims[0],e) for e in range(collims[0],uplims[1])]
+    # l4 = [(uplims[0]-1,e) for e in range(collims[0],uplims[1])]
+    # return set(l1) | set(l2) | set(l3) | set(l4)
+    ud_l = [(e,collims[0]) for e in range(rowlims[0],rowlims[1])]
+    ud_r = [(e,collims[1]-1) for e in range(rowlims[0],rowlims[1])]
+    lr_u = [(rowlims[0],e) for e in range(collims[0],collims[1])]
+    lr_d = [(rowlims[1]-1,e) for e in range(collims[0],collims[1])]
+    return set(ud_l) | set(ud_r) | set(lr_u) | set(lr_d)
 
 def pixel_transpose(pixel_list):
     return [(p[1],p[0]) for p in pixel_list]
@@ -66,7 +75,8 @@ def paint_box_pixels(im,pixel_list):
     pix = im.load()
     value = get_val(im,pix)
     for p in pixel_list:
-        # print 'pixel:',p,',value:',value
+        # print 'pixel:',p,',value:',value,'size:',im.size
+        assert im.size[0]>p[0] and im.size[1]>p[1]
         im.putpixel(p,value)
         # pix[p[0],p[1]] = value
     # plt.imshow(im)
@@ -78,14 +88,16 @@ def save_spectrograms(sourcefname,insync,mark_boxes):
     fbase = os.path.splitext(os.path.basename(sourcefname))[0]
     targetfilename_format_no_ext = dirname + '/img/' + fbase + '_{}'
     freader = psf.WaveformPklReader(sourcefname)
-    is_framed = freader.is_framed()
+    sig_data = freader.data()
+    is_framed = fdh.is_framed(sig_data)
 
     if insync is False or is_framed is False:
         print 'ERROR: I have to implement this functionality'
+        print sig_data
         exit(-1)
 
-    section_bounds = freader.data()['section_bounds']
-    box_list = freader.data()['section_bounding_boxes']
+    section_bounds = fdh.get_stage_derived_parameter(sig_data,'section_bounds')
+    box_list = fdh.get_stage_derived_parameter(sig_data,'section_bounding_boxes')
     num_sections = len(section_bounds)
     x = freader.read_section()
 

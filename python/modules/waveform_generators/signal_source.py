@@ -25,6 +25,7 @@ from gnuradio import analog
 import sys
 import pickle
 from bounding_box import *
+import filedata_handling as fdh
 
 def print_params(params):
     print 'sig_source_c starting'
@@ -67,9 +68,10 @@ def run_signal_source(args):
     print 'STATUS: Finished computing the Bounding Boxes'
     # print [(b.time_bounds,b.freq_bounds) for b in box_list]
 
-    v = {'parameters':{},'IQsamples':gen_data}
-    v['bounding_boxes'] = box_list
-    v['parameters'][args['stage_name']] = args['parameters']
+    v = fdh.init_metadata()
+    v['IQsamples'] = gen_data
+    fdh.set_stage_derived_parameter(v,args['stage_name'],'bounding_boxes',box_list)
+    fdh.set_stage_parameters(v,args['stage_name'],args['parameters'])
     fname=args['targetfilename']
     with open(fname,'wb') as f:
         pickle.dump(v,f)

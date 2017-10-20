@@ -28,6 +28,7 @@ import pickle
 from bounding_box import *
 import pkl_sig_format
 import preamble_utils
+import filedata_handling as filedata
 
 def print_params(params):
     print 'sig_source_c starting'
@@ -51,6 +52,12 @@ def apply_framing_and_offsets(args):
     targetfilename = args['targetfilename']
     sourcefilename = args['sourcefilename']
 
+    ### get dependency file, and create a new stage_data object
+    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
+    stage_data = freader.data()
+    filedata.set_stage_parameters(stage_data,args['stage_name'],params)
+    assert args['stage_name'] in stage_data['parameters']
+
     ### Read parameters
     time_offset = params['time_offset']
     section_size = params['section_size']
@@ -65,19 +72,12 @@ def apply_framing_and_offsets(args):
     hist_len = 3 # compensate for block history# channel is hier block with taps in it
 
     ### Create preamble and frame structure
-    lvl2_diff_len = len(random_sequence.maximum_length_sequence(13))
-    pseq_len = [13,61]
-    guard_len = 5
-    awgn_guard_len = 100
-    pparams = preamble_utils.generate_preamble_type2(pseq_len,lvl2_diff_len)
-    fparams = preamble_utils.frame_params(pparams,guard_len,awgn_guard_len,section_size)
+    fparams = filedata.get_frame_params(stage_data)
     sframer = preamble_utils.SignalFramer(fparams)
 
     ### Read IQsamples
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    twin = (time_offset-guard_len-hist_len,time_offset+num_samples+guard_len)
+    twin = (time_offset-fparams.guard_len-hist_len,time_offset+num_samples+fparams.guard_len)
     xsections_with_hist = freader.read_section(twin[0],twin[1])
-    prev_params = freader.parameters()
 
     ### Create GR flowgraph that picks read samples, applies freq_offset, scaling, and stores in a vector_sink
     tb = gr.top_block()
@@ -108,19 +108,23 @@ def apply_framing_and_offsets(args):
     y,section_bounds = sframer.frame_signal(gen_data,num_sections)
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
-    box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,freader.data()['bounding_boxes'])
-    section_boxes = partition_boxes_into_sections(box_list,section_size,guard_band,num_sections)
+    prev_boxes = filedata.get_stage_derived_parameter(stage_data,'bounding_boxes')
+    box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
+    section_boxes = partition_boxes_into_sections(box_list,section_size,fparams.guard_len,num_sections)
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
-    v = {'parameters':prev_params,'IQsamples':y,'section_bounds':section_bounds,
-         'section_bounding_boxes':section_boxes}
-    
-    v['parameters'][args['stage_name']] = params
+    stage_data['IQsamples'] = y # overwrites the generated samples
+    # v = {'parameters':prev_params,'IQsamples':y,'section_bounds':section_bounds,
+    #      'section_bounding_boxes':section_boxes}
+    # v['parameters'][args['stage_name']] = params
+    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounds',section_bounds)
+    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounding_boxes',section_boxes)
+
     for i in range(num_sections):
         # plt.plot(y[section_bounds[i][0]:section_bounds[i][1]])
         # plt.plot(gen_data[guard_band+i*section_size:guard_band+(i+1)*section_size],'r:')
         # plt.show()
-        assert np.all((y[section_bounds[i][0]:section_bounds[i][1]]-gen_data[guard_band+i*section_size:guard_band+(i+1)*section_size])<0.0001)
+        assert np.max(np.abs(y[section_bounds[i][0]:section_bounds[i][1]]-gen_data[(fparams.guard_len+i*section_size):fparams.guard_len+(i+1)*section_size]))<0.0001
 
     with open(targetfilename,'w') as f:
-        pickle.dump(v,f)
+        pickle.dump(stage_data,f)
     print 'STATUS: Finished writing to file',targetfilename
