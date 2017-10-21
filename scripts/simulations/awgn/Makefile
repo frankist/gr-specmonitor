@@ -1,4 +1,4 @@
-SHELL=/bin/bash
+SHELL:=/bin/bash
 
 SIM_NAME = sim0
 SIMPATH = ./$(SIM_NAME)
@@ -16,6 +16,7 @@ define SESSIONPRERUN
 mkdir -p $(SIMPATH);
 mkdir -p $(SIMPATH)/waveform;
 mkdir -p $(SIMPATH)/Tx;
+mkdir -p $(SIMPATH)/RF;
 $(RUN_CMD) check_handler
 endef
 PRERUN:=$(shell $(SESSIONPRERUN))
@@ -56,10 +57,17 @@ $(SIMPATH)/Tx/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 	$(RUN_CMD) get_spectrogram_img $@ True True
 
 $(SIMPATH)/RF/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
-	IDX="0" ; \
-	if [ IDX -ht 0 ]; then \
-		echo 'hello'; \
-	fi
+	@idx=0 ; \
+	while [ ! -f $@ ] ; do \
+		$(RUN_CMD) run_RF_channel $@ ; \
+		if [ $$idx -ne 0 ] ; then \
+			echo "Repeating the RF+sync for $@. Trial number: $$idx" ; \
+			if [ $$idx -gt 0 ] ; then \
+				exit 1 ; \
+			fi ; \
+		fi ; \
+		idx=`expr $$idx + 1` ; \
+	done
 
 # while [ ! -f $@ ]; do \
 # 	@if [ $(idx) -ht 0 ]; then \

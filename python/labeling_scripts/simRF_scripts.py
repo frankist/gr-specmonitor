@@ -20,6 +20,7 @@
 #
 
 from gnuradio import gr
+from gnuradio import blocks
 from gnuradio import channels
 import sys
 import os
@@ -27,15 +28,19 @@ from bounding_box import *
 import pkl_sig_format
 import preamble_utils
 import filedata_handling as filedata
+import pickle
 
 class RF2FileFlowgraph:
     def __init__(self,xsource,linear_att,awgn_sigma,freq_offset,outputfile):
         self.tb = gr.top_block()
 
-        self.source = blocks.vector_source_c(xsource,False)
+        print 'final SNRdB:', 10*np.log10(linear_att*2/awgn_sigma**2)
+
+        v = np.array(xsource,np.complex128)
+        self.source = blocks.vector_source_c(v,False)
         self.attenuation = blocks.multiply_const_cc(linear_att+0*1j)
         self.channel = channels.channel_model(awgn_sigma,freq_offset)
-        self.fsink = blocks.file_sink_c(outputfile)
+        self.fsink = blocks.file_sink(gr.sizeof_gr_complex,outputfile)
 
         self.tb.connect(self.source,self.attenuation)
         self.tb.connect(self.attenuation,self.channel)
@@ -45,15 +50,17 @@ class RF2FileFlowgraph:
         self.tb.run()
 
 def file_framesync(sourcefilename,targetfilename,frame_params,n_sections,num_samples):
-    block_size = 1000
-    thres = [0.12,0.09]
+    block_size = 100000
+    thres = [0.14,0.1]
     pdetec = preamble_utils.PreambleDetectorType2(frame_params,thres1=thres[0],thres2=thres[1])
 
+    i = 0
     while True:
         samples = pkl_sig_format.read_fc32_file(sourcefilename,i*block_size,block_size)
         if len(samples)==0:
             break
         pdetec.work(samples)
+        i += 1
 
     if len(pdetec.peaks)>=n_sections:
         selected_peak_idxs = np.argsort([p.xcorr for p in pdetec.peaks])[-n_sections::]
@@ -76,6 +83,7 @@ def file_framesync(sourcefilename,targetfilename,frame_params,n_sections,num_sam
 def run_RF_channel(args):
     params = args['parameters']
     targetfolder = args['targetfolder']
+    targetfilename = args['targetfilename']
     sourcefilename = args['sourcefilename']
     tmp_file = targetfolder + '/tmp.bin'
 
@@ -85,8 +93,8 @@ def run_RF_channel(args):
     filedata.set_stage_parameters(stage_data,args['stage_name'],params)
 
     ### Set variables based on given parameters
-    sample_rate = get_stage_parameter(stage_data,'sample_rate')
-    num_samples_settle = params['settle_time'] * stage_data
+    sample_rate = filedata.get_stage_parameter(stage_data,'sample_rate')
+    num_samples_settle = int(params['settle_time'] * sample_rate)
     tot_linear_gain = 10**((params['tx_gaindB']+params['rx_gaindB']-params['PLdB'])/20.0)
     noise_voltage = 10**((params['awgndBm']-30)/20.0)
     freq_offset = args.get('channel_frequency_offset',0)
@@ -94,7 +102,7 @@ def run_RF_channel(args):
     ### Read Signal already Framed and apply channel effects and settle time and writes to a temp file
     x = freader.read_section()
     x_with_settle = np.append(np.zeros(num_samples_settle,np.complex64),x)
-    x_with_settle = np.append(x_with_settle,np.zeros(num_samples_settle/2,np.complex64)) # padding at the end
+    x_with_settle = np.append(x_with_settle,np.zeros(int(num_samples_settle/2),np.complex64)) # padding at the end
 
     # it is possible the preamble sync fails. In such case, no file is gonna be written
     rf_flowgraph = RF2FileFlowgraph(x_with_settle,tot_linear_gain,noise_voltage,freq_offset,tmp_file)
@@ -110,13 +118,13 @@ def run_RF_channel(args):
         tstart = ret[0]
         peak_list = ret[1]
         y = ret[2]
-        section_bounds = filedata.get_stage_derived_parameters(stage_data,'section_bounds')
+        section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
 
         stage_data['IQsamples_per_section'] = [y[s[0]:s[1]] for s in section_bounds]
         del stage_data['IQsamples']
         filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'detected_preambles',peak_list)
         with open(targetfilename,'w') as f:
-            pickle.dump(v,f)
+            pickle.dump(stage_data,f)
         print 'STATUS: Finished writing to file',targetfilename
     else:
         print 'Preamble sync has failed. Going to repeat transmission'

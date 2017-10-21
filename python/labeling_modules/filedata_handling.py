@@ -68,11 +68,11 @@ def get_stage_derived_parameter(data_dict,param_name,stage_name=None):
     return None # didn't find it
 
 def get_num_samples_with_framing(data_dict):
-    return int(get_parameter(data_dict,'num_sections')*get_parameter(data_dict,'section_size'))
+    return int(get_stage_parameter(data_dict,'num_sections')*get_stage_parameter(data_dict,'section_size'))
 
 def get_preamble_params(data_dict):
     # TODO: Make this not hardcoded
-    lvl2_diff_len = len(random_sequence.maximum_length_sequence(13))
+    lvl2_diff_len = len(random_sequence.maximum_length_sequence(13*2))
     pseq_len = [13,61]
     pparams = preamble_utils.generate_preamble_type2(pseq_len,lvl2_diff_len)
     return pparams

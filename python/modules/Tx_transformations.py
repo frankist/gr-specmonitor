@@ -113,9 +113,6 @@ def apply_framing_and_offsets(args):
     section_boxes = partition_boxes_into_sections(box_list,section_size,fparams.guard_len,num_sections)
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
     stage_data['IQsamples'] = y # overwrites the generated samples
-    # v = {'parameters':prev_params,'IQsamples':y,'section_bounds':section_bounds,
-    #      'section_bounding_boxes':section_boxes}
-    # v['parameters'][args['stage_name']] = params
     filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounds',section_bounds)
     filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounding_boxes',section_boxes)
 

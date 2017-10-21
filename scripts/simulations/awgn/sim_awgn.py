@@ -22,6 +22,7 @@
 import sys
 sys.path.append('../../../python/modules')
 sys.path.append('../../../python/labeling_modules')
+sys.path.append('../../../python/labeling_scripts')
 sys.path.append('../../../python/utils')
 import MakeFileSimulator
 
@@ -58,7 +59,7 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
              'targetfilename':targetfilename,'sourcefilename':sourcefilename,
              'stage_name':'RF','previous_stage_name':'Tx'}
         import simRF_scripts
-        RF_scripts.run_RF_channel(d)
+        simRF_scripts.run_RF_channel(d)
         
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)

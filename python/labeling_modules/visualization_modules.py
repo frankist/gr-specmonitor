@@ -116,6 +116,8 @@ def save_spectrograms(sourcefname,insync,mark_boxes):
                 # print 'box:',b
                 section_size = section_bounds[i][1]-section_bounds[i][0]
                 xmin,xmax,ymin,ymax = bounding_box.get_box_limits_in_image(b,section_size,Sxx.shape)
+                if xmin<0: # The bounding box ended up to close to the border
+                    continue
                 pixel_list = pixel_transpose(box_pixels((xmin,xmax),(ymin,ymax),Sxx.shape))
                 # pixel_list = box_pixels((ymin,ymax),(xmin,xmax),im.size)
                 # print 'square:',xmin,xmax,ymin,ymax,'dims:',im.size
