@@ -21,6 +21,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import signal
 
 class BoundingBox:
     def __init__(self,time_bounds,freq_bounds):
@@ -68,6 +69,8 @@ class BoundingBox:
     def __str__(self):
         return '[({},{}),({},{})]'.format(self.time_bounds[0],self.time_bounds[1],self.freq_bounds[0],self.freq_bounds[1])
 
+# Helpers for computing bounding boxes
+
 def find_tx_intervals(x):
     thres = 1e-5
     stepups=[i+1 for i in range(len(x)-1) if x[i]<thres and x[i+1]>=thres]
@@ -87,60 +90,95 @@ def find_tx_intervals(x):
         # i = stepups[j+jinc]
     return l
 
-def find_tx_intervals_old(x): # NOTE: For some reason this version although simpler is super slow
-    thres = 1e-5
-    i=0
-    l=[]
-    while i < len(x):
-        try:
-            i = next(j for j in range(i,len(x)) if x[j]>=thres)
-        except StopIteration:
-            break
-        try:
-            i2 = next(j for j in range(i+1,len(x)) if x[j]<thres)
-        except StopIteration:
-            i2=len(x)
-        l.append((i,i2))
-        i = i2+1
-    return l
+# def find_tx_intervals_old(x): # NOTE: For some reason this version although simpler is super slow
+#     thres = 1e-5
+#     i=0
+#     l=[]
+#     while i < len(x):
+#         try:
+#             i = next(j for j in range(i,len(x)) if x[j]>=thres)
+#         except StopIteration:
+#             break
+#         try:
+#             i2 = next(j for j in range(i+1,len(x)) if x[j]<thres)
+#         except StopIteration:
+#             i2=len(x)
+#         l.append((i,i2))
+#         i = i2+1
+#     return l
 
-def find_frequency_bounds(x,fftsize,thres=0.01):
-    X=np.fft.fftshift(np.abs(np.fft.fft(x,fftsize))**2)
-    Xcentre = np.sum(np.arange(X.size)*X)/np.sum(X)
+def debug_freq_bound_finder(X,Xcentre,left_bound,right_bound):
+    # print 'cumsums:',csum_left[-1],csum_right[-1]
+    XdB = 10*np.log10([max(xx,1.0e-6) for xx in X])
+    plt.plot(XdB)
+    f_range = range(int(np.round(left_bound)),int(np.round(right_bound))+1)
+    plt.plot(f_range,XdB[f_range],'o:')
+    plt.plot(int(np.round(Xcentre)),XdB[int(np.round(Xcentre))],'x')
+    plt.show()
+
+def find_freq_bounds(x,thresdB=-25):
+    # preprocess X in freq domain
+    f,X = signal.welch(x,1.0,return_onesided=False,detrend=False)#nperseg=64,noverlap=0
+    X = np.fft.fftshift(X)
+    Xamp_range = (np.min(X),np.max(X))
+    X = (X-Xamp_range[0])/(Xamp_range[1]-Xamp_range[0])
+
+    # compute the centre of mass
+    Xcentre = np.argmax(X)#np.sum(np.arange(X.size)*X)/np.sum(X)
+    thres = 10**(thresdB/10.0)
 
     # find left bound
     Xstart = int(np.round(Xcentre-X.size/2))
-    Xleftrange = np.mod(range(Xstart,int(Xcentre)+1),X.size)
-    # left_bound = next(i for i in Xleftrange if X[i] > X[Xcentre]*thres)
-    csum_left = np.cumsum(X[Xleftrange])
-    left_bound = next(j+Xstart for j in range(csum_left.size) if csum_left[j]>thres*csum_left[-1])
+    Xleftrange = np.mod(range(Xstart,int(np.round(Xcentre))+1),X.size)
+    left_bound = next(j for j in Xleftrange if X[j]>thres*X[Xcentre])
 
     # find right bound
     Xend = int(np.round(Xcentre+X.size/2))
-    Xrightrange = np.mod(range(int(Xcentre),Xend),X.size)
-    # right_bound = next(i for i in Xrightrange if XdB[i] < XdB[Xcentre]*thres)
-    csum_right = np.cumsum(X[Xrightrange])
-    right_bound = next(j+Xcentre for j in range(csum_right.size) if csum_right[j]>=(1-thres)*csum_right[-1])
+    Xrightrange = np.mod(range(Xend,int(np.round(Xcentre))-1,-1),X.size) # descending order
+    right_bound = next(j for j in Xrightrange if X[j]>thres*X[Xcentre])
 
     interv = ((left_bound-0.5)/float(X.size)-0.5,(right_bound+0.5)/float(X.size)-0.5)
-
-    # Y=X
-    # zeroidxs = np.flatnonzero(X==0)
-    # Y[zeroidxs] = np.min(X[np.flatnonzero(X)])
-    # XdB = 10*np.log10(Y)
-    # XdB = XdB-np.mean(XdB)#)/(np.max(XdB)-np.min(XdB)) # do i need to scale?
-    # print 'centre:',Xcentre,'left bound:',left_bound,'right bound:',right_bound
-    # plt.plot(XdB)
-    # plt.plot(range(int(left_bound),int(right_bound)+1),np.ones(int(right_bound-left_bound+1))*np.max(XdB),'x')
-    # plt.show()
-
+    # debug_freq_bound_finder(X,Xcentre,left_bound,right_bound)
     return interv
+
+# def find_frequency_bounds(x,fftsize=64,thres=0.001):
+
+#     # preprocess X in freq domain
+#     f,X = signal.welch(x,1.0,return_onesided=False,detrend=False)
+#     # f,X = signal.periodogram(x,window='blackmanharris',nfft=fftsize,detrend=False,return_onesided=False)
+#     X = np.fft.fftshift(X)
+#     # X=np.fft.fftshift(np.abs(np.fft.fft(x,fftsize))**2)
+#     Xamp_range = (np.min(X),np.max(X))
+#     X = (X-Xamp_range[0])/(Xamp_range[1]-Xamp_range[0])
+
+#     # compute the centre of mass
+#     Xcentre = np.sum(np.arange(X.size)*X)/np.sum(X)
+
+#     # find left bound
+#     Xstart = int(np.round(Xcentre-X.size/2))
+#     Xleftrange = np.mod(range(Xstart,int(np.round(Xcentre))+1),X.size)
+#     # left_bound = next(i for i in Xleftrange if X[i] > X[Xcentre]*thres)
+#     csum_left = np.cumsum(X[Xleftrange])
+#     left_bound = next(j+Xstart for j in range(csum_left.size) if csum_left[j]>thres*csum_left[-1])
+
+#     # find right bound
+#     Xend = int(np.round(Xcentre+X.size/2))
+#     Xrightrange = np.mod(range(int(np.round(Xcentre)),Xend),X.size)
+#     # right_bound = next(i for i in Xrightrange if XdB[i] < XdB[Xcentre]*thres)
+#     csum_right = np.cumsum(X[Xrightrange])
+#     right_bound = next(j+Xcentre for j in range(csum_right.size) if csum_right[j]>=(1-thres)*csum_right[-1])
+
+#     interv = ((left_bound-0.5)/float(X.size)-0.5,(right_bound+0.5)/float(X.size)-0.5)
+
+#     debug_freq_bound_finder(X,Xcentre,left_bound,right_bound,csum_left,csum_right)
+
+#     return interv
 
 import time
 
 def compute_bounding_box(x):
     tinterv_list = find_tx_intervals(x)
-    finterv = find_frequency_bounds(x,x.size) # FIXME: Make a smarter frequency estimator that partitions the signal
+    finterv = find_freq_bounds(x) # FIXME: Make a smarter frequency estimator that partitions the signal
     # print 'elapsed time(freq intervals):',time.time()-start_time
     boxes = [BoundingBox(i,finterv) for i in tinterv_list]
     return boxes
@@ -165,10 +203,10 @@ def intersect_and_offset_box(box_list,section_interv):
 
 def get_box_limits_in_image(box,section_size,dims):
     # NOTE: section_size is needed for overlapping windows
-    xmin = int(np.round(box.time_bounds[0]*dims[0]/float(section_size)))
-    xmax = max(int(np.round(box.time_bounds[1]*dims[0]/float(section_size)))+1,xmin+1)
+    xmin = int(np.floor(box.time_bounds[0]*dims[0]/float(section_size)))
+    xmax = min(max(int(np.ceil(box.time_bounds[1]*dims[0]/float(section_size))),xmin+1),dims[0])
     ymin = int(np.round((box.freq_bounds[0]+0.5)*dims[1]))
-    ymax = max(int(np.round((box.freq_bounds[1]+0.5)*dims[1])),ymin+1)
+    ymax = max(int(np.round((box.freq_bounds[1]+0.5)*dims[1])+1),ymin+1)
     # assert xmin>=0 and xmax<=dims[0] and ymin>=0 and ymax<=dims[1]
     if xmin<0 or xmax>dims[0] or ymin<0 or ymax>dims[1]:
         print 'this should not have happened'
@@ -176,6 +214,6 @@ def get_box_limits_in_image(box,section_size,dims):
         print xmin,xmax,ymin,ymax
         print dims, section_size
         assert 0
-    if xmin==section_size or ymin==section_size: # the rounding makes the bounding box go outside
+    if xmin==dims[0] or ymin==dims[1]: # the rounding makes the bounding box go outside
         return -1,-1,-1,-1
     return xmin,xmax,ymin,ymax

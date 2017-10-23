@@ -36,13 +36,17 @@ def print_params(params):
         print k,v,type(v)
 
 def generate_section_partitions(section_size,guard_band,num_sections):
-    return ((guard_band+i*section_size,guard_band+(i+1)*section_size) for i in range(num_sections))
+    return ((i*section_size,(i+1)*section_size) for i in range(num_sections))
 
+# this function returns the boxes intersected with the section of interest. It also
+# offsets the boxes time stamp to be relative with the section start.
 def compute_new_bounding_boxes(time_offset,section_size,freq_offset,box_list):
     boi = intersect_boxes_with_section(box_list,(time_offset,time_offset+section_size))
     boi_offset = add_offset(boi,-time_offset,freq_offset)
     return list(boi_offset)
 
+# this function picks the boxes within the window (toffset:toffset+num_samples) that were offset by -toffset
+# and breaks them into sections. It also offsets the box start to coincide with the section
 def partition_boxes_into_sections(box_list,section_size,guard_band,num_sections):
     section_ranges = generate_section_partitions(section_size,guard_band,num_sections)
     return [list(intersect_and_offset_box(box_list,s)) for s in section_ranges]
@@ -109,6 +113,7 @@ def apply_framing_and_offsets(args):
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
     prev_boxes = filedata.get_stage_derived_parameter(stage_data,'bounding_boxes')
+
     box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
     section_boxes = partition_boxes_into_sections(box_list,section_size,fparams.guard_len,num_sections)
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
