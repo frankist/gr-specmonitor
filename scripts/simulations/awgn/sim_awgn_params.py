@@ -29,7 +29,7 @@ import numpy as np
 
 num_sections = 1
 section_size = 50000
-toffset_range = range(10,1000,100)
+toffset_range = range(10,1000,500)
 frequency_offset = [0]#np.linspace(-0.45,0.45,10)
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
@@ -61,11 +61,11 @@ stage_params = {
         ],
         'RF':
         [
-            ('tx_gaindB',range(0,30,5)),
+            ('tx_gaindB',range(0,30,15)),
             ('PLdB',-50),
             ('settle_time',0.01),
             ('awgndBm',-120),
-            ('rx_gaindB',range(0,30,5))
+            ('rx_gaindB',range(0,30,15))
         ],
         'Rx':
         [
