@@ -88,6 +88,10 @@ def get_frame_params(data_dict):
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_guard_len,frame_dur)
     return fparams
 
+def get_frame_period(data_dict):
+    fparams = get_frame_params(data_dict)
+    return fparams.frame_period
+
 def store_section_samples(data_dict,x,peaks):
     tstart = peaks[0].tidx
     num_samples = get_num_samples_with_framing(data_dict)

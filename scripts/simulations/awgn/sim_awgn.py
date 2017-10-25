@@ -60,7 +60,7 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
              'stage_name':'RF','previous_stage_name':'Tx'}
         import simRF_scripts
         simRF_scripts.run_RF_channel(d)
-        
+
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)
     AWGNSessionCmdParser.run_cmd(sys.argv)
