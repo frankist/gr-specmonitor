@@ -68,7 +68,9 @@ def get_stage_derived_parameter(data_dict,param_name,stage_name=None):
     return None # didn't find it
 
 def get_num_samples_with_framing(data_dict):
-    return int(get_stage_parameter(data_dict,'num_sections')*get_stage_parameter(data_dict,'section_size'))
+    num_sections = get_stage_parameter(data_dict,'num_sections')
+    fparams = get_frame_params(data_dict)
+    return int(num_sections*fparams.frame_period)
 
 def get_preamble_params(data_dict):
     # TODO: Make this not hardcoded

@@ -30,11 +30,46 @@ import preamble_utils
 import filedata_handling as filedata
 import pickle
 
+def read_channel_amplitudes(stage_params):
+    config_params = ['txgaindB','rxgaindB','PLdB','awgndBm']
+    def contains_any(any_of_these,container):
+        return any([s in container for s in any_of_these])
+
+    if 'SNRdB' in stage_params:
+        if any([p in stage_params for p in config_params]):
+            print 'ERROR: You either define the SNRdB of the channel or the hardware gains and pathloss'
+            exit(-1)
+        noise_voltage = 1.0
+        tot_linear_gain = 10**(stage_params['SNRdB']/20.0)
+    elif all([p in stage_params for p in config_params]):
+        noise_voltage = 10**((params['awgndBm']-30)/20.0)
+        tot_linear_gain = 10**((params['tx_gaindB'+params['rx_gaindB']-params['PLdB']])/20.0)
+    else:
+        print 'ERROR: You didn\'t specify the required parameters for the channel'
+        exit(-1)
+
+    return (tot_linear_gain,noise_voltage)
+
+def emulate_RF_channel(framed_signal,stage_data,params):
+    ### Set variables based on given parameters
+    sample_rate = filedata.get_stage_parameter(stage_data,'sample_rate')
+    num_samples_settle = int(params['settle_time'] * sample_rate)
+    tot_linear_gain,noise_voltage = read_channel_amplitudes(params)
+    freq_offset = args.get('channel_frequency_offset',0)
+
+    ### Read Signal already Framed and apply channel effects and settle time and writes to a temp file
+    x = freader.read_section()
+    x_with_settle = np.append(np.zeros(num_samples_settle,np.complex64),x)
+    x_with_settle = np.append(x_with_settle,np.zeros(int(num_samples_settle/2),np.complex64)) # padding at the end
+
+    # GNURadio Flowgraph
+    tb = gr.top_block()
+
 class RF2FileFlowgraph:
     def __init__(self,xsource,linear_att,awgn_sigma,freq_offset,outputfile):
         self.tb = gr.top_block()
 
-        print 'final SNRdB:', 10*np.log10(linear_att*2/awgn_sigma**2)
+        print 'final SNRdB:', 10*np.log10(linear_att**2/awgn_sigma**2)
 
         v = np.array(xsource,np.complex128)
         self.source = blocks.vector_source_c(v,False)
@@ -54,6 +89,7 @@ def file_framesync(sourcefilename,targetfilename,frame_params,n_sections,num_sam
     thres = [0.14,0.1]
     pdetec = preamble_utils.PreambleDetectorType2(frame_params,thres1=thres[0],thres2=thres[1])
 
+    # check for peaks in chunks
     i = 0
     while True:
         samples = pkl_sig_format.read_fc32_file(sourcefilename,i*block_size,block_size)
@@ -62,7 +98,7 @@ def file_framesync(sourcefilename,targetfilename,frame_params,n_sections,num_sam
         pdetec.work(samples)
         i += 1
 
-    if len(pdetec.peaks)>=n_sections:
+    if len(pdetec.peaks)==n_sections:
         selected_peak_idxs = np.argsort([p.xcorr for p in pdetec.peaks])[-n_sections::]
         # TODO: check if they are at equivalent distances
         idx_sort = np.argsort([pdetec.peaks[i].tidx for i in selected_peak_idxs])
@@ -119,14 +155,16 @@ def run_RF_channel(args):
         peak_list = ret[1]
         y = ret[2]
         section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
+        assert num_samples>=np.max([s[1] for s in section_bounds])
 
-        stage_data['IQsamples_per_section'] = [y[s[0]:s[1]] for s in section_bounds]
-        del stage_data['IQsamples']
+        stage_data['IQsamples'] = y
+        # stage_data['IQsamples_per_section'] = [y[s[0]:s[1]] for s in section_bounds]
+        # del stage_data['IQsamples']
         filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'detected_preambles',peak_list)
         with open(targetfilename,'w') as f:
             pickle.dump(stage_data,f)
         print 'STATUS: Finished writing to file',targetfilename
     else:
-        print 'Preamble sync has failed. Going to repeat transmission'
+        print 'WARNING: Preamble sync has failed. Going to repeat transmission'
     os.remove(tmp_file)
     # Note: The separation into multiple subsections happens later

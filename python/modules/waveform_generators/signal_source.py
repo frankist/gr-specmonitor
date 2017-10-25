@@ -64,7 +64,7 @@ def run_signal_source(args):
     # plt.show()
 
     print 'STATUS: Going to compute Bounding Boxes'
-    box_list = compute_bounding_box(gen_data)
+    box_list = compute_bounding_boxes(gen_data)
     print 'STATUS: Finished computing the Bounding Boxes'
     # print [(b.time_bounds,b.freq_bounds) for b in box_list]
 

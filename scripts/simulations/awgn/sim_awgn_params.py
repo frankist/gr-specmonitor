@@ -29,7 +29,7 @@ import numpy as np
 num_sections = 1
 section_size = 50000
 toffset_range = range(10,1000,500)
-frequency_offset = np.linspace(-0.45,0.45,5)
+frequency_offset = np.linspace(-0.4,0.4,3)
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 img_fft = 64 # the size of the FFT that is going to be used for the image generation
@@ -61,7 +61,7 @@ stage_params = {
         'RF':
         [
             ('tx_gaindB',range(0,30,15)),
-            ('PLdB',-50),
+            ('PLdB',150),
             ('settle_time',0.01),
             ('awgndBm',-120),
             ('rx_gaindB',range(0,30,15))

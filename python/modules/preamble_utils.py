@@ -286,7 +286,7 @@ class PreambleDetectorType2:
         # if self.nread<self.delay_cum[2]: # if first run, null the history to avoid transients
         #     self.xcrossautocorr_nodc[-self.xcrossautocorr_nodc.hist_len:min((self.delay_cum[2]-self.nread),self.xcrossautocorr_nodc.size)] = 0
         local_peaks = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
-        print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
+        # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
             t = i-self.delay_cum[2]
@@ -296,7 +296,7 @@ class PreambleDetectorType2:
             xautocorr_nodc = np.sqrt(self.xcrossautocorr_nodc[i])#self.xschmidl_filt_mag_nodc[i]#np.sqrt(self.xcrossautocorr_nodc[i])#self.xschmidl_filt_mag_nodc[i]
 #             # print 'time:',t+self.nread, peak0_mag2_nodc, xautocorr_nodc
             if xautocorr_nodc>self.thres1*peak0_mag2_nodc:
-                print 'peak:',t+self.nread,':',i+self.nread,xautocorr_nodc,'>',self.thres1*peak0_mag2_nodc
+                # print 'peak:',t+self.nread,':',i+self.nread,xautocorr_nodc,'>',self.thres1*peak0_mag2_nodc
                 tpeak,xcorr,cfo = self.find_crosscorr_peak(t)
                 dc_offset = np.mean(self.x_h[tpeak-self.awgn_len:tpeak])
                 xmag2_mavg_nodc = np.mean(np.abs(self.x_h[tpeak:tpeak+L]-dc_offset)**2) # for the whole preamble

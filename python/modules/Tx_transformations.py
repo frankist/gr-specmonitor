@@ -110,6 +110,8 @@ def apply_framing_and_offsets(args):
 
     ### Create preamble structure and frame the signal
     y,section_bounds = sframer.frame_signal(gen_data,num_sections)
+    num_samples_with_framing = filedata.get_num_samples_with_framing(stage_data)
+    assert y.size==num_samples_with_framing
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
     prev_boxes = filedata.get_stage_derived_parameter(stage_data,'bounding_boxes')
@@ -121,6 +123,7 @@ def apply_framing_and_offsets(args):
     filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounds',section_bounds)
     filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounding_boxes',section_boxes)
 
+    assert y.size >= np.max([s[1] for s in section_bounds])
     for i in range(num_sections):
         # plt.plot(y[section_bounds[i][0]:section_bounds[i][1]])
         # plt.plot(gen_data[guard_band+i*section_size:guard_band+(i+1)*section_size],'r:')

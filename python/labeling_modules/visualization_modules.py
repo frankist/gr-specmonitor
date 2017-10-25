@@ -30,6 +30,30 @@ import filedata_handling as fdh
 from PIL import Image
 from pylab import cm
 
+class SpectrogramImageUtils:
+    @staticmethod
+    def generate_img(Sxx):
+        Srange = (np.min(Sxx),np.max(Sxx))
+        Snorm = (Sxx-Srange[0])/(Srange[1]-Srange[0])
+        assert np.max(Snorm)<=1.0 and np.min(Snorm)>=0
+        im = Image.fromarray(np.uint8(cm.gist_earth(Snorm)*255))
+        return im
+
+    # based on the box limits, computes the pixel coordinates
+    @staticmethod
+    def box_pixel_coordinates(row_lims,col_lims):
+        assert row_lims[0]>=0 and col_lims[0]>=0
+        assert row_lims[0]<row_lims[1] and col_lims[0]<col_lims[1]
+        ud_l = [(e,col_lims[0]) for e in range(row_lims[0],row_lims[1])]
+        ud_r = [(e,col_lims[1]-1) for e in range(row_lims[0],row_lims[1])]
+        lr_u = [(row_lims[0],e) for e in range(col_lims[0],col_lims[1])]
+        lr_d = [(row_lims[1]-1,e) for e in range(col_lims[0],col_lims[1])]
+        return set(ud_l) | set(ud_r) | set(lr_u) | set(lr_d)
+
+    @staticmethod
+    def transpose_pixel_coordinates(pixel_list):
+        return [(p[1],p[0]) for p in pixel_list]
+
 # convert a spectrogram matrix to a normalized image
 def generate_img(S):
     Srange = (np.min(S),np.max(S))
@@ -112,6 +136,15 @@ def debug_plot_data(section,section_boxes,Sxx,im1):
         ax3.plot(b_range,section_fft[b_range],'ro:')
     plt.show()
 
+def paint_box(im,Spec,box):
+    rowmin,rowmax,colmin,colmax = Spec.convert_box_to_coordinates(box)
+    if rowmin < 0:
+        return False # bounding box was too close to the border. Not gonna draw it
+    pixel_list = SpectrogramImageUtils.box_pixel_coordinates((rowmin,rowmax),(colmin,colmax))
+    pixel_list = SpectrogramImageUtils.transpose_pixel_coordinates(pixel_list) # to be consistent with the image
+    paint_box_pixels(im,pixel_list)
+    return True
+
 def save_spectrograms(sourcefname,insync,mark_boxes):
     dirname = os.path.dirname(sourcefname)
     fbase = os.path.splitext(os.path.basename(sourcefname))[0]
@@ -132,26 +165,18 @@ def save_spectrograms(sourcefname,insync,mark_boxes):
 
     for i in range(num_sections):
         # print 'section:',section_bounds[i]
-        section_size = section_bounds[i][1]-section_bounds[i][0]
         section = x[section_bounds[i][0]:section_bounds[i][1]]
-        f,t,Sxx = signal.spectrogram(section,1.0,noverlap=0,nperseg=64,return_onesided=False,detrend=False)
-        # Pxx,f,t,im = plt.specgram(section,NFFT=64, Fs=1.0, noverlap=0, sides ='twosided')
-        Sxx = np.fft.fftshift(np.transpose(Sxx), axes=(1,))
-        im = generate_img(Sxx)
+        # print 'section:',section.size,section_bounds[i][1]-section_bounds[i][0]
+        assert section.size == section_bounds[i][1]-section_bounds[i][0]
+        Spec = bounding_box.Spectrogram.make_spectrogram(section)
+        im = SpectrogramImageUtils.generate_img(Spec.matrix())
         im_no_boxes = im.copy()
-        # pixels = im.load()
-        print 'Going to write image',targetfilename_format.format(i)
-        if mark_boxes is True and len(box_list[i])>0:
-            for b in box_list[i]:
-                # print 'box:',b
-                xmin,xmax,ymin,ymax = bounding_box.get_box_limits_in_image(b,section_size,Sxx.shape)
-                if xmin<0: # The bounding box ended up too close to the border
-                    continue
-                pixel_list = pixel_transpose(box_pixels((xmin,xmax),(ymin,ymax),Sxx.shape))
-                # pixel_list = box_pixels((ymin,ymax),(xmin,xmax),im.size)
-                # print 'square:',xmin,xmax,ymin,ymax,'dims:',im.size
-                im = paint_box_pixels(im,pixel_list)
-            # plt.show()
+
+        # print 'Going to write image',targetfilename_format.format(i)
+        if mark_boxes is True:
+            for box in box_list[i]:
+                # print 'box:',box.__str__(),Spec.Sxx.shape
+                paint_box(im,Spec,box)
         # debug_plot_data(section,box_list[i],Sxx,im)
         im = concatenate_images([im_no_boxes,im])
         im.save(targetfilename_format.format(i),'PNG')

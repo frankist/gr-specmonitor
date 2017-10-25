@@ -68,6 +68,8 @@ $(SIMPATH)/RF/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 		fi ; \
 		idx=`expr $$idx + 1` ; \
 	done
+	mkdir -p $(SIMPATH)/RF/img
+	$(RUN_CMD) get_spectrogram_img $@ True True
 
 # while [ ! -f $@ ]; do \
 # 	@if [ $(idx) -ht 0 ]; then \
