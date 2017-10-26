@@ -62,7 +62,7 @@ $(SIMPATH)/RF/data_%.pkl: $$(shell $(RUN_CMD) get_dependencies $$@)
 		$(RUN_CMD) run_RF_channel $@ ; \
 		if [ $$idx -ne 0 ] ; then \
 			echo "Repeating the RF+sync for $@. Trial number: $$idx" ; \
-			if [ $$idx -gt 0 ] ; then \
+			if [ $$idx -gt 2 ] ; then \
 				exit 1 ; \
 			fi ; \
 		fi ; \

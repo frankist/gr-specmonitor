@@ -19,9 +19,6 @@
 # Boston, MA 02110-1301, USA.
 #
 
-from gnuradio import gr
-from gnuradio import blocks
-from gnuradio import channels
 import sys
 import os
 from bounding_box import *
@@ -72,7 +69,7 @@ def filter_valid_peaks(detected_peaks,nread,frame_period,n_sections,Nsettle):
     return peaks
 
 # read raw samples file and sync with the preambles
-def read_file_and_framesync(sourcefilename,targetfilename,frame_params,n_sections,num_samples,Nsettle):
+def read_file_and_framesync(sourcefilename,targetfilename,frame_params,n_sections,Nsuperframe,Nsettle):
     block_size = 100000 # we read in chunks
     thres = [0.14,0.1]
     pdetec = preamble_utils.PreambleDetectorType2(frame_params,thres1=thres[0],thres2=thres[1])
@@ -87,7 +84,7 @@ def read_file_and_framesync(sourcefilename,targetfilename,frame_params,n_section
         pdetec.work(samples)
         i += 1
         nread += len(samples)
-    assert(nread>=num_samples+Nsettle)
+    assert(nread>=Nsuperframe+Nsettle)
 
     selected_peaks = filter_valid_peaks(pdetec.peaks,nread,frame_params.frame_period,n_sections,Nsettle)
     if selected_peaks is None:
@@ -95,8 +92,8 @@ def read_file_and_framesync(sourcefilename,targetfilename,frame_params,n_section
 
     tstart = selected_peaks[0].tidx-frame_params.awgn_len
     assert tstart>=0
-    y = pkl_sig_format.read_fc32_file(sourcefilename,tstart,num_samples)
-    if len(y)!=num_samples:
+    y = pkl_sig_format.read_fc32_file(sourcefilename,tstart,Nsuperframe)
+    if len(y)!=Nsuperframe:
         print 'ERROR: this was not the expected size for the samples'
         exit(-1)
     for p in selected_peaks: # correct the offset

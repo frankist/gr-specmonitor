@@ -168,7 +168,7 @@ def save_spectrograms(sourcefname,insync,mark_boxes):
         section = x[section_bounds[i][0]:section_bounds[i][1]]
         # print 'section:',section.size,section_bounds[i][1]-section_bounds[i][0]
         assert section.size == section_bounds[i][1]-section_bounds[i][0]
-        Spec = bounding_box.Spectrogram.make_spectrogram(section)
+        Spec = bounding_box.Spectrogram.make_spectrogram(section,cancel_DC_offset=True)
         im = SpectrogramImageUtils.generate_img(Spec.matrix())
         im_no_boxes = im.copy()
 

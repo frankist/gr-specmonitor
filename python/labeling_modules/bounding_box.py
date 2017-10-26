@@ -218,8 +218,11 @@ class Spectrogram:
         return rowlims[0],rowlims[1],collims[0],collims[1]
     
     @classmethod
-    def make_spectrogram(cls,x,fftsize=64):
+    def make_spectrogram(cls,x,fftsize=64,cancel_DC_offset=False):
         _,_,Sxx=signal.spectrogram(x,1.0,noverlap=0,nperseg=fftsize,return_onesided=False,detrend=False)
+        if cancel_DC_offset:
+            pwr_min = np.min(Sxx)
+            Sxx[0,:] = pwr_min # the spectrogram is still not transposed
         return cls(Sxx,x.size)
 
 def find_tx_intervals(x):

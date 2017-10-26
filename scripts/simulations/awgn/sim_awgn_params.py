@@ -61,9 +61,10 @@ stage_params = {
         'RF':
         [
             ('tx_gaindB',range(0,30,15)),
-            ('PLdB',0),#150),
+            ('PLdB',155),
             ('settle_time',0.01),
             ('awgndBm',-120),
+            ('DC_offset',10**(-140/20.0)),
             ('rx_gaindB',range(0,30,15))
         ],
         'Rx':
