@@ -24,17 +24,20 @@ from gnuradio import blocks
 from gnuradio import channels
 import sys
 import os
+import time
 from bounding_box import *
 import pkl_sig_format
 import preamble_utils
 import filedata_handling as filedata
 import pickle
 import RF_sync_utils
+from gnuradio import uhd
+import ssh_utils
 
-def run_RF_Tx_on_repeat(framed_signal,params,fparams,sample_rate):
+def setup_RF_Tx_on_repeat(framed_signal,params,fparams,sample_rate):
     ### Set variables based on given parameters
     gaindB = params['tx_gaindB']
-    centre_freq = params['centre_frequency']
+    centre_freq = params['rf_frequency']
 
     # read samples already framed, apply USRP params, and keep transmitting until interruption
     tb = gr.top_block()
@@ -50,13 +53,14 @@ def run_RF_Tx_on_repeat(framed_signal,params,fparams,sample_rate):
     usrp_sink.set_center_freq(centre_freq,0)
     usrp_sink.set_gain(gaindB,0)
 
-    connect(vector_source,(usrp_sink,0))
-    tb.run()
+    tb.connect(vector_source,(usrp_sink,0))
+    
+    return tb
 
-def run_RF_Rx_for_on_repeat(params,sample_rate,Nsuperframe,Nsettle):
+def run_RF_Rx_on_repeat(outputfile,params,sample_rate,Nsuperframe,Nsettle):
     ### Set variables based on given stage parameters
     gaindB = params['rx_gaindB']
-    centre_freq = params['centre_frequency']
+    centre_freq = params['rf_frequency']
 
     # get the needed global parameters
     frame_period = fparams.frame_period
@@ -103,7 +107,23 @@ def run_RF_channel(args):
     sample_rate = filedata.get_stage_parameter(stage_data,'sample_rate')
     Nsettle = int(params['settle_time'] * sample_rate)
 
-    # call here the Tx or Rx scripts
+    # set parameters at remote endpoint. It will lock until the procedure is complete
+    d = {'outputfile':tmp_file,'sample_rate':sample_rate,'Nsuperframe':Nsuperframe,'Nsettle':Nsettle,'params':params}
+    remote_command = RF_sync_utils.setup_remote_rx(targetfolder,targetfilename,"USRPRx",d)
+
+    # call here the Tx or Rx scripts. It will lock until signal is received
+    tb = run_RF_Tx_on_repeat(x,params,fparams,sample_rate)
+    tb.start()
+
+    # run Rx remotely. It will lock until completion
+    ssh_utils.ssh_run("USRPRx","python ~/{}/RF_scripts.py {}".format(params['targetfolder'],remote_filename))
+
+    # send signal to stop Tx.
+    tb.stop()
+    tb.wait()
+
+    # pull results from Rx. It will lock until the SCP is successful
+    ssh_utils.scp_recv("USRPRx",tmp_file,tmp_file)
 
     # save the results
     success = RF_sync_utils.post_process_rx_file_and_save(stage_data,tmp_file,args,fparams,n_sections,Nsuperframe,Nsettle)
@@ -113,3 +133,14 @@ def run_RF_channel(args):
         print 'WARNING: Preamble sync has failed. Going to repeat transmission'
     os.remove(tmp_file)
     # Note: The separation into multiple subsections happens later
+
+if __name__ == '__main__':
+    pkl_file = sys.argv[1]
+    with open(pkl_file,'r') as f:
+        pklparams = pickle.load(f)
+    outputfile = pklparams['outputfile']
+    params = pklparams['params']
+    sample_rate = pklparams['sample_rate']
+    Nsuperframe = pklparams['Nsuperframe']
+    Nsettle = pklparams['Nsettle']
+    run_RF_Rx_on_repeat(outputfile,params,sample_rate,Nsuperframe,Nsettle)

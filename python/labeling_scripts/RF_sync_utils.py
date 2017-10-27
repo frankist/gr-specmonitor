@@ -126,3 +126,26 @@ def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsu
             pickle.dump(stage_data,f)
         return True
     return False
+
+def setup_remote_rx(session_folder,local_targetfile,hostnames,params_to_send):
+    params_filename = 'tmp_params.pkl' # TODO: change this to be specific to the run
+
+    # save the params into a local file
+    local_tmp_path = session_folder+'/tmp/'+params_filename
+    with open(local_tmp_path,'w') as f:
+        pickle.dump(params_to_send,f)
+
+    # send the stored params to the remote user 
+    remote_tmp_path = '/home/francisco/'+local_tmp_path
+    if type(hostnames) is str:
+        hostnames = [hostnames]
+    for h in hostnames:
+        ssh_utils.scp_send(h,local_tmp_path,remote_tmp_path)
+    
+    # clear local file
+    os.remove(local_tmp_path)
+
+    remote_cmd = "python ~/{}/RF_scripts.py {}".format(session_folder,remote_tmp_path)
+    clear_cmd = "rm " + remote_tmp_path
+
+    return (remote_cmd,saved_results_file,clear_cmd)

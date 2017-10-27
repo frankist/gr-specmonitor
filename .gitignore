@@ -7,4 +7,5 @@ nbproject/
 gr-specmonitor.kdev4
 .idea/
 scripts/simulations/awgn/sim0/*
+scripts/ota/awgn/sim0/*
 .vscode/

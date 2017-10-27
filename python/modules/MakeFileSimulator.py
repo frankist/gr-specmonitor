@@ -25,6 +25,7 @@ import pickle
 import importlib
 from filename_utils import *
 import time
+import SessionParams
 import visualization_modules
 
 def get_run_all_stages_parameters(handler,filename):
@@ -76,6 +77,11 @@ class SessionCommandParser:
 
     def check_handler(self,args):
         handler = self.__get_handler__()
+
+    def load_session(self,args):
+        sessionabspath = os.path.dirname(os.path.abspath(self.session_file))
+        session_args = SessionParams.SessionInstanceArguments(sessionabspath,self.cfg_filename)
+        SessionParams.try_session_init(session_args)
 
     def get_filenames(self,args):
         if len(args)==0:
