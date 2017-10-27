@@ -55,11 +55,19 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
         targetfilename = args[0]
         sourcefilename = self.__get_dependency_file__(targetfilename)
         run_parameters = MakeFileSimulator.get_run_stage_parameters(handler,targetfilename)
-        d = {'parameters':dict(run_parameters),'targetfolder':handler.filename_handler.get_session_path(),
+        d = {'parameters':dict(run_parameters),'sessiondata':self.sessiondata,#handler.filename_handler.get_session_path(),
              'targetfilename':targetfilename,'sourcefilename':sourcefilename,
              'stage_name':'RF','previous_stage_name':'Tx'}
         import RF_scripts
         RF_scripts.run_RF_channel(d)
+    
+    def transfer_files_to_remote(self):
+        handler = self.__get_handler__()
+        if self.sessiondata.remote_exists():
+            remote_folder = SessionPaths.remote_session_folder(sessiondata)
+            rf_scripts = 
+            for h in self.sessiondata.hosts():
+                out,err = ssh_utils.scp_send(h,,remote_folder+'')
 
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)

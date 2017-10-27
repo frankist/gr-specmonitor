@@ -33,6 +33,7 @@ import pickle
 import RF_sync_utils
 from gnuradio import uhd
 import ssh_utils
+import SessionParams
 
 def setup_RF_Tx_on_repeat(framed_signal,params,fparams,sample_rate):
     ### Set variables based on given parameters
@@ -88,15 +89,18 @@ def run_RF_Rx_on_repeat(outputfile,params,sample_rate,Nsuperframe,Nsettle):
 
 def run_RF_channel(args):
     params = args['parameters']
-    targetfolder = args['targetfolder']
+    sessiondata = args['sessiondata']
+    session_folder = SessionParams.SessionPaths.session_folder(sessiondata)
+    tmp_folder = SessionParams.SessionPaths.tmp_folder(sessiondata)
+    tmp_file = tmp_folder + '/tmp.bin'
     targetfilename = args['targetfilename']
     sourcefilename = args['sourcefilename']
-    tmp_file = targetfolder + '/tmp.bin'
+    stage_name = args['stage_name']
 
     ### Read previous stage data and sets the parameters of the new stage
     freader = pkl_sig_format.WaveformPklReader(sourcefilename)
     stage_data = freader.data()
-    filedata.set_stage_parameters(stage_data,args['stage_name'],params)
+    filedata.set_stage_parameters(stage_data,stage_name,params)
     x = np.array(freader.read_section(),np.complex128)
 
     # get parameters from other stages
@@ -109,14 +113,15 @@ def run_RF_channel(args):
 
     # set parameters at remote endpoint. It will lock until the procedure is complete
     d = {'outputfile':tmp_file,'sample_rate':sample_rate,'Nsuperframe':Nsuperframe,'Nsettle':Nsettle,'params':params}
-    remote_command = RF_sync_utils.setup_remote_rx(targetfolder,targetfilename,"USRPRx",d)
+    tmp_params = tmp_folder+'/tmp_params.pkl'
+    remote_command = RF_sync_utils.setup_remote_rx(session_folder,tmp_params,targetfilename,"USRPRx",d)
 
     # call here the Tx or Rx scripts. It will lock until signal is received
     tb = run_RF_Tx_on_repeat(x,params,fparams,sample_rate)
     tb.start()
 
     # run Rx remotely. It will lock until completion
-    ssh_utils.ssh_run("USRPRx","python ~/{}/RF_scripts.py {}".format(params['targetfolder'],remote_filename))
+    ssh_utils.ssh_run("USRPRx","python ~/{}/RF_scripts.py {}".format(session_folder,remote_filename))
 
     # send signal to stop Tx.
     tb.stop()

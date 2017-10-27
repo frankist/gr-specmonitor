@@ -47,14 +47,19 @@ def generate_filenames(handler,level_list):
 
 class SessionCommandParser:
     def __init__(self,session_file,cfg_file,handler_type):
+        self.session_abspath = os.path.dirname(os.path.abspath(session_file))
         self.session_file = session_file#os.path.abspath(session_file)
         dirname = os.path.dirname(self.session_file)
         self.session_name = os.path.split(dirname)[1]
         self.cfg_filename = cfg_file
         self.handler_type = handler_type
         self.handler = None
+        self.session_args = SessionParams.SessionInstanceArguments(self.session_abspath,self.cfg_filename)
+        self.sessiondata = None
 
     def __get_handler__(self):
+        if self.sessiondata is None:
+            self.sessiondata = SessionParams.load_session(self.session_args) # it make call the session setup
         if self.handler is None:
             if os.path.isfile(self.session_file):
                 self.handler = self.handler_type.load_handler(self.session_file)
@@ -79,9 +84,7 @@ class SessionCommandParser:
         handler = self.__get_handler__()
 
     def load_session(self,args):
-        sessionabspath = os.path.dirname(os.path.abspath(self.session_file))
-        session_args = SessionParams.SessionInstanceArguments(sessionabspath,self.cfg_filename)
-        SessionParams.try_session_init(session_args)
+        return SessionParams.load_session(self.session_args)
 
     def get_filenames(self,args):
         if len(args)==0:
@@ -107,6 +110,9 @@ class SessionCommandParser:
         is_signal_insync = args[1]=='True'
         mark_box = args[1]=='True'
         visualization_modules.save_spectrograms(sourcefilename,is_signal_insync, mark_box)
+    
+    def transfer_files_to_remote(self,args):
+        pass
 
     @classmethod
     def run_cmd(cls,argv,handler_type=mh.SessionParamsHandler):

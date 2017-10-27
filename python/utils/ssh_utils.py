@@ -40,10 +40,11 @@ def scp_command(hostname,localfile,remotefile,send=True):
         time.sleep(0.05)
     print 'STATUS: SCP output:'
     result = scp.stdout.readlines()
+    error = scp.stderr.readlines()
     if result == []:
-        error = scp.stderr.readlines()
         if error != []:
             print >>sys.stderr, "ERROR: %s" % error
             exit(-1)
     else:
         print result
+    return (result,error)

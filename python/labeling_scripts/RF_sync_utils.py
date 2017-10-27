@@ -26,6 +26,7 @@ import pkl_sig_format
 import preamble_utils
 import filedata_handling as filedata
 import pickle
+import ssh_utils
 
 # it deletes false alarms, peaks found inside the settle time or too close to the end
 # it also confirms that the peaks are equidistant
@@ -127,25 +128,23 @@ def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsu
         return True
     return False
 
-def setup_remote_rx(session_folder,local_targetfile,hostnames,params_to_send):
-    params_filename = 'tmp_params.pkl' # TODO: change this to be specific to the run
-
+def setup_remote_rx(session_folder,tmp_params_file,local_targetfile,hostnames,params_to_send):
+    print 'STATUS: Going to send the params to the remote host'
     # save the params into a local file
-    local_tmp_path = session_folder+'/tmp/'+params_filename
-    with open(local_tmp_path,'w') as f:
+    with open(tmp_params_file,'w') as f:
         pickle.dump(params_to_send,f)
 
     # send the stored params to the remote user 
-    remote_tmp_path = '/home/francisco/'+local_tmp_path
-    if type(hostnames) is str:
+    remote_tmp_params = tmp_params_file
+    if isinstance(hostnames,str):
         hostnames = [hostnames]
     for h in hostnames:
-        ssh_utils.scp_send(h,local_tmp_path,remote_tmp_path)
+        ssh_utils.scp_send(h,tmp_params_file,remote_tmp_params)
     
     # clear local file
-    os.remove(local_tmp_path)
+    os.remove(tmp_params_file)
 
-    remote_cmd = "python ~/{}/RF_scripts.py {}".format(session_folder,remote_tmp_path)
-    clear_cmd = "rm " + remote_tmp_path
+    remote_cmd = "python ~/{}/RF_scripts.py {}".format(session_folder,remote_tmp_params)
+    clear_cmd = "rm " + remote_tmp_params
 
     return (remote_cmd,saved_results_file,clear_cmd)

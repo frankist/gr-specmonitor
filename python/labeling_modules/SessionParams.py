@@ -112,14 +112,20 @@ class SessionPaths:
         session_path = SessionPaths.session_folder(data)
         return '{}/param_cfg2.pkl'.format(session_path)
 
+    @staticmethod
+    def remote_session_folder(data):
+        return '~/{}'.format(SessionPaths.__session_args__(data).session_name)
+
 def session_clean(session_args):
     session_folder = SessionPaths.session_folder(session_args)
     os.rmdir(session_folder)
 
-def try_session_init(session_args):
+def load_session(session_args):
     pkl_file = SessionPaths.session_pkl(session_args)
-    if not os.path.exists(pkl_file):
+    if not os.path.isfile(pkl_file):
         session_init(session_args)
+    with open(pkl_file,'r') as f:
+        return pickle.load(f)
 
 def session_init(session_args):
     print 'STATUS: Going to load the config file and setup the session'
@@ -131,19 +137,25 @@ def session_init(session_args):
     print 'STATUS: Going to create the session folders'
     setup_local_folders(sessiondata)
 
-    # checks if the hosts are inaccessible
-    if sessiondata.remote_exists():
-        print 'STATUS: Going to try to reach the hosts'
-        for h in sessiondata.hosts():
-            out,err = ssh_utils.ssh_run(h,'echo hello world',printstdout=False)
-            if out[0] != "hello world\n":
-                print 'ERROR: Could not ssh to the host',h
-                exit(-1)
+    # checks if the hosts are inaccessible, if not create session folder
+    setup_remote_folders(sessiondata)
 
     # stores the pickle file of the session
     print 'STATUS: Going to save configuration of session for fast access'
     with open(SessionPaths.session_pkl(sessiondata),'wb') as f:
         pickle.dump(sessiondata,f)
+
+# This function just checks if the hosts are reachable and sets up the session folder
+def setup_remote_folders(sessiondata):
+    if sessiondata.remote_exists():
+        remote_folder = SessionPaths.remote_session_folder(sessiondata)
+        print 'STATUS: Going to attempt to reach the hosts and set folders'
+        for h in sessiondata.hosts():
+            out,err = ssh_utils.ssh_run(h,'echo hello world',printstdout=False)
+            if out[0] != "hello world\n":
+                print 'ERROR: Could not ssh to the host',h
+                exit(-1)
+            out,err = ssh_utils.ssh_run(h,'mkdir -p '+remote_folder,printstdout=False)
 
 def setup_local_folders(sessiondata):
     def try_mkdir(folder_name):
