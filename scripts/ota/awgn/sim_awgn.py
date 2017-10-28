@@ -65,9 +65,16 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
         handler = self.__get_handler__()
         if self.sessiondata.remote_exists():
             remote_folder = SessionPaths.remote_session_folder(sessiondata)
-            rf_scripts = 
+            # find path of files to transfer
+            import inspect
+            folder_names = ['RF_scripts']
+            folders = {}
+            for f in folder_names:
+                folders[f] = os.path.dirname(inspect.getfile(f))
+                # labeling_scripts_folder = [s for s in sys.path if os.path.basename(s)=='labeling_scripts']
             for h in self.sessiondata.hosts():
-                out,err = ssh_utils.scp_send(h,,remote_folder+'')
+                for k,f in folders.items():
+                    out,err = ssh_utils.scp_send(h,f,remote_folder+'/'+k)
 
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)

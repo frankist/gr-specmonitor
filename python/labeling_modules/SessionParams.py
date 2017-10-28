@@ -155,7 +155,10 @@ def setup_remote_folders(sessiondata):
             if out[0] != "hello world\n":
                 print 'ERROR: Could not ssh to the host',h
                 exit(-1)
-            out,err = ssh_utils.ssh_run(h,'mkdir -p '+remote_folder,printstdout=False)
+            out,err = ssh_utils.ssh_run(h,'mkdir -p '+remote_folder,printstdout=false)
+            if err != []:
+                print 'ERROR: There was an error while setting session folder on the host',h
+                exit(-1)
 
 def setup_local_folders(sessiondata):
     def try_mkdir(folder_name):
