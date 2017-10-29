@@ -61,9 +61,9 @@ stage_params = {
         ],
         'RF':
         [
-            ('tx_gaindB',20),#range(0,30,15)),
+            ('tx_gaindB',range(0,21,10)),#range(0,30,15)),
             ('settle_time',0.25),
-            ('rx_gaindB',range(0,30,15)),
+            ('rx_gaindB',range(0,21,10)),
             ('rf_frequency',2.35e9)
         ],
         'Rx':

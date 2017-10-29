@@ -27,14 +27,23 @@ import preamble_utils
 import filedata_handling as filedata
 import pickle
 import ssh_utils
+import SessionParams
+import json
+
+def get_recording_params(Nsettle,Nsuperframe,frame_period):
+    n_skip_samples = max(Nsettle-frame_period,0)
+    n_settle_tmp = Nsettle-n_skip_samples # not making this skipped samples is important to fill the history of the pdetec
+    n_rx_samples = Nsuperframe + n_settle_tmp + frame_period + 10 # some padding on the right
+    valid_rx_window = (n_settle_tmp,n_rx_samples-frame_period) # the peaks to close to the left are gonna be dropped as they would not create a whole frame
+    return (n_skip_samples,n_rx_samples,valid_rx_window)
 
 # it deletes false alarms, peaks found inside the settle time or too close to the end
 # it also confirms that the peaks are equidistant
 # if the number of peaks is not equal to the expected number of sections, return None
-def filter_valid_peaks(detected_peaks,nread,frame_period,n_sections,Nsettle):
+def filter_valid_peaks(detected_peaks,frame_period,n_sections,valid_window):
     # print 'stage1:',len(detected_peaks)
     # ignore frames that were not complete or are in settle region
-    peaks = [p for p in detected_peaks if p.tidx < nread-frame_period and p.tidx>=Nsettle]
+    peaks = [p for p in detected_peaks if p.tidx < valid_window[1] and p.tidx>=valid_window[0]]
     if len(peaks)<n_sections:
         return None
 
@@ -70,10 +79,11 @@ def filter_valid_peaks(detected_peaks,nread,frame_period,n_sections,Nsettle):
     return peaks
 
 # read raw samples file and sync with the preambles
-def read_file_and_framesync(sourcefilename,targetfilename,frame_params,n_sections,Nsuperframe,Nsettle):
+def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsuperframe,Nsettle):
     block_size = 100000 # we read in chunks
     thres = [0.14,0.1]
-    pdetec = preamble_utils.PreambleDetectorType2(frame_params,thres1=thres[0],thres2=thres[1])
+    pdetec = preamble_utils.PreambleDetectorType2(fparams,thres1=thres[0],thres2=thres[1])
+    _,n_rx_samples,valid_rx_window = get_recording_params(Nsettle,Nsuperframe,fparams.frame_period)
 
     # check for peaks in chunks
     i = 0
@@ -85,13 +95,15 @@ def read_file_and_framesync(sourcefilename,targetfilename,frame_params,n_section
         pdetec.work(samples)
         i += 1
         nread += len(samples)
-    assert(nread>=Nsuperframe+Nsettle)
+    if nread < n_rx_samples:
+        print 'ERROR: I was expecting',n_rx_samples, ' samples. Got',nread,' instead.'
+        exit(-1)
 
-    selected_peaks = filter_valid_peaks(pdetec.peaks,nread,frame_params.frame_period,n_sections,Nsettle)
+    selected_peaks = filter_valid_peaks(pdetec.peaks,fparams.frame_period,n_sections,valid_rx_window)
     if selected_peaks is None:
         return None
 
-    tstart = selected_peaks[0].tidx-frame_params.awgn_len
+    tstart = selected_peaks[0].tidx-fparams.awgn_len
     assert tstart>=0
     y = pkl_sig_format.read_fc32_file(sourcefilename,tstart,Nsuperframe)
     if len(y)!=Nsuperframe:
@@ -128,23 +140,28 @@ def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsu
         return True
     return False
 
-def setup_remote_rx(session_folder,tmp_params_file,local_targetfile,hostnames,params_to_send):
+def setup_remote_rx(sessiondata,hostnames,params_to_send):
+    tmp_folder = SessionParams.SessionPaths.tmp_folder(sessiondata)
+    tmp_params_file = tmp_folder+'/tmp_params.json'
+    remote_session_folder = SessionParams.SessionPaths.remote_session_folder(sessiondata)
+    remote_tmp_params_file = remote_session_folder+'/tmp_params.json'
+    remote_cmd = "python {}/remote_RF_script.py {}".format(remote_session_folder+'/scripts',remote_tmp_params_file)
+    params_to_send['outputfile'] = '{}/tmp.32fc'.format(remote_session_folder)
+    clear_cmd = "rm " + remote_tmp_params_file + ' ' + params_to_send['outputfile']
+
     print 'STATUS: Going to send the params to the remote host'
     # save the params into a local file
     with open(tmp_params_file,'w') as f:
-        pickle.dump(params_to_send,f)
+        json.dump(params_to_send,f)
+    assert os.path.isfile(tmp_params_file)
 
     # send the stored params to the remote user 
-    remote_tmp_params = tmp_params_file
     if isinstance(hostnames,str):
         hostnames = [hostnames]
     for h in hostnames:
-        ssh_utils.scp_send(h,tmp_params_file,remote_tmp_params)
+        ssh_utils.scp_send(h,tmp_params_file,remote_tmp_params_file)
     
     # clear local file
     os.remove(tmp_params_file)
 
-    remote_cmd = "python ~/{}/RF_scripts.py {}".format(session_folder,remote_tmp_params)
-    clear_cmd = "rm " + remote_tmp_params
-
-    return (remote_cmd,saved_results_file,clear_cmd)
+    return (remote_cmd,params_to_send['outputfile'],clear_cmd)

@@ -25,6 +25,8 @@ sys.path.append('../../../python/labeling_modules')
 sys.path.append('../../../python/labeling_scripts')
 sys.path.append('../../../python/utils')
 import MakeFileSimulator
+import SessionParams
+import importlib
 
 class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
     def generate_waveform(self,args):
@@ -61,20 +63,29 @@ class AWGNSessionCmdParser(MakeFileSimulator.SessionCommandParser):
         import RF_scripts
         RF_scripts.run_RF_channel(d)
     
-    def transfer_files_to_remote(self):
+    def transfer_files_to_remote(self,args):
         handler = self.__get_handler__()
         if self.sessiondata.remote_exists():
-            remote_folder = SessionPaths.remote_session_folder(sessiondata)
+            def find_script_path(script_name): # TODO: make this better
+                modu = importlib.import_module(script_name)
+                base = os.path.splitext(os.path.basename(modu.__file__))[0] # take the pyc out
+                absp = os.path.splitext(os.path.abspath(modu.__file__))[0] # take the pyc out
+                return (base,absp+'.py')
+            remote_folder = SessionParams.SessionPaths.remote_session_folder(self.sessiondata)
             # find path of files to transfer
-            import inspect
-            folder_names = ['RF_scripts']
-            folders = {}
-            for f in folder_names:
-                folders[f] = os.path.dirname(inspect.getfile(f))
+            #import inspect
+            import os
+            import ssh_utils
+            scripts = ['remote_RF_script']
+            script_paths = [find_script_path(s) for s in scripts]
+            # for f in folder_names:
+            #     folders[f] = os.path.dirname(inspect.getfile(f))
                 # labeling_scripts_folder = [s for s in sys.path if os.path.basename(s)=='labeling_scripts']
             for h in self.sessiondata.hosts():
-                for k,f in folders.items():
-                    out,err = ssh_utils.scp_send(h,f,remote_folder+'/'+k)
+                for tup in script_paths:
+                    remote_path = remote_folder+'/scripts/'+tup[0]+'.py'
+                    print 'Going to transfer script {} to remote {}'.format(tup[1],h)
+                    ssh_utils.scp_send(h,tup[1],remote_path)
 
 if __name__ == '__main__':
     # MakeFileSimulator.SessionCommandParser.run_cmd(sys.argv)

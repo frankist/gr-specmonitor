@@ -14,6 +14,7 @@ RUN_CMD = $(SIM_EXEC) $(SESSION_HANDLER_FILE) $(SIM_PARAM_FILE)
 
 define SESSIONPRERUN
 $(RUN_CMD) load_session ;
+$(RUN_CMD) transfer_files_to_remote ;
 #mkdir -p $(SIMPATH);
 #mkdir -p $(SIMPATH)/waveform;
 #mkdir -p $(SIMPATH)/Tx;
