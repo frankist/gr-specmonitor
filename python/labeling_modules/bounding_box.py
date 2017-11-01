@@ -118,6 +118,9 @@ def scale_time_range_to_image_rows(trange,nrows,section_size):
         exit(-1)
     return (rowmin,rowmax)
 
+def compute_boxes_pwr(x, box_list):
+    return [np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2) for b in box_list]
+
 # to be finished
 class ImageBoundingBox:
     def __init__(self,img_shape,row_bounds,col_bounds):
@@ -189,6 +192,10 @@ class Spectrogram:
             # Smax = Sfreq[Scentre]
             Sthres = 1*thres
             Ssize = Sfreq.size
+
+            print 'twin:',twin
+            plt.imshow(self.Sxx)
+            plt.show()
 
             # find left bound
             Sstart = int(np.round(Scentre-Ssize/2))

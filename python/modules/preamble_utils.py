@@ -22,7 +22,9 @@
 # import zadoffchu
 import numpy as np
 import sys
+import os
 import matplotlib.pyplot as plt
+sys.path.append(os.path.abspath('../utils'))
 from basic_algorithms import *
 import random_sequence
 

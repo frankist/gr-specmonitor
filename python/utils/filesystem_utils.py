@@ -20,6 +20,7 @@
 #
 
 import os
+import time
 
 def check_dependency_met(dep_filename,this_filename=None):
     if os.path.isfile(dep_filename): # if dep file already exists

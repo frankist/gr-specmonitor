@@ -56,7 +56,7 @@ stage_params = {
             ('time_offset',toffset_range),
             ('section_size',section_size),
             ('num_sections',num_sections),
-            ('soft_gain',1.0),#10**np.arange(-2,1.0)),
+            ('soft_gain',[0.1,1.0]),#10**np.arange(-2,1.0)),
             ('noise_voltage',[0])
         ],
         'RF':

@@ -19,6 +19,9 @@
 # Boston, MA 02110-1301, USA.
 #
 
+import os
+import sys
+sys.path.append(os.path.abspath('../modules/'))
 import preamble_utils
 import random_sequence
 
