@@ -20,14 +20,19 @@
 #
 
 import sys
+import os
 import MakeFileSimulator
 sys.path.append('../../../python/modules')
-sys.path.append('../../../python/modules/waveform_generators')
+# sys.path.append('../../../python/modules/waveform_generators')
+sys.path.append('../../../python/waveform_generators')
 import signal_source as sc
+import wifi_source as ws
 
 def waveform_gen_launcher(params):
     if params['parameters']['session_tag']=='sig_source':
         sc.run_signal_source(params)
+    elif params['parameters']['session_tag']=='wifi_source':
+        ws.run_signal_source(params)
     else:
         raise ValueError('ERROR: Do not recognize this waveform')
 

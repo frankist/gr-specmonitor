@@ -38,8 +38,41 @@ img_fft = 64 # the size of the FFT that is going to be used for the image genera
 stage_names = ['waveform','Tx','RF'] # order matters
 tags = ['sig_source']#,'wlan']
 ssh_hosts = ['USRPRx']
+stage_dependency_tree = {
+    'Tx':'waveform',
+    'RF':'Tx'
+}
+
+RF_params = [
+    ('tx_gaindB', range(0, 21, 10)),  #range(0,30,15)),
+    ('settle_time', 0.25),
+    ('rx_gaindB', range(0, 21, 10)),
+    ('rf_frequency', 2.35e9)
+]
 
 stage_params = {
+    'wifi_source':
+    {
+        'waveform':
+        [
+            ('waveform',['wifi']),
+            ('number_samples',wf_gen_samps),
+            ('sample_rate',20e6),
+            ('encoding',range(0,7)),
+            ('pdu_length',500), # 50-1500
+            ('pad_interval',5000) # spaces between packets. I may make it random
+        ],
+        'Tx':
+        [
+            ('frequency_offset',frequency_offset),
+            ('time_offset',toffset_range),
+            ('section_size',section_size),
+            ('num_sections',num_sections),
+            ('soft_gain',[0.1,1.0]),
+            ('noise_voltage',[0])
+        ],
+        'RF': RF_params
+    },
     'sig_source':
     {
         'waveform':
@@ -48,7 +81,7 @@ stage_params = {
             ('frequency',[1e4,1e5]),
             ('sample_rate',20e6),
             ('number_samples',wf_gen_samps),
-            ('skip_samples',skip_samps)
+            # ('skip_samples',skip_samps)
         ],
         'Tx':
         [
@@ -59,29 +92,12 @@ stage_params = {
             ('soft_gain',[0.1,1.0]),#10**np.arange(-2,1.0)),
             ('noise_voltage',[0])
         ],
-        'RF':
-        [
-            ('tx_gaindB',range(0,21,10)),#range(0,30,15)),
-            ('settle_time',0.25),
-            ('rx_gaindB',range(0,21,10)),
-            ('rf_frequency',2.35e9)
-        ],
-        'Rx':
-        [
-            ('num_subsections_per_section',5)
-        ]
+        'RF': RF_params
+        # 'Rx':
+        # [
+        #     ('num_subsections_per_section',5)
+        # ]
     }
-    # 'wlan':
-    # {
-    #     'waveform':
-    #     [
-    #         ('waveform',['wlan']),
-    #     ],
-    #     'Tx':
-    #     [
-    #         ('frequency_offset',np.linspace(-0.4,0.4,100))
-    #     ]
-    # }
 }
 
 if __name__ == '__main__':

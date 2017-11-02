@@ -20,9 +20,12 @@
 #
 import os
 import importlib
-import session_params
 import pickle
 import ssh_utils
+import logging
+import StageParamData
+import StageDependencyTree as sdt
+import itertools
 
 # this class stores all the data necessary to setup a session instance
 # - It needs to specify our instance name (e.g. 'sim0')
@@ -31,7 +34,7 @@ import ssh_utils
 # - It can be loaded from the command line by passing a dictionary
 class SessionInstanceArguments:
     def __init__(self,sessionabspath,cfg_file):
-        self.sessionabspath = sessionabspath
+        self.sessionabspath = os.path.abspath(sessionabspath)
         self.session_name = os.path.basename(sessionabspath)
         self.cfg_filename = cfg_file
     
@@ -43,12 +46,12 @@ class SessionInstanceArguments:
 
     @classmethod
     def load_dict(cls,d):
-        return cls(d['absolute_path'],d['session_name'],d['cfg_file'])
+        return cls(d['session_path'],d['cfg_file'])
 
 class SessionData:
     def __init__(self,session_instance_args,stage_params,stage_dependency_tree,ssh_hosts):
         self.session_args = session_instance_args
-        self.stage_params = stage_params
+        self.stage_params = stage_params # session_params.TaggedMultiStageParams type
         self.stage_dependency_tree = stage_dependency_tree
         self.ssh_hosts = ssh_hosts
 
@@ -59,7 +62,17 @@ class SessionData:
         return len(self.ssh_hosts)>0
 
     def stage_name_list(self):
-        return self.stage_params.stage_names
+        return self.stage_dependency_tree.stage_names
+
+    def get_stage_iteration_indices(self,stage_name):
+        dep_path = self.stage_dependency_tree.stage_dep_path[stage_name]
+        dep_len_list = [self.stage_params.length(stage=s) for s in reversed(dep_path)]
+        stage_idx_list = itertools.product(*[range(s) for s in dep_len_list])
+        return stage_idx_list
+
+    def get_run_parameters(self,stage_name,stage_idx_tuple):
+        this_stage_param_idx = stage_idx_tuple[-1]
+        return list(self.stage_params.get_stage_iterable(stage_name,this_stage_param_idx))[0]
 
     def hosts(self):
         return self.ssh_hosts
@@ -75,20 +88,24 @@ class SessionData:
             print 'Error while opening config file: ',str(e)
             exit(-1)
         # TODO: Parse the module to see if every variable is initialized
-        sp = session_params.TaggedMultiStageParams(cfg_module.tags,
-                                                   cfg_module.stage_names,
+        deptree = sdt.StageDependencyTree(cfg_module.stage_dependency_tree)
+        sp = StageParamData.TaggedMultiStageParams(cfg_module.tags,
+                                                   deptree,
                                                    cfg_module.stage_params)
-        dep_tree = cfg_module.stage_dependency_tree if hasattr(cfg_module,'stage_dependency_tree') else None
         hosts = cfg_module.ssh_hosts if hasattr(cfg_module,'ssh_hosts') else None
-        return cls(session_args,sp,dep_tree,hosts)
+        return cls(session_args,sp,deptree,hosts)
 
 # This class is only an interface to generate appropriate folder paths, and filename formats
 # This way i separate the concerns of each class and I have one single point where I make changes to the file/folder names
 class SessionPaths:
     @staticmethod
     def __session_args__(data): # receives or either sessioninstancearguments or sessiondata
-        return data if isinstance(data,SessionInstanceArguments) else data.args()
-
+        if isinstance(data,SessionInstanceArguments):
+            return data
+        elif isinstance(data,SessionData):
+            return data.args()
+        return SessionInstanceArguments.load_dict(data)
+        
     @staticmethod
     def session_folder(data):
         return SessionPaths.__session_args__(data).session_path()
@@ -102,8 +119,8 @@ class SessionPaths:
         return '{}/tmp'.format(SessionPaths.session_folder(data))
 
     @staticmethod
-    def stage_outputfile(session,stage,fidx_list):
-        folder = '{}/{}/data_'.format(session,stage)
+    def stage_outputfile(session_path,stage,fidx_list):
+        folder = '{}/{}/data_'.format(session_path,stage)
         filepath = folder + '_'.join([str(i) for i in fidx_list])
         return filepath+'.pkl'
 
@@ -117,8 +134,10 @@ class SessionPaths:
         return '~/{}'.format(SessionPaths.__session_args__(data).session_name)
 
 def session_clean(session_args):
+    import shutil
     session_folder = SessionPaths.session_folder(session_args)
-    os.rmdir(session_folder)
+    shutil.rmtree(session_folder)
+    # os.rmdir(session_folder)
 
 def load_session(session_args):
     pkl_file = SessionPaths.session_pkl(session_args)
@@ -127,8 +146,9 @@ def load_session(session_args):
     with open(pkl_file,'r') as f:
         return pickle.load(f)
 
-def session_init(session_args):
-    print 'STATUS: Going to load the config file and setup the session'
+def session_init(sargs):
+    session_args = SessionPaths.__session_args__(sargs)
+    logging.info('Going to load the config file %s and setup the session', session_args.cfg_filename)
     # loads config file
     sessiondata = SessionData.load_cfg(session_args)
     print 'STATUS: Config file was successfully loaded'

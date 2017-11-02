@@ -22,6 +22,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
+import sys
+import os
+sys.path.append(os.path.abspath('../utils'))
+from basic_utils import *
+
+fftsize = 64 # I have to define this somewhere later
 
 class BoundingBox:
     def __init__(self,time_bounds,freq_bounds):
@@ -79,7 +85,7 @@ class BoundingBox:
 def freqnorm_to_int(freqnorm,dft_size):
     return int(np.round((freqnorm+0.5)*dft_size+0.5))
 
-def freqnorm_to_int_bounds(freqnorm_range,dft_size):
+def freqnorm_to_int_bounds(freqnorm_range, dft_size):
     fmin = freqnorm_to_int(freqnorm_range[0],dft_size)
     fmax = freqnorm_to_int(freqnorm_range[1],dft_size)
     return (fmin,fmax)
@@ -193,14 +199,15 @@ class Spectrogram:
             Sthres = 1*thres
             Ssize = Sfreq.size
 
-            print 'twin:',twin
-            # plt.imshow(self.Sxx)
+            print 'twin:',twin,'len:',twin[1]-twin[0]
+            # plt.imshow(S)
             # plt.show()
 
             # find left bound
             Sstart = int(np.round(Scentre-Ssize/2))
             Sleftrange = np.mod(range(Sstart,int(np.round(Scentre))+1),Ssize)
-            left_bound = next((j for j in Sleftrange if Sfreq[j]>Sthres),Sleftrange[-1])
+            # left_bound = next((j for j in Sleftrange if Sfreq[j]>Sthres),Sleftrange[-1])
+            left_bound = Sleftrange[first_where(Sfreq[Sleftrange],lambda x: x>Sthres,-1)]
 
             # find right bound
             Send = int(np.round(Scentre+Ssize/2))
@@ -232,8 +239,19 @@ class Spectrogram:
             Sxx[0,:] = pwr_min # the spectrogram is still not transposed
         return cls(Sxx,x.size)
 
-def find_tx_intervals(x):
-    thres = 1e-5
+def find_tx_intervals(xorig,fftsize):
+    def merge_close_intervals(l,margin=5):
+        l2 = []
+        i = 0
+        while i < len(l):
+            j=i+1
+            while j<len(l) and l[j][0]-l[j-1][1] <= margin:
+                j+=1
+            l2.append((l[i][0],l[j-1][1]))
+            i=j
+        return l2
+    thres = 1e-12
+    x = np.abs(xorig)**2
     stepups=[i+1 for i in range(len(x)-1) if x[i]<thres and x[i+1]>=thres]
     stepdowns=[i+1 for i in range(len(x)-1) if x[i]>=thres and x[i+1]<thres]
     n_intervs = max(len(stepups),len(stepdowns))
@@ -249,13 +267,15 @@ def find_tx_intervals(x):
             break
         prev = stepups[j]
         # i = stepups[j+jinc]
-    return l
+    l2 = merge_close_intervals(l,fftsize/2)
+    return l2
 
 # Helpers for computing bounding boxes
 
 def compute_bounding_boxes(x):
-    time_intervals = find_tx_intervals(x)
-    Spec = Spectrogram.make_spectrogram(x)
+    fftsize = 64 # NOTE: I have to define this in the sim_awgn_params config file
+    time_intervals = find_tx_intervals(x,fftsize)
+    Spec = Spectrogram.make_spectrogram(x,fftsize)
     finterv_list = Spec.find_freq_bounds(time_intervals)
     n_boxes = len(time_intervals)
     assert n_boxes == len(finterv_list)

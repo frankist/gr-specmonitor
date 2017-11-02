@@ -21,19 +21,27 @@
 
 import os
 import time
+import collections
+from basic_utils import *
 
 def mtime(path):
         return time.ctime(os.path.getmtime(path))
 
-def check_dependency_met(dep_filename,this_filename=None):
-    if os.path.isfile(dep_filename): # if dep file already exists
-        if this_filename is not None and os.path.isfile(this_filename):
-            dep_date = mtime(dep_filename)
-            this_date = mtime(this_filename)
-            if dep_date<this_date: # If dep file is older than this file
-                return True
-            else:
-                return False
-        else:
-            return True
-    return False
+def check_complete_with_date(luigitask):
+    # assuming 1 output
+    assert isinstance(luigitask.output().path,str)
+
+    # if output does not exist return false
+    if not os.path.exists(luigitask.output().path):
+        return False
+    self_mtime = mtime(luigitask.output().path)
+
+    for el in force_iterable_not_str(luigitask.requires()):
+        # if one of the dependencies does not exist
+        if not el.complete():
+            return False
+        # if one of the dependencies is newer
+        for out in force_iterable_not_str(el.output()):
+            if mtime(out.path) > self_mtime:
+                return False 
+    return True

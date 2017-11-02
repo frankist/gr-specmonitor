@@ -58,7 +58,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
                  n_written_samples,
                  encoding=0,
                  pdu_length=500,
-                 interval_ms=0,#300.0,
+                 pad_interval=1000,
                  linear_gain=1.0):
         super(GrWifiFlowgraph, self).__init__() # this makes the initiation of all the qt nonsense
 
@@ -66,10 +66,9 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.n_written_samples = int(n_written_samples)
         self.linear_gain = float(linear_gain)
         self.pdu_length = pdu_length  # size of the message passed to the WiFi [1,1500]
-        self.interval_ms = interval_ms  # period of message passing
         assert isinstance(encoding, (int, str))
         self.encoding = encoding if isinstance(encoding,int) else GrWifiFlowgraph.encoding_labels.index(encoding)
-        self.num_msg = 100000000
+        self.pad_interval = pad_interval
 
         # phy
         self.wifi_phy_hier = wifi_phy_hier(
@@ -82,7 +81,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.foo_packet_pad2 = foo.packet_pad2(
             False, False, 0.01,
             100, # Before padding
-            1000)  # After padding
+            self.pad_interval)  # After padding
         self.foo_packet_pad2.set_min_output_buffer(
             96000)  # CHECK: What does this do?
         # self.time_plot = gr_qtgui_utils.make_time_sink_c(1024, 20.0e6, "", 1)
@@ -102,7 +101,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         #                                               self.interval_ms, self.num_msg, True, False)
         self.message_strobe = blocks.message_strobe(
             pmt.intern("".join("x" for i in range(self.pdu_length))),
-            self.interval_ms)  # NOTE: This sends a message periodically
+            0)  # NOTE: This sends a message periodically
         # self.message_debug = blocks.message_debug()
 
         self.setup_flowgraph()
@@ -144,15 +143,13 @@ def run_wifi_source(args):
         d['number_samples'],
         encoding=d['encoding'],
         pdu_length=d['pdu_length'],
-        interval_ms=d['interval_ms'])
+        pad_interval=d['pad_interval'])
 
     logging.info('Starting GR waveform generator script for Wifi')
     tb.run()
     logging.debug('GR script finished')
 
     gen_data = np.array(tb.dst.data())
-    # plt.plot(np.abs(gen_data))
-    # plt.show()
 
     logging.info('Going to compute Bounding Boxes')
     box_list = compute_bounding_boxes(gen_data)
@@ -160,7 +157,11 @@ def run_wifi_source(args):
     # print [(b.time_bounds,b.freq_bounds) for b in box_list]
     box_pwr_list = compute_boxes_pwr(gen_data, box_list)
     max_pwr_box = np.max(box_pwr_list)
+    # gen_data0 = np.array(gen_data)
     gen_data /= np.sqrt(max_pwr_box)
+    # plt.plot(np.abs(gen_data))
+    # plt.plot(np.abs(gen_data0),'r')
+    # plt.show()
 
     logging.debug('Going to fill the stage data structure and save to file')
     v = fdh.init_metadata()
@@ -168,8 +169,8 @@ def run_wifi_source(args):
     fdh.set_stage_derived_parameter(v, args['stage_name'], 'bounding_boxes',
                                     box_list)
     fdh.set_stage_parameters(v, args['stage_name'], args['parameters'])
-    fname = args['targetfilename']
-    with open(fname, 'wb') as f:
+    fname = os.path.expanduser(args['targetfilename'])
+    with open(fname, 'w') as f:
         pickle.dump(v, f)
     logging.debug('Finished writing to file %s', fname)
 
@@ -182,14 +183,15 @@ if __name__ == '__main__':
             'number_samples': 100000,
             'encoding': 0,
             'pdu_length': 500,
-            'interval_ms': 0#1000
+            'pad_interval': 5000,
         },
         'targetfilename': targetfile,
         'stage_name': 'waveform'
     }
+    targetfile = os.path.expanduser(targetfile)
     run_wifi_source(args)
     import pkl_sig_format
-    dat = WaveformPklReader(targetfile)
+    dat = pkl_sig_format.WaveformPklReader(targetfile)
     x = dat.read_section()
     plt.plot(np.abs(x))
     plt.show()
