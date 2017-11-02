@@ -194,18 +194,18 @@ class Spectrogram:
             Ssize = Sfreq.size
 
             print 'twin:',twin
-            plt.imshow(self.Sxx)
-            plt.show()
+            # plt.imshow(self.Sxx)
+            # plt.show()
 
             # find left bound
             Sstart = int(np.round(Scentre-Ssize/2))
             Sleftrange = np.mod(range(Sstart,int(np.round(Scentre))+1),Ssize)
-            left_bound = next(j for j in Sleftrange if Sfreq[j]>Sthres)
+            left_bound = next((j for j in Sleftrange if Sfreq[j]>Sthres),Sleftrange[-1])
 
             # find right bound
             Send = int(np.round(Scentre+Ssize/2))
             Srightrange = np.mod(range(Send,int(np.round(Scentre))-1,-1),Ssize) # descending order
-            right_bound = next(j for j in Srightrange if Sfreq[j]>Sthres)
+            right_bound = next((j for j in Srightrange if Sfreq[j]>Sthres),Srightrange[-1])
             right_bound += 1 # NOTE: to consistent with ranges/slices
 
             interv = freqint_to_norm_bounds((left_bound,right_bound),Ssize)
