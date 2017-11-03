@@ -29,6 +29,8 @@ import bounding_box
 import filedata_handling as fdh
 from PIL import Image
 from pylab import cm
+import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 class SpectrogramImageUtils:
     @staticmethod
@@ -144,6 +146,41 @@ def paint_box(im,Spec,box):
     pixel_list = SpectrogramImageUtils.transpose_pixel_coordinates(pixel_list) # to be consistent with the image
     paint_box_pixels(im,pixel_list)
     return True
+
+def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
+    targetfile = this_run_params['targetfilename']
+    sourcefile = this_run_params['sourcefilename']
+    freader = psf.WaveformPklReader(sourcefile)
+    sig_data = freader.data()
+    is_framed = fdh.is_framed(sig_data)
+    if insync is False or is_framed is False:
+        logger.error('I have to implement this functionality')
+        print sig_data
+        exit(-1)
+
+    section_bounds = fdh.get_stage_derived_parameter(sig_data,'section_bounds')
+    box_list = fdh.get_stage_derived_parameter(sig_data,'section_bounding_boxes')
+    num_sections = len(section_bounds)
+    x = freader.read_section()
+
+    assert num_sections==1 # TODO: Implement this for several subsections
+    for i in range(num_sections):
+        # print 'section:',section_bounds[i]
+        section = x[section_bounds[i][0]:section_bounds[i][1]]
+        # print 'section:',section.size,section_bounds[i][1]-section_bounds[i][0]
+        assert section.size == section_bounds[i][1]-section_bounds[i][0]
+        Spec = bounding_box.Spectrogram.make_spectrogram(section,cancel_DC_offset=True)
+        im = SpectrogramImageUtils.generate_img(Spec.matrix())
+        im_no_boxes = im.copy()
+
+        # print 'Going to write image',targetfilename_format.format(i)
+        if mark_boxes is True:
+            for box in box_list[i]:
+                # print 'box:',box.__str__(),Spec.Sxx.shape
+                paint_box(im,Spec,box)
+        # debug_plot_data(section,box_list[i],Sxx,im)
+        im = concatenate_images([im_no_boxes,im])
+        im.save(targetfile,'PNG')#targetfilename_format.format(i),'PNG')
 
 def save_spectrograms(sourcefname,insync,mark_boxes):
     dirname = os.path.dirname(sourcefname)

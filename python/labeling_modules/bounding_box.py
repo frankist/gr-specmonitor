@@ -91,7 +91,7 @@ def freqnorm_to_int_bounds(freqnorm_range, dft_size):
     return (fmin,fmax)
 
 def freqint_to_norm(freqint,dft_size):
-    return (freqint-0.5)/float(dft_size)-0.5
+    return max((freqint-0.5)/float(dft_size)-0.5,-0.5)
 
 def freqint_to_norm_bounds(freqint_bounds,dft_size):
     fmin = freqint_to_norm(freqint_bounds[0],dft_size)
@@ -194,23 +194,24 @@ class Spectrogram:
             Sfreq = np.max(S,0) # gets maximum for each column
 
             # centre
-            Scentre = np.argmax(Sfreq)
+            Scentre = np.sum(np.arange(Sfreq.size)*Sfreq)/np.sum(Sfreq)
+            # Scentre = np.argmax(Sfreq)
             # Smax = Sfreq[Scentre]
             Sthres = 1*thres
             Ssize = Sfreq.size
 
-            print 'twin:',twin,'len:',twin[1]-twin[0]
+            # print 'twin:',twin,'len:',twin[1]-twin[0]
             # plt.imshow(S)
             # plt.show()
 
             # find left bound
-            Sstart = int(np.round(Scentre-Ssize/2))
+            Sstart = max(int(np.round(Scentre-Ssize/2)),0)
             Sleftrange = np.mod(range(Sstart,int(np.round(Scentre))+1),Ssize)
             # left_bound = next((j for j in Sleftrange if Sfreq[j]>Sthres),Sleftrange[-1])
             left_bound = Sleftrange[first_where(Sfreq[Sleftrange],lambda x: x>Sthres,-1)]
 
             # find right bound
-            Send = int(np.round(Scentre+Ssize/2))
+            Send = min(int(np.round(Scentre+Ssize/2)),Ssize-1)
             Srightrange = np.mod(range(Send,int(np.round(Scentre))-1,-1),Ssize) # descending order
             right_bound = next((j for j in Srightrange if Sfreq[j]>Sthres),Srightrange[-1])
             right_bound += 1 # NOTE: to consistent with ranges/slices

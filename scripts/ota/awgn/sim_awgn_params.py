@@ -23,7 +23,6 @@ import sys
 sys.path.append('../../../python/modules')
 sys.path.append('../../../python/labeling_modules')
 sys.path.append('../../../python/utils')
-import session_params as sparams
 import numpy as np
 
 num_sections = 1
@@ -34,13 +33,13 @@ skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 img_fft = 64 # the size of the FFT that is going to be used for the image generation
 
-# format_extension = 'pkl'
-stage_names = ['waveform','Tx','RF'] # order matters
-tags = ['sig_source']#,'wlan']
+# stage_names = ['waveform','Tx','RF'] # order matters # NOTE: Consider deleting this
+tags = ['sig_source','wifi_source']#,'wlan'] # NOTE: Consider deleting this
 ssh_hosts = ['USRPRx']
 stage_dependency_tree = {
     'Tx':'waveform',
-    'RF':'Tx'
+    'RF':'Tx',
+    'TxImg':'Tx'
 }
 
 RF_params = [
@@ -64,7 +63,7 @@ stage_params = {
         ],
         'Tx':
         [
-            ('frequency_offset',frequency_offset),
+            ('frequency_offset',[0]),
             ('time_offset',toffset_range),
             ('section_size',section_size),
             ('num_sections',num_sections),

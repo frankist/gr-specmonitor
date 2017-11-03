@@ -25,37 +25,13 @@ import luigi
 import itertools
 import importlib
 import pickle
-import logging
 sys.path.append(os.path.abspath('../utils'))
 import SessionParams as sp
 import StageParamData
 from basic_utils import *
-
-# This class is only to generate appropriate filename formats
-
-
-class SessionFileNames:
-    @staticmethod
-    def stage_outputfile(session, stage, fidx_list):
-        folder = '{}/{}/data_'.format(session, stage)
-        filepath = folder + '_'.join([str(i) for i in fidx_list])
-        return filepath + '.pkl'
-
-    @staticmethod
-    def session_pkl(params):
-        session_name = params['session_name']
-        return '{}/param_cfg.pkl'.format(session_name)
-
-# this class stores data we pass through cmd line
-# and identifies our session instance
-
-
-class SessionInstanceParams:
-    def __init__(self, session_name, cfg_file):
-        self.session_name = session_name
-        self.cfg_file = cfg_file
-
-        self.session_path = './' + self.session_name
+import logging_utils
+import logging
+logger = logging_utils.DynamicLogger(__name__)
 
 # this class stores the cmdline configuration of our session
 # loads the config_file and stores its values
@@ -152,7 +128,7 @@ class CmdSession(luigi.WrapperTask):
     cfg_file = luigi.Parameter()
     stages_to_run = luigi.Parameter()
     clean_first = luigi.Parameter(significant=False,default='False')
-    first_run = luigi.Parameter(significant=False,default='True')
+    first_run = luigi.BoolParameter(significant=False,default=True)
 
     def session_args(self):
         # NOTE: This was originally a DictParameter()
@@ -161,8 +137,8 @@ class CmdSession(luigi.WrapperTask):
         return {'session_path':self.session_path,'cfg_file':self.cfg_file}
 
     def requires(self):
-        if self.first_run=='True':
-            self.first_run='False'
+        if self.first_run==True:
+            self.first_run=False
             if self.clean_first=='True':
                 sp.session_clean(self.session_args())
             # run the session config setup as a sub-pipeline
@@ -183,13 +159,14 @@ class CmdSession(luigi.WrapperTask):
         stage_idx_list = sessiondata.get_stage_iteration_indices(stage)
         stage_task_caller = self.get_stage_caller(stage)
         if not stage_task_caller:
-            logging.error('Method %s not implemented', stage)
+            logger.error('Method %s not implemented', stage)
             raise NotImplementedError('Method %s not implemented' % stage)
         return [stage_task_caller(self.session_args(), idxs) for idxs in list(stage_idx_list)]
 
 class StageLuigiTask(luigi.Task):
     session_args = luigi.DictParameter()
     stage_idxs = luigi.ListParameter()
+    output_fmt = luigi.Parameter(significant=False,default='.pkl') 
 
     def load_sessiondata(self):
         return sp.load_session(self.session_args)
@@ -201,13 +178,7 @@ class StageLuigiTask(luigi.Task):
         stage_name = self.my_stage_name()
         outfilename = sp.SessionPaths.stage_outputfile(self.session_args['session_path'],
                                          stage_name,
-                                         self.stage_idxs)
-        # filepath = SessionFileNames.stage_outputfile(self.session_args['session_path'],
-        #                                        stage_name,
-        #                                        self.stage_idxs)
-        # folder = '{}/{}'.format(self.session_args['session_name'],self.__class__.__name__)
-        # filepath = '{}/data_{}_{}_{}.pkl'.format(folder,self.wav_idx,
-        #                                          self.Tx_idx,self.RF_idx)
+                                         self.stage_idxs,self.output_fmt)
         return luigi.LocalTarget(outfilename)
 
     def get_run_parameters(self):

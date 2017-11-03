@@ -25,16 +25,20 @@ import collections
 from basic_utils import *
 
 def mtime(path):
-        return time.ctime(os.path.getmtime(path))
+    return time.ctime(os.path.getmtime(path))
+
+def time_cmp(f1,f2): # If f1 is newer, returns positive
+    return os.path.getmtime(f1)-os.path.getmtime(f2)
 
 def check_complete_with_date(luigitask):
     # assuming 1 output
-    assert isinstance(luigitask.output().path,str)
+    outputfile = luigitask.output().path
+    assert len(force_iterable_not_str(outputfile))==1
 
     # if output does not exist return false
-    if not os.path.exists(luigitask.output().path):
+    if not os.path.exists(outputfile):
         return False
-    self_mtime = mtime(luigitask.output().path)
+    self_mtime = mtime(outputfile)
 
     for el in force_iterable_not_str(luigitask.requires()):
         # if one of the dependencies does not exist
@@ -42,6 +46,6 @@ def check_complete_with_date(luigitask):
             return False
         # if one of the dependencies is newer
         for out in force_iterable_not_str(el.output()):
-            if mtime(out.path) > self_mtime:
+            if time_cmp(out.path,outputfile)>0:
                 return False 
     return True

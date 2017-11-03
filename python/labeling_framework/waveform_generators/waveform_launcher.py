@@ -19,22 +19,30 @@
 # Boston, MA 02110-1301, USA.
 #
 
-# NOTE: Consider deleting this
+from LuigiSimulatorHandler import *
+import waveform_generator
+import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
-import sys
-import os
-import MakeFileSimulator
-sys.path.append('../../../python/modules')
-# sys.path.append('../../../python/modules/waveform_generators')
-sys.path.append('../../../python/waveform_generators')
-import signal_source as sc
-import wifi_source as ws
+class waveform(StageLuigiTask):
+    """
+    This task generates waveform files
+    """
+    def requires(self):
+        return SessionInit(self.session_args)
 
-def waveform_gen_launcher(params):
-    if params['parameters']['session_tag']=='sig_source':
+    def run(self):
+        logger.trace('Running Waveform Generator for %s',self.output().path)
+        this_run_params = self.get_run_parameters()
+        waveform_launcher(this_run_params)
+
+def waveform_launcher(params):
+    if params['parameters']['session_tag']=='sig_source': #FIXME: It should not read the tag but the waveform parameter
+        import signal_source as sc
         sc.run_signal_source(params)
-    elif params['parameters']['session_tag']=='wifi_source':
-        ws.run_signal_source(params)
+    elif params['parameters']['waveform']=='wifi':
+        import wifi_source as ws
+        ws.run(params)
     else:
         raise ValueError('ERROR: Do not recognize this waveform')
-
+    pass

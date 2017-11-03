@@ -119,10 +119,10 @@ class SessionPaths:
         return '{}/tmp'.format(SessionPaths.session_folder(data))
 
     @staticmethod
-    def stage_outputfile(session_path,stage,fidx_list):
+    def stage_outputfile(session_path,stage,fidx_list,fmt='.pkl'):
         folder = '{}/{}/data_'.format(session_path,stage)
         filepath = folder + '_'.join([str(i) for i in fidx_list])
-        return filepath+'.pkl'
+        return filepath+fmt
 
     @staticmethod
     def session_pkl(data):

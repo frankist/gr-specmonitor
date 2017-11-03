@@ -134,7 +134,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.stop()
         self.wait()
 
-def run_wifi_source(args):
+def run(args):
     d = args['parameters']
     # print_params(d)
 

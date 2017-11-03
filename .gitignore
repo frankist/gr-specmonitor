@@ -9,3 +9,4 @@ gr-specmonitor.kdev4
 scripts/simulations/awgn/sim0/*
 scripts/ota/awgn/sim0/*
 .vscode/
+*logs/

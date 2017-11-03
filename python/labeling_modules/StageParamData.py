@@ -47,7 +47,9 @@ class LabeledParamValues:
 class StageParams:
     def __init__(self,param_list):
         self.labeled_params = [LabeledParamValues(pair[0],pair[1]) for pair in param_list]
-        self.__product_size__ = np.cumprod([v.length() for v in self.labeled_params])[-1]
+        self.__product_size__ = 1
+        if len(self.labeled_params)!=0:
+            self.__product_size__ = np.cumprod([v.length() for v in self.labeled_params])[-1]
 
     def length(self):
         return self.__product_size__
@@ -60,7 +62,7 @@ class MultiStageParams:
     def __init__(self,stage_dep_tree,stage_params):
         self.stage_dep_tree = stage_dep_tree
         # I keep the order of the stages according to the stage_names list
-        self.stage_params = {k:StageParams(stage_params[k]) for k in self.stage_names()}
+        self.stage_params = {k:StageParams(stage_params.get(k,[])) for k in self.stage_names()}
         self.__stage_lengths__ = {k:self.stage_params[k].length() for k in self.stage_names()}
         self.__param_length__ = np.cumprod([v.length() for v in self.stage_params.values()])[-1]
 
