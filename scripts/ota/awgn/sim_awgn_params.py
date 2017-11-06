@@ -27,7 +27,7 @@ import numpy as np
 
 num_sections = 1
 section_size = 50000
-toffset_range = range(10,1000,500)
+toffset_range = [10]#range(10,1000,500)
 frequency_offset = np.linspace(-0.1,0.1,2)
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
@@ -43,9 +43,9 @@ stage_dependency_tree = {
 }
 
 RF_params = [
-    ('tx_gaindB', range(0, 21, 10)),  #range(0,30,15)),
+    ('tx_gaindB', [0]),#range(0, 21, 10)),  #range(0,30,15)),
     ('settle_time', 0.25),
-    ('rx_gaindB', range(0, 21, 10)),
+    ('rx_gaindB', [0]),#range(0, 21, 10)),
     ('rf_frequency', 2.35e9)
 ]
 
@@ -57,7 +57,7 @@ stage_params = {
             ('waveform',['wifi']),
             ('number_samples',wf_gen_samps),
             ('sample_rate',20e6),
-            ('encoding',range(0,7)),
+            ('encoding',[0]),#range(0,7)),
             ('pdu_length',500), # 50-1500
             ('pad_interval',5000) # spaces between packets. I may make it random
         ],
@@ -67,10 +67,14 @@ stage_params = {
             ('time_offset',toffset_range),
             ('section_size',section_size),
             ('num_sections',num_sections),
-            ('soft_gain',[0.1,1.0]),
+            ('soft_gain',[0.1]),#[0.1,1.0]),
             ('noise_voltage',[0])
         ],
-        'RF': RF_params
+        'RF': RF_params,
+        'TxImg':
+        [
+            ('need_at_least_one_parameter',0)
+        ]
     },
     'sig_source':
     {
@@ -91,7 +95,11 @@ stage_params = {
             ('soft_gain',[0.1,1.0]),#10**np.arange(-2,1.0)),
             ('noise_voltage',[0])
         ],
-        'RF': RF_params
+        'RF': RF_params,
+        'TxImg':
+        [
+            ('need_at_least_one_parameter',0)
+        ]
         # 'Rx':
         # [
         #     ('num_subsections_per_section',5)

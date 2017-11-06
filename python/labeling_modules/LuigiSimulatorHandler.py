@@ -184,10 +184,10 @@ class StageLuigiTask(luigi.Task):
     def get_run_parameters(self):
         sessiondata = self.load_sessiondata()
         this_stage = self.my_stage_name()
-        iterable_parameters = sessiondata.get_run_parameters(this_stage,self.stage_idxs)
+        params_dict = sessiondata.get_run_parameters(this_stage,self.stage_idxs)
         outputfile = self.output().path
         parent_stage = sessiondata.stage_dependency_tree.get_stage_dependency(this_stage)
-        d = {'parameters':dict(iterable_parameters),
+        d = {'parameters':params_dict,
         'targetfolder':os.path.dirname(outputfile),
         'targetfilename':outputfile,
         'sourcefilename':self.requires().output().path,

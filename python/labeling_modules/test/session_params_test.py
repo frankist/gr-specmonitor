@@ -22,10 +22,12 @@
 import sys
 sys.path.append('../')
 sys.path.append('../../utils/')
-from session_params import *
+from StageParamData import *
+import StageDependencyTree
 import numpy as np
 import typesystem_utils as ts
 
+# check if labeledparamvalues is efficiently stored and iterable over
 def test1():
     tag = 'label1'
     values = range(10)
@@ -50,6 +52,7 @@ def test2():
 
 def test3():
     stages = ['stage1','stage2']
+    stage_dep_tree = {'stage2':'stage1'}
     l = {
         'stage1': [
             ('var1',range(10)),
@@ -60,16 +63,17 @@ def test3():
             ('var4',np.linspace(0,1,4))
         ]
     }
-    p = MultiStageParams(stages,l)
+    tr = StageDependencyTree.StageDependencyTree(stage_dep_tree)
+    p = MultiStageParams(tr,l)
     assert p.length('stage1') == np.cumprod([len(t[1]) for t in l['stage1']])[-1]
     assert p.length('stage2') == np.cumprod([len(t[1]) for t in l['stage2']])[-1]
     assert p.length() == p.length('stage1')*p.length('stage2')
-    assert p.length('stage1')==p.length(0) and p.length('stage2')==p.length(1)
     # print list(p.get_iterable('stage2'))
 
 def test4():
     tags = ['sig','wifi']
     stages = ['waveform','Tx']
+    stage_dep_tree = {'Tx':'waveform'}
     l = { 'sig':
           {
               'waveform':
@@ -91,17 +95,32 @@ def test4():
               ],
               'Tx':
               [
-                 ('frequency_offset',np.linspace(-0.5,0.5,6))
+                 ('frequency_offset',[0]),#np.linspace(-0.5,0.5,6))
               ]
          }
     }
-    p = TaggedMultiStageParams(tags,stages,l)
+    t = StageDependencyTree.StageDependencyTree(stage_dep_tree)
+    p = TaggedMultiStageParams(tags,t,l)
     # print [[len(ts.convert2list(t[1])) for t in u['waveform']] for u in l.values()]
     assert p.length(stage='waveform') == sum([np.cumprod([len(ts.convert2list(t[1])) for t in u['waveform']])[-1] for u in l.values()])
     assert len(list(p.get_iterable(stage='waveform'))) == p.length(stage='waveform')
     assert len(list(p.get_iterable(stage='Tx'))) == p.length(stage='Tx')
-    assert p.length(tag='wifi',stage='Tx')==6
+    assert p.length(tag='wifi',stage='Tx')==1
     assert p.length(tag='sig')==(p.length('sig','waveform')*p.length('sig','Tx'))
+    assert p.length(tag='wifi')==(p.length('wifi','waveform')*p.length('wifi','Tx'))
+    wifi_wf_files = p.length(tag='wifi',stage='waveform')
+    sig_wf_files = p.length(tag='sig',stage='waveform')
+    tag_list_wv_stage = ['sig']*sig_wf_files + ['wifi']*wifi_wf_files
+    for i in range(p.length(stage='waveform')):
+        assert p.get_tag_name([i])==dict(list(p.get_stage_iterable(stage='waveform'))[i])['session_tag']
+        assert p.get_tag_name([i])==tag_list_wv_stage[i]
+    assert p.__length_matrix__.shape == (len(p.stage_names()),len(p.tag_names))
+    for ti,t in enumerate(p.tag_names):
+        assert np.cumprod(p.__length_matrix__[:,ti])[-1]==p.length(tag=t)
+    for si,s in enumerate(p.stage_names()):
+        assert np.sum(p.__length_matrix__[si,:])==p.length(stage=s)
+    assert len(list(p.get_idx_tuples(stage='Tx')))==p.length()
+    assert len(list(p.get_idx_tuples(stage='waveform')))==p.length('waveform')
     # assert p.length(stage='waveform')*p.length(stage='Tx')==p.length()
 
 if __name__ == '__main__':
@@ -109,3 +128,4 @@ if __name__ == '__main__':
     test2()
     test3()
     test4()
+    print "Finished all the tests successfully"

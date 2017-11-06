@@ -37,7 +37,8 @@ class waveform(StageLuigiTask):
         waveform_launcher(this_run_params)
 
 def waveform_launcher(params):
-    if params['parameters']['session_tag']=='sig_source': #FIXME: It should not read the tag but the waveform parameter
+    wf = params['parameters']['waveform']
+    if wf in ['square','saw']: #FIXME: It should not read the tag but the waveform parameter
         import signal_source as sc
         sc.run_signal_source(params)
     elif params['parameters']['waveform']=='wifi':
