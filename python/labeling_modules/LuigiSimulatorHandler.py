@@ -106,6 +106,7 @@ class SessionInit(luigi.Task):
         # saves pkl with params
         session_arg_obj = self.get_arg_obj()
         sp.session_init(session_arg_obj)
+
         # # load the config file
         # simdata = LuigiSessionData.load_cfg_file(self.session_args['session_name'],self.session_args['cfg_file'])
 
@@ -156,12 +157,29 @@ class CmdSession(luigi.WrapperTask):
     # creates a list of callers respective to stage given as argument
     # each caller corresponds to a different iteration of stage parameters
     def get_luigi_callers(self, sessiondata, stage):
-        stage_idx_list = sessiondata.get_stage_iteration_indices(stage)
+        stage_idx_list = sessiondata.get_session_idx_tuples(stage)
         stage_task_caller = self.get_stage_caller(stage)
         if not stage_task_caller:
             logger.error('Method %s not implemented', stage)
             raise NotImplementedError('Method %s not implemented' % stage)
         return [stage_task_caller(self.session_args(), idxs) for idxs in list(stage_idx_list)]
+
+# this is for tasks that are run just once
+class SessionLuigiTask(luigi.Task):
+    session_args = luigi.DictParameter()
+
+    def load_sessiondata(self):
+        return sp.load_session(self.session_args)
+
+    def my_task_name(self):
+        return self.__class__.__name__
+
+    def output(self):
+        outfilename = sp.SessionPaths.tmp_folder(self.session_args)+'/'+self.my_task_name()+'_complete.pkl'
+        return luigi.LocalTarget(outfilename)
+
+    def run(self):
+        print 'do nothing'
 
 class StageLuigiTask(luigi.Task):
     session_args = luigi.DictParameter()
@@ -171,11 +189,11 @@ class StageLuigiTask(luigi.Task):
     def load_sessiondata(self):
         return sp.load_session(self.session_args)
 
-    def my_stage_name(self):
+    def my_task_name(self):
         return self.__class__.__name__
 
     def output(self):
-        stage_name = self.my_stage_name()
+        stage_name = self.my_task_name()
         outfilename = sp.SessionPaths.stage_outputfile(self.session_args['session_path'],
                                          stage_name,
                                          self.stage_idxs,self.output_fmt)
@@ -183,15 +201,21 @@ class StageLuigiTask(luigi.Task):
 
     def get_run_parameters(self):
         sessiondata = self.load_sessiondata()
-        this_stage = self.my_stage_name()
+        this_stage = self.my_task_name()
         params_dict = sessiondata.get_run_parameters(this_stage,self.stage_idxs)
         outputfile = self.output().path
         parent_stage = sessiondata.stage_dependency_tree.get_stage_dependency(this_stage)
+        req = self.requires()
+        if isinstance(req,list): # in case there were multiple dependencies
+            o = [r for r in req if r.my_task_name()==parent_stage]
+            assert len(o)==1
+            req = o[0]
         d = {'parameters':params_dict,
         'targetfolder':os.path.dirname(outputfile),
         'targetfilename':outputfile,
-        'sourcefilename':self.requires().output().path,
+        'sourcefilename':req.output().path,
         'stage_name':this_stage,
+        'sessiondata':sessiondata,
         'previous_stage_name':parent_stage}
         return d
 

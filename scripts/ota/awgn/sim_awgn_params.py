@@ -34,12 +34,13 @@ wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 img_fft = 64 # the size of the FFT that is going to be used for the image generation
 
 # stage_names = ['waveform','Tx','RF'] # order matters # NOTE: Consider deleting this
-tags = ['sig_source','wifi_source']#,'wlan'] # NOTE: Consider deleting this
+tags = ['sig','wifi']#,'wlan'] # NOTE: Consider deleting this
 ssh_hosts = ['USRPRx']
 stage_dependency_tree = {
     'Tx':'waveform',
     'RF':'Tx',
-    'TxImg':'Tx'
+    'TxImg':'Tx',
+    'RFImg':'RF'
 }
 
 RF_params = [
@@ -50,7 +51,7 @@ RF_params = [
 ]
 
 stage_params = {
-    'wifi_source':
+    'wifi':
     {
         'waveform':
         [
@@ -70,13 +71,9 @@ stage_params = {
             ('soft_gain',[0.1]),#[0.1,1.0]),
             ('noise_voltage',[0])
         ],
-        'RF': RF_params,
-        'TxImg':
-        [
-            ('need_at_least_one_parameter',0)
-        ]
+        'RF': RF_params
     },
-    'sig_source':
+    'sig':
     {
         'waveform':
         [
@@ -95,11 +92,7 @@ stage_params = {
             ('soft_gain',[0.1,1.0]),#10**np.arange(-2,1.0)),
             ('noise_voltage',[0])
         ],
-        'RF': RF_params,
-        'TxImg':
-        [
-            ('need_at_least_one_parameter',0)
-        ]
+        'RF': RF_params
         # 'Rx':
         # [
         #     ('num_subsections_per_section',5)
@@ -108,5 +101,5 @@ stage_params = {
 }
 
 if __name__ == '__main__':
-    for v in staged_params.get_iterable('sig_source','Tx'):
+    for v in staged_params.get_iterable('sig','Tx'):
         print v

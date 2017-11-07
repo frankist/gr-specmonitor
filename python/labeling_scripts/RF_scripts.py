@@ -34,6 +34,9 @@ import RF_sync_utils
 from gnuradio import uhd
 import ssh_utils
 import SessionParams
+from LuigiSimulatorHandler import SessionLuigiTask
+import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 def setup_RF_Tx_on_repeat(framed_signal,params,fparams,sample_rate):
     ### Set variables based on given parameters
@@ -113,3 +116,49 @@ def run_RF_channel(args):
         print 'WARNING: Preamble sync has failed. Going to repeat transmission'
     os.remove(tmp_file)
     # Note: The separation into multiple subsections happens later
+
+class RemoteSetup(SessionLuigiTask):
+    def run(self):
+        sessiondata = self.load_sessiondata()
+        scp_out = {}
+
+        if sessiondata.remote_exists():
+            remote_folder = SessionParams.SessionPaths.remote_session_folder(sessiondata)
+            scripts = ['remote_RF_script']
+
+            def find_script_path(script_name): # TODO: make this better
+                import importlib
+                modu = importlib.import_module(script_name)
+                base = os.path.splitext(os.path.basename(modu.__file__))[0] # take the pyc out
+                absp = os.path.splitext(os.path.abspath(modu.__file__))[0] # take the pyc out
+                return (base,absp+'.py')
+
+            # find path of files to transfer
+            script_paths = [find_script_path(s) for s in scripts]
+            for h in sessiondata.hosts():
+                for tup in script_paths:
+                    remote_path = remote_folder+'/scripts/'+tup[0]+'.py'
+                    logger.info('Going to transfer script {} to remote {}'.format(tup[1],h))
+                    r,e = ssh_utils.scp_send(h,tup[1],remote_path)
+                    scp_out[h] = {'cout':r,'err':e}
+
+        with open(self.output().path,'w') as f:
+            pickle.dump(scp_out,f)
+
+            # def find_script_path(script_name): # TODO: make this better
+            #     modu = importlib.import_module(script_name)
+            #     base = os.path.splitext(os.path.basename(modu.__file__))[0] # take the pyc out
+            #     absp = os.path.splitext(os.path.abspath(modu.__file__))[0] # take the pyc out
+            #     return (base,absp+'.py')
+            # remote_folder = SessionParams.SessionPaths.remote_session_folder(self.sessiondata)
+            # # find path of files to transfer
+            # #import inspect
+            # import os
+            # import ssh_utils
+            # scripts = ['remote_RF_script']
+            # script_paths = [find_script_path(s) for s in scripts]
+            # for h in self.sessiondata.hosts():
+            #     for tup in script_paths:
+            #         remote_path = remote_folder+'/scripts/'+tup[0]+'.py'
+            #         print 'Going to transfer script {} to remote {}'.format(tup[1],h)
+            #         ssh_utils.scp_send(h,tup[1],remote_path)

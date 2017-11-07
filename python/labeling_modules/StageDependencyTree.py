@@ -34,6 +34,12 @@ class StageDependencyTree:
         idx = np.argsort(lvls)
         self.stage_names = [self.stage_names[i] for i in idx]
 
+    def path_to_root(self,stage):
+        return self.stage_dep_path[stage]
+
+    def distance_to_root(self,stage):
+        return len(self.path_to_root(stage))-1
+
     def get_stage_dependency(self,stage_name):
         assert stage_name in self.stage_names
         if stage_name in self.dep_tree:

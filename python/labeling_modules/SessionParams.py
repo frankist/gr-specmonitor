@@ -64,19 +64,19 @@ class SessionData:
     def stage_name_list(self):
         return self.stage_dependency_tree.stage_names
 
-    def get_stage_iteration_indices(self,stage_name):
+    def get_session_idx_tuples(self,stage_name):
         """
         Returns a iterator (itertools) that goes from (0,0,...,0),(0,0,...,1),...,(4,3,...,6)
         Basically iterates over all file indices from the first stage up to "stage_name"
         """
-        return self.stage_params.get_idx_tuples(stage=stage_name)
+        return StageParamData.generate_session_run_idxs(self.stage_params,stage_name)
         # dep_path = self.stage_dependency_tree.stage_dep_path[stage_name]
         # dep_len_list = [self.stage_params.length(stage=s) for s in reversed(dep_path)]
         # stage_idx_list = itertools.product(*[range(s) for s in dep_len_list])
         # return stage_idx_list
 
     def get_run_parameters(self,stage_name,stage_idx_tuple):
-        return self.stage_params.get_run_parameters(stage_name,stage_idx_tuple)
+        return StageParamData.get_run_parameters(self.stage_params,stage_idx_tuple,stage_name)
         # this_stage_param_idx = stage_idx_tuple[-1]
         # tag = self.stage_params.get_tag_name(stage_idx_tuple)
         # return list(self.stage_params.get_stage_iterable(stage=stage_name,tag=tag,this_stage_param_idx))[0]

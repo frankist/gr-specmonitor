@@ -31,9 +31,9 @@ def ssh_run(hostname,command,printstdout=True,logfilename=None):
     return (result,error)
 
 def scp_send(hostname,localfile,remotefile,folder=False):
-    scp_command(hostname,localfile,remotefile,True,folder)
+    return scp_command(hostname,localfile,remotefile,True,folder)
 def scp_recv(hostname,localfile,remotefile,folder=False):
-    scp_command(hostname,localfile,remotefile,False,folder)
+    return scp_command(hostname,localfile,remotefile,False,folder)
 
 def scp_command(hostname,localfile,remotefile,send=True,folder=False):
     l = ['scp']

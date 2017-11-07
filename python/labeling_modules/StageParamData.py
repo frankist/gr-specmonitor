@@ -23,6 +23,7 @@ import typesystem_utils as ts
 import itertools
 import numpy as np
 import collections
+from basic_utils import *
 
 # This object stores the label and possible values of a parameter
 class LabeledParamValues:
@@ -97,70 +98,135 @@ class TaggedMultiStageParams:
         self.__stage_lengths__ = {s:np.sum([t.length(s) for t in self.multistage_params.values()]) for s in self.stage_names()} # total lengths for each stage
         self.__tag_lengths__ = [self.multistage_params[t].length() for t in self.tag_names] # total lengths for each tag
         self.__param_length__ = np.sum([v.length() for v in self.multistage_params.values()]) # total length
-        self.__length_matrix__ = np.zeros((len(self.stage_names()),len(self.tag_names)),np.int32)
-        for si,s in enumerate(self.stage_names()):
-            for ti,t in enumerate(self.tag_names):
-                self.__length_matrix__[si,ti] = self.multistage_params[t].length(s)
+        self.__length_matrix__ = np.zeros((len(self.tag_names),len(self.stage_names())),np.int32)
+        for ti,t in enumerate(self.tag_names):
+            for si,s in enumerate(self.stage_names()):
+                self.__length_matrix__[ti,si] = self.multistage_params[t].length(s)
 
     def stage_names(self):
         return self.stage_dep_tree.stage_names
 
-    def length(self,tag=None,stage=None):
-        if stage is None and tag is None:
-            return self.__param_length__
-        elif stage is None and tag is not None:
-            tag_idx = tag if type(tag) is not str else self.tag_names.index(tag)
-            return self.__tag_lengths__[tag_idx]
-        elif stage is not None and tag is None:
-            # stage_idx = stage if type(stage) is not str else self.stage_names.index(stage)
-            return self.__stage_lengths__[stage]
-        else:
-            tag_key = tag if type(tag) is str else self.tag_names[tag]
-            return self.multistage_params[tag_key].length(stage)
+    def slice_stage_lengths(self,tags=[],stages=[]):
+        tags = force_iterable_not_str(tags)
+        stages = force_iterable_not_str(stages)
+        tags = tags if len(tags)>0 else self.tag_names
+        stages = stages if len(stages)>0 else self.stage_names()
+        tidxs = np.array([self.tag_names.index(t) for t in tags],np.int32)
+        sidxs = np.array([self.stage_names().index(t) for t in stages],np.int32)
+        m = self.__length_matrix__ # stupid numpy doesn't slice matrices without affecting its dimensions
+        m = m[tidxs,:].reshape(tidxs.size,m.shape[1])
+        m = m[:,sidxs].reshape(m.shape[0],sidxs.size)
+        return m
 
-    def get_idx_tuples(self,stage):#,tag=None):
-        dep_path = self.stage_dep_tree.stage_dep_path[stage] # finds path to root
-        stage_dep_idxs = [self.stage_names().index(s) for s in dep_path]
-        tag_idx_list = range(len(self.tag_names))#self.tag_names.index(tag) if tag is not None else range(len(self.tag_names))
-        idx_tuple_per_tag_list = []
-        first_lvl_cum = 0
-        for t in tag_idx_list:
-            len_per_stage = self.__length_matrix__[stage_dep_idxs,t]
-            range_per_stage = [range(s) for s in len_per_stage]
-            range_per_stage[0] = range(first_lvl_cum,first_lvl_cum+len_per_stage[0]) # for the first we start by where the tag left us
-            first_lvl_cum += len_per_stage[0]
-            idx_tuple_per_tag_list.append(itertools.product(*range_per_stage))
-        return itertools.chain(*idx_tuple_per_tag_list)
+    def length(self,tags=[],stages=[]):
+        m = self.slice_stage_lengths(tags,stages)
+        return np.sum([np.cumprod(m[t,:])[-1] for t in range(m.shape[0])])
 
-    def get_iterable(self,tag=None,stage=None):
-        if tag is not None:
-            assert isinstance(tag,basestring)
-            return self.multistage_params[tag].get_iterable(stage)
-        return itertools.chain(*[self.multistage_params[t].get_iterable(stage) for t in self.tag_names])
+    def get_iterable(self,tags=[],stages=[]):
+        tags = force_iterable_not_str(tags)
+        tags = tags if len(tags)>0 else self.tag_names
+        stages = force_iterable_not_str(stages)
+        stages = stages if len(stages)>0 else self.stage_names()
+        l = []
+        for t in tags:
+            for s in stages:
+                l.append(self.multistage_params[t].get_iterable(s))
+        return itertools.chain(*l)
+    # def length(self,tag=None,stage=None):
+    #     if stage is None and tag is None:
+    #         return self.__param_length__
+    #     elif stage is None and tag is not None:
+    #         tag_idx = tag if type(tag) is not str else self.tag_names.index(tag)
+    #         return self.__tag_lengths__[tag_idx]
+    #     elif stage is not None and tag is None:
+    #         # stage_idx = stage if type(stage) is not str else self.stage_names.index(stage)
+    #         return self.__stage_lengths__[stage]
+    #     else:
+    #         tag_key = tag if type(tag) is str else self.tag_names[tag]
+    #         return self.multistage_params[tag_key].length(stage)
 
-    def get_stage_iterable(self,stage,tag=None,idx_range=None):
-        """
-        With this method I am allowed to pick a specific iterator through its index.
-        """
-        if idx_range is None:
-            return self.get_iterable(stage=stage,tag=tag)
-        if stage==self.stage_dep_tree.root: # if we are at the root
-            v = self.get_iterable(stage=stage)
-        else:
-            assert tag is not None
-            v = self.get_iterable(stage=stage,tag=tag) # you cannot find the iterator if you don't have the tag in case you are not at the root
-        if isinstance(idx_range,(list,tuple,slice)): # we will make a slice
-            return itertools.islice(v,*idx_range)
-        return itertools.islice(v,idx_range,idx_range+1)
+    # def get_idx_tuples(self,stage):#,tag=None):
+    #     dep_path = self.stage_dep_tree.stage_dep_path[stage] # finds path to root
+    #     stage_dep_idxs = [self.stage_names().index(s) for s in dep_path]
+    #     tag_idx_list = range(len(self.tag_names))#self.tag_names.index(tag) if tag is not None else range(len(self.tag_names))
+    #     idx_tuple_per_tag_list = []
+    #     first_lvl_cum = 0
+    #     for t in tag_idx_list:
+    #         len_per_stage = self.__length_matrix__[stage_dep_idxs,t]
+    #         range_per_stage = [range(s) for s in len_per_stage]
+    #         range_per_stage[0] = range(first_lvl_cum,first_lvl_cum+len_per_stage[0]) # for the first we start by where the tag left us
+    #         first_lvl_cum += len_per_stage[0]
+    #         idx_tuple_per_tag_list.append(itertools.product(*range_per_stage))
+    #     return itertools.chain(*idx_tuple_per_tag_list)
 
-    def get_tag_name(self,stage_idx_tuple):
-        idx0 = stage_idx_tuple[0]
-        root_name = self.stage_dep_tree.root
-        v = self.get_stage_iterable(stage=root_name,idx_range=idx0)
-        entry_params = dict(list(v)[0])
-        return entry_params['session_tag']
+        # if tag is not None:
+        #     assert isinstance(tag,basestring)
+        #     return self.multistage_params[tag].get_iterable(stage)
+        # return itertools.chain(*[self.multistage_params[t].get_iterable(stage) for t in self.tag_names])
 
-    def get_run_parameters(self,stage_name,stage_idx_tuple):
-        this_stage_param_idx = stage_idx_tuple[-1]
-        tag = self.get_tag_name(stage_idx_tuple)
-        return dict(list(self.get_stage_iterable(stage=stage_name,tag=tag,idx_range=this_stage_param_idx))[0])
+    # def get_stage_iterable(self,stage,tag=None,idx_range=None):
+    #     """
+    #     With this method I am allowed to pick a specific iterator through its index.
+    #     """
+    #     if idx_range is None:
+    #         return self.get_iterable(stage=stage,tag=tag)
+    #     # if stage==self.stage_dep_tree.root: # if we are at the root
+    #     #     v = self.get_iterable(stage=stage)
+    #     # else:
+    #     assert tag is not None
+    #     v = self.get_iterable(stage=stage,tag=tag) # you cannot find the iterator if you don't have the tag in case you are not at the root
+    #     if isinstance(idx_range,(list,tuple,slice)): # we will make a slice
+    #         return itertools.islice(v,*idx_range)
+    #     return itertools.islice(v,idx_range,idx_range+1)
+
+    # def get_tag_name(self,stage_idx_tuple):
+    #     idx0 = stage_idx_tuple[0]
+    #     root_name = self.stage_dep_tree.root
+    #     v = self.get_stage_iterable(stage=root_name,idx_range=idx0)
+    #     entry_params = dict(list(v)[0])
+    #     return entry_params['session_tag']
+
+    # def get_run_parameters(self,stage_name,stage_idx_tuple):
+    #     this_stage_param_idx = stage_idx_tuple[-1]
+    #     tag = self.get_tag_name(stage_idx_tuple)
+    #     return dict(list(self.get_stage_iterable(stage=stage_name,tag=tag,idx_range=this_stage_param_idx))[0])
+
+# utilities for stage idx tuple
+# idx tuple format: (tag, stage0 idx, stage1 idx, ...)
+# I don't create a class bc this has to be understood in the command line
+
+def get_tag(stage_idx_tuple):
+    return stage_idx_tuple[0]
+
+def get_stage_idx(sessiondata,stage_idx_tuple,stage_name):
+    dist2root = sessiondata.stage_dep_tree.distance_to_root(stage_name)
+    return stage_idx_tuple[dist2root+1] # account for tag
+
+# receives a iterator over the lsit of parameters, and slices it
+def slice_param_iterator(stage_param_iterator,idx_range):
+    if isinstance(idx_range,(list,tuple)):
+        return itertools.islice(stage_param_iterator,*idx_range)
+    elif isinstance(idx_range,slice):
+        return itertools.islice(stage_param_iterator,idx_range)
+    return itertools.islice(stage_param_iterator,idx_range,idx_range+1)
+
+# NOTE: the stage_idx_tuple by itself cannot tell the stage name bc it is a tree of stages
+def get_run_parameters(sessiondata,stage_idx_tuple,stage_name):
+    tag = get_tag(stage_idx_tuple)
+    this_stage_idx = get_stage_idx(sessiondata,stage_idx_tuple,stage_name)
+    params = list(slice_param_iterator(sessiondata.get_iterable(tags=tag,stages=stage_name),this_stage_idx))
+    return dict(params[0])
+    # return dict(list(sessiondata.get_stage_iterable(stage=stage_name,tag=tag,idx_range=this_stage_idx))[0])
+
+def generate_session_run_idxs(sessiondata,final_stage):
+    path2root = sessiondata.stage_dep_tree.path_to_root(final_stage) # [this stage, ..., root]
+    path2root_idx = [sessiondata.stage_names().index(s) for s in path2root] # get the idxs
+
+    l = []
+    for t in sessiondata.tag_names:
+        stage_len_list = sessiondata.slice_stage_lengths(stages=path2root,tags=t)
+        assert stage_len_list.shape[0]==1 # should only have one tag
+        stage_range_list = [range(si) for si in reversed(stage_len_list[0,:])] # [root,...,this stage]
+        range_idx_tuple = tuple([[t]]+stage_range_list)
+        l.append(itertools.product(*range_idx_tuple))
+    return itertools.chain(*l)

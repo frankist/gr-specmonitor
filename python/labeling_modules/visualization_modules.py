@@ -29,6 +29,7 @@ import bounding_box
 import filedata_handling as fdh
 from PIL import Image
 from pylab import cm
+from LuigiSimulatorHandler import StageLuigiTask
 import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -218,3 +219,15 @@ def save_spectrograms(sourcefname,insync,mark_boxes):
         im = concatenate_images([im_no_boxes,im])
         im.save(targetfilename_format.format(i),'PNG')
         # misc.imsave(targetfilename_format.format(i),Sxx)
+
+class ImgSpectrogramBoundingBoxTask(StageLuigiTask):
+    def __init__(self,*args,**kwargs):
+        kwargs['output_fmt'] = '.png'
+        # new_args = args + ('.png',)
+        super(ImgSpectrogramBoundingBoxTask,self).__init__(*args,**kwargs)
+
+    def run(self):
+        this_run_params = self.get_run_parameters()
+        is_signal_insync = True
+        mark_box = True
+        generate_spectrogram_imgs(this_run_params,is_signal_insync, mark_box)

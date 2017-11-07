@@ -70,10 +70,10 @@ def test3():
     assert p.length() == p.length('stage1')*p.length('stage2')
     # print list(p.get_iterable('stage2'))
 
-def test4():
+def generate_multi_stage_multi_tag_data():
     tags = ['sig','wifi']
-    stages = ['waveform','Tx']
-    stage_dep_tree = {'Tx':'waveform'}
+    stages = ['waveform','Tx','Img'] # Img does not have parameters
+    stage_dep_tree = {'Tx':'waveform','Img':'Tx'}
     l = { 'sig':
           {
               'waveform':
@@ -99,33 +99,59 @@ def test4():
               ]
          }
     }
+    return tags,stages,stage_dep_tree,l
+
+def test4():
+    """
+    This test checks if the session data class computes correctly the number of runs per stage/tag
+    """
+    tags,stages,stage_dep_tree,l = generate_multi_stage_multi_tag_data()
     t = StageDependencyTree.StageDependencyTree(stage_dep_tree)
     p = TaggedMultiStageParams(tags,t,l)
-    # print [[len(ts.convert2list(t[1])) for t in u['waveform']] for u in l.values()]
-    assert p.length(stage='waveform') == sum([np.cumprod([len(ts.convert2list(t[1])) for t in u['waveform']])[-1] for u in l.values()])
-    assert len(list(p.get_iterable(stage='waveform'))) == p.length(stage='waveform')
-    assert len(list(p.get_iterable(stage='Tx'))) == p.length(stage='Tx')
-    assert p.length(tag='wifi',stage='Tx')==1
-    assert p.length(tag='sig')==(p.length('sig','waveform')*p.length('sig','Tx'))
-    assert p.length(tag='wifi')==(p.length('wifi','waveform')*p.length('wifi','Tx'))
-    wifi_wf_files = p.length(tag='wifi',stage='waveform')
-    sig_wf_files = p.length(tag='sig',stage='waveform')
-    tag_list_wv_stage = ['sig']*sig_wf_files + ['wifi']*wifi_wf_files
-    for i in range(p.length(stage='waveform')):
-        assert p.get_tag_name([i])==dict(list(p.get_stage_iterable(stage='waveform'))[i])['session_tag']
-        assert p.get_tag_name([i])==tag_list_wv_stage[i]
-    assert p.__length_matrix__.shape == (len(p.stage_names()),len(p.tag_names))
+
+    assert p.length(stages='waveform') == sum([np.cumprod([len(ts.convert2list(t[1])) for t in u['waveform']])[-1] for u in l.values()])
+    assert len(list(p.get_iterable(stages='waveform'))) == p.length(stages='waveform')
+    assert len(list(p.get_iterable(stages='Tx'))) == p.length(stages='Tx')
+    assert p.length(tags='wifi',stages='Tx')==1
+    assert p.length(tags='sig')==(p.length(tags='sig',stages='waveform')*p.length(tags='sig',stages='Tx'))
+    assert p.length(tags='wifi')==(p.length(tags='wifi',stages='waveform')*p.length(tags='wifi',stages='Tx'))
+    assert p.slice_stage_lengths().shape == (len(p.tag_names),len(p.stage_names()))
+    assert p.slice_stage_lengths(tags='wifi').shape == (1,len(p.stage_names()))
+    assert p.slice_stage_lengths(stages='waveform').shape == (len(p.tag_names),1)
+
+def test5():
+    tags,stages,stage_dep_tree,l = generate_multi_stage_multi_tag_data()
+    t = StageDependencyTree.StageDependencyTree(stage_dep_tree)
+    p = TaggedMultiStageParams(tags,t,l)
+
     for ti,t in enumerate(p.tag_names):
-        assert np.cumprod(p.__length_matrix__[:,ti])[-1]==p.length(tag=t)
+        assert np.cumprod(p.__length_matrix__[ti,:])[-1]==p.length(tags=t)
     for si,s in enumerate(p.stage_names()):
-        assert np.sum(p.__length_matrix__[si,:])==p.length(stage=s)
-    assert len(list(p.get_idx_tuples(stage='Tx')))==p.length()
-    assert len(list(p.get_idx_tuples(stage='waveform')))==p.length('waveform')
-    # assert p.length(stage='waveform')*p.length(stage='Tx')==p.length()
+        assert np.sum(p.__length_matrix__[:,si])==p.length(stages=s)
+    
+    wifi_wf_files = p.length(tags='wifi',stages='waveform')
+    sig_wf_files = p.length(tags='sig',stages='waveform')
+    tag_list_wv_stage = ['sig']*sig_wf_files + ['wifi']*wifi_wf_files
+    for i in range(p.length(stages='waveform')):
+        wf_idx = i if tag_list_wv_stage[i]=='sig' else i-sig_wf_files
+        tuple_idx = (tag_list_wv_stage[i],wf_idx)
+        assert tag_list_wv_stage[i]==get_run_parameters(p,tuple_idx,'waveform')['session_tag']
+    
+    l = list(generate_session_run_idxs(p,final_stage='Tx'))
+    assert len(l)==p.length()
+    for i in l:
+        assert get_run_parameters(p,i,'waveform')==get_run_parameters(p,i[0:-1],'waveform')
+        assert i[0]==get_run_parameters(p,i,'waveform')['session_tag']
+        assert i[0]==get_run_parameters(p,i,'Tx')['session_tag']
+    l2 = list(generate_session_run_idxs(p,final_stage='waveform'))
+    assert len(l2)==p.length(stages='waveform')
+    for i in l:
+        assert get_run_parameters(p,i,'waveform')==get_run_parameters(p,i[0:-1],'waveform')
 
 if __name__ == '__main__':
     test1()
     test2()
     test3()
     test4()
+    test5()
     print "Finished all the tests successfully"

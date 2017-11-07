@@ -9,6 +9,8 @@ sys.path.append('../../../python/labeling_framework/waveform_generators')
 from waveform_launcher import *
 import luigi
 from LuigiSimulatorHandler import *
+from visualization_modules import ImgSpectrogramBoundingBoxTask
+import RF_scripts
 import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -21,14 +23,15 @@ class Tx(StageLuigiTask):
         import Tx_transformations
         Tx_transformations.apply_framing_and_offsets(this_run_params)
 
+
 class RF(StageLuigiTask):
     def requires(self):
-        return Tx(self.session_args,self.stage_idxs[0:-1])
+        return [RF_scripts.RemoteSetup(self.session_args),Tx(self.session_args,self.stage_idxs[0:-1])]
 
     def run(self):
-        sessiondata = self.load_sessiondata()
-        with self.output().open('w') as out_file:
-            print 'creating file'
+        this_run_params = self.get_run_parameters()
+        import RF_scripts
+        RF_scripts.run_RF_channel(this_run_params)
 
 class TxImg(StageLuigiTask):
     def __init__(self,*args,**kwargs):
@@ -45,6 +48,10 @@ class TxImg(StageLuigiTask):
         mark_box = True
         import visualization_modules
         visualization_modules.generate_spectrogram_imgs(this_run_params,is_signal_insync, mark_box)
+
+class RFImg(ImgSpectrogramBoundingBoxTask):
+    def requires(self):
+        return RF(self.session_args,self.stage_idxs[0:-1])
 
 class AWGNCmdSession(CmdSession):
     def get_stage_caller(self,stage_name): # I need to look at the local scope to get the stage_caller
