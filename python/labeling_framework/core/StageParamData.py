@@ -19,11 +19,12 @@
 # Boston, MA 02110-1301, USA.
 #
 
-import typesystem_utils as ts
 import itertools
 import numpy as np
 import collections
-from basic_utils import *
+
+from ..utils import typesystem_utils as ts
+from ..utils.basic_utils import *
 
 # This object stores the label and possible values of a parameter
 class LabeledParamValues:

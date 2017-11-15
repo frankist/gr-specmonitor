@@ -25,12 +25,13 @@ import luigi
 import itertools
 import importlib
 import pickle
-sys.path.append(os.path.abspath('../utils'))
-import SessionParams as sp
-import StageParamData
-from basic_utils import *
-import logging_utils
-import logging
+
+# my package
+from . import SessionParams as sp
+from . import StageParamData
+from ..utils.basic_utils import *
+from ..utils import luigi_utils
+from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 # this class stores the cmdline configuration of our session
@@ -96,7 +97,6 @@ class SessionInit(luigi.Task):
         return luigi.LocalTarget(sp.SessionPaths.session_pkl(session_arg_obj))
 
     def complete(self):
-        import luigi_utils
         return luigi_utils.check_complete_with_date(self)
 
     def run(self):

@@ -3,6 +3,8 @@
 import subprocess
 import sys
 import time
+from . import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 def ssh_run(hostname,command,printstdout=True,logfilename=None):
     ssh = subprocess.Popen(["ssh", "%s" % hostname, command],
@@ -20,14 +22,14 @@ def ssh_run(hostname,command,printstdout=True,logfilename=None):
             f.write(r)
             f.write(e)
     if printstdout:
-        print 'STATUS: SSH {}:{}. output:'.format(hostname,command)
+        logger.info('SSH {}:{}. output:'.format(hostname,command))
         for line in result:
-            print '{}|out>'.format(hostname),line,
+            logger.info('{}|out> {}'.format(hostname,line))
         for line in error:
-            print '{}|err>'.format(hostname),line,
+            logger.info('{}|err> {}'.format(hostname,line))
     if result ==[] and error != []:
-        print >>sys.stderr, "ERROR: %s" % error
-        exit(-1)
+        logger.exception('Remote {} has failed with error: {}'.format(hostname,error))
+        raise AssertionError()
     return (result,error)
 
 def scp_send(hostname,localfile,remotefile,folder=False):
@@ -45,19 +47,19 @@ def scp_command(hostname,localfile,remotefile,send=True,folder=False):
     elif send==False:
         l.append("{}:{}".format(hostname,remotefile))
         l.append(localfile)
-    print 'STATUS: running SCP command:',' '.join(l)
+    logger.debug('Running SCP command: {}'.format(' '.join(l)))
     scp = subprocess.Popen(l,
                         shell=False,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE)
     while scp.poll()is None:
         time.sleep(0.05)
-    print 'STATUS: SCP output:'
+    logger.info('SCP output:')
     result = scp.stdout.readlines()
     for line in result:
-        print line
+        logger.info('> '+line)
     error = scp.stderr.readlines()
     if error != []:
-        print error
-        exit(-1)
+        logger.exception('Could not transfer file. Got error: {}'.format(error))
+        raise AssertionError()
     return (result,error)

@@ -21,14 +21,17 @@
 
 import sys
 import os
-from bounding_box import *
-import pkl_sig_format
-import preamble_utils
-import filedata_handling as filedata
 import pickle
-import ssh_utils
-import SessionParams
 import json
+
+from ..labeling_tools.bounding_box import *
+from ..labeling_tools import preamble_utils
+from ..sig_format import pkl_sig_format
+from ..sig_format import sig_data_access as filedata
+from ..utils import ssh_utils
+from ..core import SessionParams
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 def get_recording_params(Nsettle,Nsuperframe,frame_period):
     n_skip_samples = max(Nsettle-frame_period,0)
@@ -96,8 +99,9 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
         i += 1
         nread += len(samples)
     if nread < n_rx_samples:
-        print 'ERROR: I was expecting',n_rx_samples, ' samples. Got',nread,' instead.'
-        exit(-1)
+        err_msg = 'I was expecting {} samples. Got {} instead.'.format(n_rx_samples,nread)
+        logger.exception(err_msg)
+        raise AssertionError(err_msg)
 
     selected_peaks = filter_valid_peaks(pdetec.peaks,fparams.frame_period,n_sections,valid_rx_window)
     if selected_peaks is None:
@@ -107,8 +111,9 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
     assert tstart>=0
     y = pkl_sig_format.read_fc32_file(sourcefilename,tstart,Nsuperframe)
     if len(y)!=Nsuperframe:
-        print 'ERROR: this was not the expected size for the samples'
-        exit(-1)
+        err_msg = 'I was expecting {} samples. Got {} instead.'.format(Nsuperframe,len(y))
+        logger.exception(err_msg)
+        raise AssertionError(err_msg)
     for p in selected_peaks: # correct the offset
         p.tidx -= tstart
 
@@ -149,7 +154,7 @@ def setup_remote_rx(sessiondata,hostnames,params_to_send):
     params_to_send['outputfile'] = '{}/tmp.32fc'.format(remote_session_folder)
     clear_cmd = "rm " + remote_tmp_params_file + ' ' + params_to_send['outputfile']
 
-    print 'STATUS: Going to send the params to the remote host'
+    logger.info('Going to send the params to the remote host')
     # save the params into a local file
     with open(tmp_params_file,'w') as f:
         json.dump(params_to_send,f)

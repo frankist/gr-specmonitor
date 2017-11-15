@@ -18,9 +18,4 @@
 
 # The presence of this file turns this directory into a Python package
 
-#print 'importing labeling framework'
 
-#import waveform_generators
-#import labeling_tools
-#import sys
-#sys.path.append('../')

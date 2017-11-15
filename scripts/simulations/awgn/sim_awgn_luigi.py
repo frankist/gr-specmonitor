@@ -1,11 +1,8 @@
 import sys
-sys.path.append('../../../python/modules')
-sys.path.append('../../../python/labeling_modules')
-sys.path.append('../../../python/labeling_scripts')
-sys.path.append('../../../python/utils')
+sys.path.append('../../../python')
 import luigi
 import itertools
-from LuigiSimulatorHandler import *
+from labeling_framework.core.LuigiSimulatorHandler import *
 
 class waveform(StageLuigiTask):
     """

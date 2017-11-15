@@ -21,11 +21,13 @@
 import os
 import importlib
 import pickle
-import ssh_utils
-import logging
-import StageParamData
-import StageDependencyTree as sdt
-import itertools
+# import itertools
+
+from . import StageParamData
+from . import StageDependencyTree as sdt
+from ..utils import ssh_utils
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 # this class stores all the data necessary to setup a session instance
 # - It needs to specify our instance name (e.g. 'sim0')
@@ -91,9 +93,10 @@ class SessionData:
         fbase = os.path.splitext(os.path.basename(cfg_file))[0]
         try:
             cfg_module = importlib.import_module(fbase) # TODO: Find an appropriate format that is not a python file load
-        except Exception, e:
-            print 'Error while opening config file: ',str(e)
-            exit(-1)
+        except ImportError, e:
+            err_str = 'Could not load the config file {}:{}'.format(cfg_file,str(e))
+            logger.error(err_str)
+            raise ImportError(err_str)
         # TODO: Parse the module to see if every variable is initialized
         deptree = sdt.StageDependencyTree(cfg_module.stage_dependency_tree)
         sp = StageParamData.TaggedMultiStageParams(cfg_module.tags,
@@ -155,20 +158,20 @@ def load_session(session_args):
 
 def session_init(sargs):
     session_args = SessionPaths.__session_args__(sargs)
-    logging.info('Going to load the config file %s and setup the session', session_args.cfg_filename)
+    logger.info('Going to load the config file %s and setup the session', session_args.cfg_filename)
     # loads config file
     sessiondata = SessionData.load_cfg(session_args)
-    print 'STATUS: Config file was successfully loaded'
+    logger.info('Param config file was successfully loaded')
 
     # setups up necessary folders
-    print 'STATUS: Going to create the session folders'
+    logger.info('Going to create the session folders')
     setup_local_folders(sessiondata)
 
     # checks if the hosts are inaccessible, if not create session folder
     setup_remote_folders(sessiondata)
 
     # stores the pickle file of the session
-    print 'STATUS: Going to save configuration of session for fast access'
+    logger.info('Going to save configuration of session in a pkl for fast access')
     with open(SessionPaths.session_pkl(sessiondata),'wb') as f:
         pickle.dump(sessiondata,f)
 
@@ -176,18 +179,19 @@ def session_init(sargs):
 def setup_remote_folders(sessiondata):
     if sessiondata.remote_exists():
         remote_folder = SessionPaths.remote_session_folder(sessiondata)
-        print 'STATUS: Going to attempt to reach the hosts and set folders'
+        logger.info('Going to attempt to reach the hosts and set the session folders')
         for h in sessiondata.hosts():
             out,err = ssh_utils.ssh_run(h,'echo hello world',printstdout=False)
             if out[0] != "hello world\n":
-                print 'ERROR: Could not ssh to the host',h
-                exit(-1)
+                err_msg = 'I could not ssh to the host {}' % h
+                logger.error(err_msg)
+                raise AssertionError(err_msg)
             out,err = ssh_utils.ssh_run(h,'mkdir -p '+remote_folder,printstdout=False)
             ssh_utils.ssh_run(h,'mkdir -p '+remote_folder+'/scripts',printstdout=False)
 
 def setup_local_folders(sessiondata):
     def try_mkdir(folder_name):
-        print '> mkdir',folder_name
+        logger.info('shell> mkdir -p '+folder_name)
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
     session_path = SessionPaths.session_folder(sessiondata)

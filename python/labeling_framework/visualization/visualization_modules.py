@@ -20,17 +20,18 @@
 #
 
 import os
-import pkl_sig_format as psf
+import numpy as np
 from scipy import signal
 from scipy import misc
-import numpy as np
-import matplotlib.pyplot as plt
-import bounding_box
-import filedata_handling as fdh
 from PIL import Image
 from pylab import cm
-from LuigiSimulatorHandler import StageLuigiTask
-import logging_utils
+import matplotlib.pyplot as plt
+
+from ..sig_format import pkl_sig_format as psf
+from ..labeling_tools import bounding_box
+from ..sig_format import sig_data_access as fdh
+from ..core.LuigiSimulatorHandler import StageLuigiTask
+from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class SpectrogramImageUtils:

@@ -19,20 +19,22 @@
 # Boston, MA 02110-1301, USA.
 #
 
+import numpy as np
+import os
+import pickle
+# import matplotlib.pyplot as plt
+
+# gnuradio dependencies
 from gnuradio import gr
 from gnuradio import blocks
 from gnuradio import analog
-import sys
-import pickle
-from bounding_box import *
-import filedata_handling as fdh
 
-def print_params(params):
-    print 'sig_source_c starting'
-    for k,v in params.iteritems():
-        print k,v,type(v)
+# labeling_framework dependencies
+from waveform_generator_utils import *
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
-def run_signal_source(args):
+def run(args):
     gr_waveform_map = {'square':analog.GR_SQR_WAVE,'saw':analog.GR_SAW_WAVE}
     d = args['parameters']
     #skip_samples =
@@ -54,29 +56,19 @@ def run_signal_source(args):
     tb.connect(float2cplx,head)
     tb.connect(head,dst)
 
-    print 'STATUS: Starting GR waveform generator script for waveform',d['waveform']
+    logger.info('Starting GR waveform generator script for waveform %s',d['waveform'])
     tb.run()
-    print 'STATUS: GR script finished'
+    logger.debug('GR script finished')
 
     # TODO: read file to insert bounding boxes and params
+    logger.info('Starting GR waveform generator script for sig source')
     gen_data = np.array(dst.data())
-    # plt.plot(np.abs(gen_data))
-    # plt.show()
+    logger.debug('GR script finished')
 
-    print 'STATUS: Going to compute Bounding Boxes'
-    box_list = compute_bounding_boxes(gen_data)
-    print 'STATUS: Finished computing the Bounding Boxes'
-    # print [(b.time_bounds,b.freq_bounds) for b in box_list]
+    v = transform_IQ_to_sig_data(gen_data,args)
 
-    v = fdh.init_metadata()
-    v['IQsamples'] = gen_data
-    fdh.set_stage_derived_parameter(v,args['stage_name'],'bounding_boxes',box_list)
-    fdh.set_stage_parameters(v,args['stage_name'],args['parameters'])
-    fname=args['targetfilename']
+    # save file
+    fname=os.path.expanduser(args['targetfilename'])
     with open(fname,'wb') as f:
         pickle.dump(v,f)
-    print 'STATUS: Finished writing to file',fname
-
-if __name__ == '__main__':
-    args = pickle.loads(sys.argv[1])
-    run_square_source(args)
+    logger.debug('Finished writing to file %s', fname)

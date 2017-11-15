@@ -19,16 +19,13 @@
 # Boston, MA 02110-1301, USA.
 #
 
-# import zadoffchu
 import numpy as np
 import sys
 import os
 import matplotlib.pyplot as plt
-sys.path.append(os.path.abspath('../utils'))
-from basic_algorithms import *
-import random_sequence
 
-# min_idx = 0
+from ..utils.basic_algorithms import *
+import random_sequence
 
 class preamble_params:
     def __init__(self, pseq_list, pseq_list_seq, pseq_list_coef = None):

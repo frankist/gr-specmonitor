@@ -3,6 +3,9 @@ import logging
 class DynamicLogger:
     def __init__(self,logname,points_to=None,init_level=None):
         self.logname = logname
+        # pos = self.logname.rfind('.') # it is a submodule of a package if it has a dot
+        # if pos >= 0:
+        #     self.logname = self.logname[pos+1::]
         logger = self.getLogger()
         if init_level is not None:
             if points_to is not None:

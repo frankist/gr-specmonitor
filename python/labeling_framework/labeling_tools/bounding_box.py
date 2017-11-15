@@ -24,8 +24,8 @@ import matplotlib.pyplot as plt
 from scipy import signal
 import sys
 import os
-sys.path.append(os.path.abspath('../utils'))
-from basic_utils import *
+
+from ..utils.basic_utils import *
 
 fftsize = 64 # I have to define this somewhere later
 

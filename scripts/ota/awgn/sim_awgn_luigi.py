@@ -1,17 +1,19 @@
+
 import sys
-sys.path.append('../../../python/modules')
-sys.path.append('../../../python/labeling_modules')
-sys.path.append('../../../python/labeling_scripts')
-sys.path.append('../../../python/utils')
-sys.path.append('../../../python/labeling_scripts')
-sys.path.append('../../../python/labeling_framework')
-sys.path.append('../../../python/labeling_framework/waveform_generators')
-from waveform_launcher import *
+sys.path.append('../../../python')
+# sys.path.append('../../../python/modules')
+# sys.path.append('../../../python/labeling_modules')
+# sys.path.append('../../../python/labeling_scripts')
+# sys.path.append('../../../python/utils')
+# sys.path.append('../../../python/labeling_scripts')
+# sys.path.append('../../../python/labeling_framework')
+# sys.path.append('../../../python/labeling_framework/waveform_generators')
+from labeling_framework.waveform_generators.waveform_launcher import *
 import luigi
-from LuigiSimulatorHandler import *
-from visualization_modules import ImgSpectrogramBoundingBoxTask
-import RF_scripts
-import logging_utils
+from labeling_framework.core.LuigiSimulatorHandler import *
+from labeling_framework.visualization.visualization_modules import ImgSpectrogramBoundingBoxTask
+from labeling_framework.RF import RF_scripts
+from labeling_framework.utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class Tx(StageLuigiTask):
@@ -20,7 +22,7 @@ class Tx(StageLuigiTask):
 
     def run(self):
         this_run_params = self.get_run_parameters()
-        import Tx_transformations
+        from labeling_framework.Tx import Tx_transformations
         Tx_transformations.apply_framing_and_offsets(this_run_params)
 
 
@@ -30,7 +32,6 @@ class RF(StageLuigiTask):
 
     def run(self):
         this_run_params = self.get_run_parameters()
-        import RF_scripts
         RF_scripts.run_RF_channel(this_run_params)
 
 class TxImg(StageLuigiTask):
@@ -60,6 +61,7 @@ class AWGNCmdSession(CmdSession):
         return possibles.get(stage_name)
 
 def run_before_luigi():
+    import logging
     logging_utils.addLoggingLevel('TRACE',logging.WARNING-5)
     # print 'LASLDDLASLDLASDL args:',sys.argv
 

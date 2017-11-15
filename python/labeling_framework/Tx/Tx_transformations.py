@@ -18,22 +18,20 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 #
+import sys
+import pickle
 
 from gnuradio import gr
 from gnuradio import blocks
 from gnuradio import analog
 from gnuradio import channels
-import sys
-import pickle
-from bounding_box import *
-import pkl_sig_format
-import preamble_utils
-import filedata_handling as filedata
 
-def print_params(params):
-    print 'sig_source_c starting'
-    for k,v in params.iteritems():
-        print k,v,type(v)
+from ..labeling_tools.bounding_box import *
+from ..sig_format import pkl_sig_format
+from ..labeling_tools import preamble_utils
+from ..sig_format import sig_data_access as filedata
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 def generate_section_partitions(section_size,guard_band,num_sections):
     return ((i*section_size,(i+1)*section_size) for i in range(num_sections))
@@ -97,9 +95,9 @@ def apply_framing_and_offsets(args):
     tb.connect(channel,head)
     tb.connect(head,dst)
 
-    print 'STATUS: Starting GR waveform generator script'
+    logger.info('Starting Tx parameter transformation script')
     tb.run()
-    print 'STATUS: GR script finished'
+    logger.info('GR script finished successfully')
 
     gen_data = np.array(dst.data())
     xsections = xsections_with_hist[hist_len::]
@@ -132,4 +130,4 @@ def apply_framing_and_offsets(args):
 
     with open(targetfilename,'w') as f:
         pickle.dump(stage_data,f)
-    print 'STATUS: Finished writing to file',targetfilename
+    logger.info('Finished writing resulting signal to file %s',targetfilename)

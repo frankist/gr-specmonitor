@@ -20,11 +20,11 @@
 #
 
 import numpy as np
-import sys
 import os
-sys.path.append(os.path.abspath('../labeling_modules'))
-from bounding_box import *
+import pickle
+import time
 
+import sys
 sys.path.append(
     os.environ.get('GRC_HIER_PATH', os.path.expanduser('~/.grc_gnuradio')))
 from gnuradio import gr
@@ -36,17 +36,12 @@ from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
 import foo
 import ieee802_11
 import pmt
-import time
-import pickle
-import filedata_handling as fdh
-import logging
-import gr_qtgui_utils
+# import gr_qtgui_utils
 
-def print_params(params):
-    logging.debug('bastian_ieee802_11 starting')
-    for k, v in params.iteritems():
-        logging.debug('%s: %s (type=%s)', k, v, type(v))
-
+# labeling_framework package
+from waveform_generator_utils import *
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
     encoding_labels = [
@@ -60,7 +55,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
                  pdu_length=500,
                  pad_interval=1000,
                  linear_gain=1.0):
-        super(GrWifiFlowgraph, self).__init__() # this makes the initiation of all the qt nonsense
+        super(GrWifiFlowgraph, self).__init__()
 
         # params
         self.n_written_samples = int(n_written_samples)
@@ -136,7 +131,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
 def run(args):
     d = args['parameters']
-    # print_params(d)
+    # print_params(d,__name__)
 
     # create Wifi block
     tb = GrWifiFlowgraph(
@@ -145,38 +140,22 @@ def run(args):
         pdu_length=d['pdu_length'],
         pad_interval=d['pad_interval'])
 
-    logging.info('Starting GR waveform generator script for Wifi')
+    logger.info('Starting GR waveform generator script for Wifi')
     tb.run()
-    logging.debug('GR script finished')
+    logger.debug('GR script finished')
 
     gen_data = np.array(tb.dst.data())
 
-    logging.info('Going to compute Bounding Boxes')
-    box_list = compute_bounding_boxes(gen_data)
-    logging.debug('Finished computing the Bounding Boxes')
-    # print [(b.time_bounds,b.freq_bounds) for b in box_list]
-    box_pwr_list = compute_boxes_pwr(gen_data, box_list)
-    max_pwr_box = np.max(box_pwr_list)
-    # gen_data0 = np.array(gen_data)
-    gen_data /= np.sqrt(max_pwr_box)
-    # plt.plot(np.abs(gen_data))
-    # plt.plot(np.abs(gen_data0),'r')
-    # plt.show()
+    v = transform_IQ_to_sig_data(gen_data,args)
 
-    logging.debug('Going to fill the stage data structure and save to file')
-    v = fdh.init_metadata()
-    v['IQsamples'] = gen_data
-    fdh.set_stage_derived_parameter(v, args['stage_name'], 'bounding_boxes',
-                                    box_list)
-    fdh.set_stage_parameters(v, args['stage_name'], args['parameters'])
     fname = os.path.expanduser(args['targetfilename'])
     with open(fname, 'w') as f:
         pickle.dump(v, f)
-    logging.debug('Finished writing to file %s', fname)
+    logger.debug('Finished writing to file %s', fname)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logger.basicConfig(level='DEBUG')
     targetfile = '~/tmp/out.pkl'
     args = {
         'parameters': {
@@ -189,7 +168,7 @@ if __name__ == '__main__':
         'stage_name': 'waveform'
     }
     targetfile = os.path.expanduser(targetfile)
-    run_wifi_source(args)
+    run(args)
     import pkl_sig_format
     dat = pkl_sig_format.WaveformPklReader(targetfile)
     x = dat.read_section()
