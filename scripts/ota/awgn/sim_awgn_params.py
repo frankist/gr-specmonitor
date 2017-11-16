@@ -20,9 +20,6 @@
 #
 
 import sys
-# sys.path.append('../../../python/modules')
-# sys.path.append('../../../python/labeling_modules')
-# sys.path.append('../../../python/utils')
 import numpy as np
 
 num_sections = 1
@@ -40,7 +37,8 @@ stage_dependency_tree = {
     'Tx':'waveform',
     'RF':'Tx',
     'TxImg':'Tx',
-    'RFImg':'RF'
+    'RFImg':'RF',
+    'RFLabels':'RF'
 }
 
 Tx_params = [
@@ -52,9 +50,9 @@ Tx_params = [
     ('noise_voltage',[0])
 ]
 Tx_params_wifi = list(Tx_params)
-for e in Tx_params_wifi:
+for i,e in enumerate(Tx_params_wifi):
     if e[0]=='frequency_offset':
-        e = ('frequency_offset',0)
+        Tx_params_wifi[i] = ('frequency_offset',0)
 
 RF_params = [
     ('tx_gain_norm', 10.0**np.arange(-20,0,5)),#range(0, 21, 10)),  #range(0,30,15)),

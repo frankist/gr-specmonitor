@@ -19,13 +19,53 @@
 # Boston, MA 02110-1301, USA.
 #
 from collections import Iterable
+import numpy as np
+import inspect
+import copy
+from . import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
+# NOTE: Test this properly. What happens to dictionaries?
 def convert2list(v):
-    if not isinstance(v,Iterable) or type(v) is str:
+    if not isinstance(v,Iterable) or isinstance(v,basestring):
         return [v]
-    elif type(v) is not str:
+    elif not isinstance(v,list):
         return list(v)
     return v
+
+def is_class_instance(obj):
+    if not hasattr(obj, '__dict__'): # must have __dict__ to be a class
+        return False
+    if inspect.isroutine(obj): # cannot be a function/method
+        return False
+    if inspect.isclass(obj): # must be an instance
+        return False
+    else:
+        return True
+
+def np_to_native(v):
+    ret = None
+    if isinstance(v,np.generic): # it is np.float32, etc.
+        ret = np.asscalar(v)
+    elif isinstance(v,np.ndarray): # it is an np.array
+        ret = v.tolist()
+    elif is_class_instance(v): # it is a class object
+        ret = copy.deepcopy(v)
+        for member,val in vars(ret).items():
+            setattr(ret,member,np_to_native(val))
+    elif not isinstance(v,Iterable) or isinstance(v,basestring): # it is POD type or string
+        ret = v # it is already a native
+    elif isinstance(v,list):
+        ret = [np_to_native(e) for e in v]
+    elif isinstance(v,tuple):
+        ret = tuple([np_to_native(e) for e in v])
+    elif isinstance(v,dict):
+        ret = {np_to_native(k):np_to_native(e) for k,e in v.items()}
+    else:
+        err_msg = 'Please define a conversion for type '+type(v)
+        logger.error(err_msg)
+        raise NotImplementedError(err_msg)
+    return ret
 
 if __name__ == '__main__':
     pass

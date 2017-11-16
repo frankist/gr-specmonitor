@@ -26,23 +26,35 @@ import sys
 import os
 
 from ..utils.basic_utils import *
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 fftsize = 64 # I have to define this somewhere later
 
 class BoundingBox:
     def __init__(self,time_bounds,freq_bounds):
+        BoundingBox.assert_validity(time_bounds,freq_bounds)
         self.time_bounds = time_bounds
-        self.freq_bounds = freq_bounds
-        self.assert_validity()
+        self.freq_bounds = tuple([float(f) for f in freq_bounds])
 
-    def assert_validity(self):
-        assert len(self.time_bounds)==2
-        assert type(self.time_bounds[0]) is int and type(self.time_bounds[1]) is int
-        if len(self.freq_bounds)!=2 or np.max(self.freq_bounds)>0.5 or np.min(self.freq_bounds)<-0.5:
-            print 'ERROR: The freq bounds: ', self.freq_bounds, ' are not valid.'
-            print 'Reconsider a different freq offset range'
-            exit(-1)
-        assert self.time_bounds[1]>self.time_bounds[0] and self.freq_bounds[1]>self.freq_bounds[0]
+    @staticmethod
+    def assert_validity(time_bounds,freq_bounds):
+        err_test = True
+        err_test &= len(time_bounds)==2
+        err_test &= isinstance(time_bounds,tuple)
+        err_test &= isinstance(time_bounds[0],int)
+        err_test &= time_bounds[1]>time_bounds[0]
+        err_test &= len(freq_bounds)==2
+        err_test &= isinstance(freq_bounds,tuple)
+        err_test &= isinstance(freq_bounds[0],float)
+        err_test &= np.max(freq_bounds)<=0.5
+        err_test &= np.min(freq_bounds)>=-0.5
+        err_test &= freq_bounds[1]>freq_bounds[0]
+        if err_test==False:
+            err_msg = 'The time/freq bounds [{},{}] are not valid.'.format(time_bounds,freq_bounds)
+            logger.error(err_msg)
+            logger.error('Reconsider changing the waveform params (freq offset range/signal duration)')
+            raise AssertionError(err_msg)
 
     def is_equal(self,box):
         return box.time_bounds==self.time_bounds and box.freq_bounds==self.freq_bounds
@@ -107,9 +119,8 @@ def scale_time_bounds(old_sample_bounds,new_section_size,old_section_size):
     assert tmax>=tmin+1 and tmin>=0
     tmax = min(tmax,new_section_size)
     if max(tmin,tmax)>new_section_size:
-        print 'ERROR: Time window mismatch with the image dimensions'
-        print 'tlims:',(tmin,tmax),',window size:',new_section_size
-        exit(-1)
+        logger.error('Tiem window mismatch with the image dimensions. tlims: {},window size:{}'.format((tmin,tmax),new_section_size))
+        raise AssertionError()
     return (tmin,tmax)
 
 # Utils to convert bounding box to image bounding box
@@ -125,7 +136,8 @@ def scale_time_range_to_image_rows(trange,nrows,section_size):
     return (rowmin,rowmax)
 
 def compute_boxes_pwr(x, box_list):
-    return [np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2) for b in box_list]
+    # NOTE: I convert to float bc I want the json of the labels to look nice
+    return [float(np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2)) for b in box_list]
 
 # to be finished
 class ImageBoundingBox:

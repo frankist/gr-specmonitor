@@ -63,12 +63,13 @@ def derive_bounding_boxes(x):
     box_pwr_list = bb.compute_boxes_pwr(x, box_list)
     max_pwr_box = np.max(box_pwr_list)
     y = x/np.sqrt(max_pwr_box)
+    box_pwr_list_norm = [b/max_pwr_box for b in box_pwr_list]
 
     #debug
     # plt.plot(np.abs(gen_data))
     # plt.plot(np.abs(gen_data0),'r')
     # plt.show()
-    return (y,box_pwr_list,box_list)
+    return (y,box_pwr_list,box_pwr_list_norm)
 
 def transform_IQ_to_sig_data(x,args):
     y,box_pwr_list,box_list = derive_bounding_boxes(x)

@@ -114,7 +114,12 @@ def apply_framing_and_offsets(args):
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
     prev_boxes = filedata.get_stage_derived_parameter(stage_data,'bounding_boxes')
 
-    box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
+    try:
+        box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
+    except AssertionError:
+        err_msg = 'These were the original stage params {}'.format(params)
+        logger.error(err_msg)
+        raise
     section_boxes = partition_boxes_into_sections(box_list,section_size,fparams.guard_len,num_sections)
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
     stage_data['IQsamples'] = y # overwrites the generated samples

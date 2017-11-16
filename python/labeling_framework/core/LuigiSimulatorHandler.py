@@ -148,7 +148,8 @@ class CmdSession(luigi.WrapperTask):
 
         # get itertools iterator of all possible idxs
         sessiondata = sp.load_session(self.session_args())
-        stage_list = force_iterable_not_str(self.stages_to_run)
+        stage_list = self.stages_to_run.strip('[] ').split(',') # removes whitespace,[ and ]. splits the elements
+        # stage_list = force_iterable_not_str(self.stages_to_run)
         callers = []
         for s in stage_list:
             callers += self.get_luigi_callers(sessiondata, s)
@@ -179,7 +180,7 @@ class SessionLuigiTask(luigi.Task):
         return luigi.LocalTarget(outfilename)
 
     def run(self):
-        print 'do nothing'
+        raise NotImplementedError()
 
 class StageLuigiTask(luigi.Task):
     session_args = luigi.DictParameter()
@@ -220,4 +221,4 @@ class StageLuigiTask(luigi.Task):
         return d
 
     def run(self):
-        print 'do nothing'
+        raise NotImplementedError()

@@ -40,7 +40,7 @@ import pmt
 
 # labeling_framework package
 from waveform_generator_utils import *
-from ..utils import logging_utils
+from utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
@@ -168,7 +168,7 @@ if __name__ == '__main__':
         'stage_name': 'waveform'
     }
     targetfile = os.path.expanduser(targetfile)
-    run(args)
+    run_wifi_source(args)
     import pkl_sig_format
     dat = pkl_sig_format.WaveformPklReader(targetfile)
     x = dat.read_section()

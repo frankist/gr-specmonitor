@@ -24,9 +24,9 @@ def ssh_run(hostname,command,printstdout=True,logfilename=None):
     if printstdout:
         logger.info('SSH {}:{}. output:'.format(hostname,command))
         for line in result:
-            logger.info('{}|out> {}'.format(hostname,line))
+            logger.info('{}|out> {}'.format(hostname,line[0:-1]))
         for line in error:
-            logger.info('{}|err> {}'.format(hostname,line))
+            logger.info('{}|err> {}'.format(hostname,line[0:-1]))
     if result ==[] and error != []:
         logger.exception('Remote {} has failed with error: {}'.format(hostname,error))
         raise AssertionError()

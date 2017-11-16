@@ -216,7 +216,8 @@ def get_run_parameters(sessiondata,stage_idx_tuple,stage_name):
     tag = get_tag(stage_idx_tuple)
     this_stage_idx = get_stage_idx(sessiondata,stage_idx_tuple,stage_name)
     params = list(slice_param_iterator(sessiondata.get_iterable(tags=tag,stages=stage_name),this_stage_idx))
-    return dict(params[0])
+    d = dict(params[0])
+    return ts.np_to_native(d)
     # return dict(list(sessiondata.get_stage_iterable(stage=stage_name,tag=tag,idx_range=this_stage_idx))[0])
 
 def generate_session_run_idxs(sessiondata,final_stage):
