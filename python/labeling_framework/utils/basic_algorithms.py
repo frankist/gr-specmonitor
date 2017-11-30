@@ -88,9 +88,11 @@ class sliding_window_max_hist: # this only works with an array with history
         self.margin = margin
         self.xidx = 0
 
-    def work(self,x_h):
+    def work(self,x_h,max_n_eval=None):
         assert x_h.hist_len>=self.margin
-        i_end = x_h.size-self.margin
+        if max_n_eval is None:
+            max_n_eval = x_h.size
+        i_end = max_n_eval-self.margin
         l = []
         while self.xidx < i_end:
             maxi = np.argmax(x_h[self.xidx+1:self.xidx+self.margin])
@@ -100,7 +102,7 @@ class sliding_window_max_hist: # this only works with an array with history
                 continue
             l.append(self.xidx)
             self.xidx+=self.margin
-        self.xidx -= x_h.size # starts from a negative point, most of the time at "-margin"
+        self.xidx -= max_n_eval # starts from a negative point, most of the time at "-margin"
         return l
 
 class filter_ccc:
@@ -210,7 +212,7 @@ class array_with_hist(object):# need to base it on object for negative slices
     def __init__(self,array,hist_len,val=0.0):
         self.hist_len = hist_len
         self.size = len(array)
-        if type(array) is np.ndarray:
+        if isinstance(array,np.ndarray):
             self.array_h = np.append(np.ones(hist_len,dtype=array.dtype)*val,array)
         else:
             self.array_h = np.append(np.ones(hist_len)*val,array)
@@ -234,7 +236,8 @@ class array_with_hist(object):# need to base it on object for negative slices
         if type(idx) is slice:
             start = idx.start+self.hist_len if idx.start is not None else 0
             stop = idx.stop+self.hist_len if idx.stop is not None else self.size+self.hist_len
-            assert stop<=self.size+self.hist_len
+            if stop>self.size+self.hist_len:
+                raise IndexError('The index {} goes beyond array limits {}'.format(stop,self.size+self.hist_len))
             return self.array_h[start:stop:idx.step]
         assert idx<=self.size+self.hist_len
         return self.array_h[idx+self.hist_len]
@@ -244,7 +247,7 @@ class array_with_hist(object):# need to base it on object for negative slices
 
     def __setitem__(self,idx,value):
         if type(idx) is slice:
-            start = idx.start+self.hist_len if idx.start is not None else 0
+            start = idx.start+self.hist_len if idx.start is not None else 0 # FIXME: Should this be zero or histlen?
             stop = idx.stop+self.hist_len if idx.stop is not None else self.size+self.hist_len
             assert stop<=self.size+self.hist_len
             self.array_h[start:stop:idx.step] = value
@@ -262,10 +265,33 @@ class array_with_hist(object):# need to base it on object for negative slices
         self.size = x.size
         self.array_h[self.hist_len:self.hist_len+len(x)] = x
 
-# not tested
+# this points at an existing array_with_hist
+# NOTE: I cannot point at a normal array if its size grows dynamically (which array_with_hist allows)
+class array_hist_view(object):
+    def __init__(self,array_obj_h,offset=0):
+        self.__array_h__ = array_obj_h
+        self.__offset__ = offset # this is relative to the array_with_hist
+        self.dtype = array_obj_h.dtype
+        assert self.hist_len()>=0
+
+    # NOTE: I have to make this a method bc __array_h__ can change size dynamically
+    def size(self):
+        return self.__array_h__.size-self.__offset__
+
+    def hist_len(self):
+        return self.__array_h__.hist_len+self.__offset__
+
+    def __getitem__(self,idx):
+        if isinstance(idx,slice):
+            start = idx.start+self.__offset__ if idx.start is not None else self.__offset__
+            stop = idx.stop+self.__offset__ if idx.stop is not None else None
+            return self.__array_h__[start:stop:idx.step]
+        return self.__array_h__[idx+self.__offset__]
+
+# not tested. To erase
 class offset_array_view(object):
     def __init__(self,array,offset):
-        if type(array) is np.ndarray:
+        if isinstance(array,np.ndarray):
             self.array = array
             self.size = self.array.size-offset
             self.hist_len = offset
@@ -281,6 +307,7 @@ class offset_array_view(object):
             stop = idx.stop+self.hist_len if idx.stop is not None else None
             return self.array[start:stop:idx.step]
         return self.array[idx+self.hist_len]
+
 def test1():
     mavg = moving_average_ccc(5)
     x = [1,1,1,1,1]

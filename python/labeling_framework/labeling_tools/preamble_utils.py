@@ -191,18 +191,21 @@ class PreambleDetectorType2:
         self.frame_params = fparams
         self.thres1 = thres1
         self.thres2 = thres2
-        self.__max_margin__ = autocorr_margin if autocorr_margin is not None else None
+        self.__max_margin__ = autocorr_margin if autocorr_margin is not None else self.pseq0_tot_len
+        assert isinstance(self.__max_margin__,int)
 
-#         # derived
+        # derived
         self.params = self.frame_params.preamble_params
+        self.L = self.params.preamble_len
         self.lvl2_seq = self.params.pseq_list_coef[0:-1]
         self.lvl2_len = len(self.lvl2_seq)
         self.lvl2_seq_diff = get_schmidl_sequence(self.lvl2_seq)
         self.pseq0 = self.params.pseq_list_norm[0]
-        self.pseq0_tot_len = self.pseq0.size*self.lvl2_len
+        self.l0 = self.pseq0.size
+        self.l1 = self.params.pseq_list_norm[1].size
+        self.pseq0_tot_len = self.l0*self.lvl2_len
+        self.L0 = self.pseq0_tot_len
         self.awgn_len = self.frame_params.awgn_len
-        if self.__max_margin__ is None:
-            self.__max_margin__ = self.pseq0_tot_len
 
         # object state variables
         self.nread = 0
@@ -210,28 +213,32 @@ class PreambleDetectorType2:
 
         # internal operation variables
         self.margin = 4#16
-        self.hist_len = self.awgn_len + self.params.preamble_len
-        self.delay = [self.pseq0_tot_len-1, self.pseq0.size*2-1, len(self.lvl2_seq_diff)*self.pseq0.size-1]
-        self.delay2 = [self.delay[0], self.pseq0.size-1,self.lvl2_len*self.pseq0.size-1]
+        self.hist_len = self.awgn_len + self.L
+        self.delay = [self.pseq0_tot_len-1, self.l0*2-1, len(self.lvl2_seq_diff)*self.l0-1]
+        self.delay2 = [self.delay[0], self.l0-1,self.lvl2_len*self.l0-1]
         self.delay_cum = np.cumsum(self.delay)
         self.delay2_cum = np.cumsum(self.delay2)
-        self.hist_len2 = np.sum(self.delay_cum[1:3])+self.params.length()+self.awgn_len+2*self.margin
+        self.hist_len2 = self.delay_cum[2]+self.L+self.awgn_len+2*self.margin
 
-        self.x_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)#,1.0e7*(1+1j))# check if this size is fine
-        self.xdc_mavg_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
-        self.xnodc_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)
-        self.xschmidl_nodc = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)# check if this size is fine
-        self.xschmidl_filt_nodc = array_with_hist(np.array([],dtype=np.complex64),self.__max_margin__)
-        self.xcorr_nodc = array_with_hist(np.array([],dtype=np.float32),self.lvl2_len*self.pseq0.size)
-        self.xcorr_filt_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__+self.lvl2_len*self.pseq0.size)
-        self.xcrossautocorr_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__)
+        # NOTE: we look back in time by self.delay_cum[2] to find peaks
+        self.x_h = array_with_hist(np.array([],dtype=np.complex64),max(self.delay_cum[2],self.L0)) #self.hist_len2)
+        self.xdc_mavg_h = array_with_hist(np.array([],dtype=np.complex64),self.delay_cum[2]-self.L0)
+        self.xnodc_h = array_with_hist(np.array([],dtype=np.complex64),self.L0+self.delay_cum[0]+self.margin+self.l1)#self.hist_len2)
+        self.xschmidl_nodc = array_with_hist(np.array([],dtype=np.complex64),self.L0)#self.hist_len)
+        self.xschmidl_filt_nodc = array_with_hist(np.array([],dtype=np.complex64),0)#self.__max_margin__)
+        self.xcorr_nodc = array_with_hist(np.array([],dtype=np.float32),self.L0)
+        self.xcorr_filt_nodc = array_with_hist(np.array([],dtype=np.float32),0)#self.__max_margin__+self.lvl2_len*self.pseq0.size)
+        self.Ldiff = max(self.l1-self.__max_margin__,0) # this guarantees that the peak1 fits in window
+        self.xcrossautocorr_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__+self.Ldiff)
+        #NOTE: self.xfinal_view is just an offset view of self.xcrossautocorr_nodc
+        self.xfinal_view = array_hist_view(self.xcrossautocorr_nodc,-self.Ldiff)
 
         self.local_max_finder_h = sliding_window_max_hist(self.__max_margin__)
 
     def find_crosscorr_peak(self,tpeak): # this is for high precision time sync
         # compensate CFO
         cfo = compute_schmidl_cox_cfo(self.xschmidl_filt_nodc[tpeak+self.delay_cum[2]],self.pseq0.size)
-        toffset = self.pseq0_tot_len+self.delay_cum[0]
+        toffset = self.L0+self.delay_cum[0]
         pseq = self.params.pseq_list_norm[1]#self.params.preamble
         plen = len(pseq)
         twin = (tpeak-self.margin+toffset,tpeak+plen+self.margin+toffset)
@@ -242,11 +249,13 @@ class PreambleDetectorType2:
         # dc_mavg2 = np.array([np.mean(self.x_h[i-self.awgn_len:i]) for i in range(twin[0],twin[1])])
         # xnodc = self.x_h[twin[0]:twin[1]]-dc_mavg2
         # y = compensate_cfo(xnodc,cfo)
+        # print 'lengths:',plen+self.margin+toffset, ',', self.xnodc_h.hist_len, ',', tpeak, ',', self.xnodc_h[0::].size
         y = compensate_cfo(self.xnodc_h[twin[0]:twin[1]],cfo)
         # y = compensate_cfo(self.x_h[tpeak-self.margin:tpeak+self.params.length()+self.margin],cfo)
         ycorr = np.correlate(y,pseq)
         maxi = np.argmax(np.abs(ycorr))
-        xcorr = np.abs(ycorr[maxi]/plen)**2
+        ymag2 = np.mean(np.abs(self.xnodc_h[twin[0]+maxi:twin[0]+maxi+self.l1])**2)
+        xcorr = np.abs(ycorr[maxi]/plen)**2/ymag2
         # tnew = tpeak + maxi-self.margin
         # if tnew!=tpeak:
         #     cfo = cfo + (tnew-tpeak)*0.5/self.pseq0.size # compensate the residual CFO
@@ -268,7 +277,7 @@ class PreambleDetectorType2:
         l0 = self.pseq0.size
         L0 = self.pseq0_tot_len
         L = self.params.length()
-        print 'window:',self.nread,self.nread+x.size
+        # print 'window:',self.nread,self.nread+x.size
         self.x_h.push(x) # [hist | x]
         self.xdc_mavg_h.push(moving_average_with_hist(self.x_h,L0)) # delay=delay_cum[0]=L0-1
         self.xnodc_h.push(self.x_h[-L0+1:self.x_h.size-L0+1]-self.xdc_mavg_h[0::]) # delay_cum[0]
@@ -282,12 +291,16 @@ class PreambleDetectorType2:
         self.xcorr_filt_nodc.push(interleaved_sum_with_hist(self.xcorr_nodc,self.lvl2_len,l0)/self.lvl2_len) # delay=delay1_cum[0]
         self.xcrossautocorr_nodc.push(np.abs(self.xschmidl_filt_nodc[0::])*self.xcorr_filt_nodc[0::])
 
-        # if self.nread<self.delay_cum[2]: # if first run, null the history to avoid transients
-        #     self.xcrossautocorr_nodc[-self.xcrossautocorr_nodc.hist_len:min((self.delay_cum[2]-self.nread),self.xcrossautocorr_nodc.size)] = 0
-        local_peaks = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
+        # NOTE: problem with the first version is that the peak1 may not fit if __max_margin__ is small enough
+        # local_peaks2 = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
+        assert np.array_equal(self.xfinal_view[0:len(x)],self.xcrossautocorr_nodc[-self.Ldiff:-self.Ldiff+len(x)])
+        # assert self.xfinal_view.__array_h__ is self.xcrossautocorr_nodc
+        local_peaks = self.local_max_finder_h.work(self.xfinal_view,len(x))
+        local_peaks = [l-self.Ldiff for l in local_peaks]
         # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
+            assert i>=0 # I make this assumption for the history len of the arrays
             t = i-self.delay_cum[2]
             dc0 = self.xdc_mavg_h[t+L0] #np.mean(self.x_h[t:t+L0])
             peak0_mag2_nodc = np.mean(np.abs(self.x_h[t:t+L0]-dc0)**2)
