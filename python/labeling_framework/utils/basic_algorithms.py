@@ -83,7 +83,7 @@ class sliding_window_max: # this works with any array but keeps a buffer
         return l
 
 #tested
-class sliding_window_max_hist: # this only works with an array with history
+class SlidingWindowMax_hist: # this only works with an array with history
     def __init__(self,margin,dtype=np.float32):
         self.margin = margin
         self.xidx = 0
@@ -289,24 +289,24 @@ class array_hist_view(object):
         return self.__array_h__[idx+self.__offset__]
 
 # not tested. To erase
-class offset_array_view(object):
-    def __init__(self,array,offset):
-        if isinstance(array,np.ndarray):
-            self.array = array
-            self.size = self.array.size-offset
-            self.hist_len = offset
-        elif type(array) is array_with_hist:
-            self.array = array.array_h
-            self.hist_len = array.hist_len+offset
-            self.size = array.size-toffset
-        assert self.size>=0
+# class offset_array_view(object):
+#     def __init__(self,array,offset):
+#         if isinstance(array,np.ndarray):
+#             self.array = array
+#             self.size = self.array.size-offset
+#             self.hist_len = offset
+#         elif type(array) is array_with_hist:
+#             self.array = array.array_h
+#             self.hist_len = array.hist_len+offset
+#             self.size = array.size-toffset
+#         assert self.size>=0
 
-    def __getitem__(self,idx):
-        if type(idx) is slice:
-            start = idx.start+self.hist_len if idx.start is not None else None
-            stop = idx.stop+self.hist_len if idx.stop is not None else None
-            return self.array[start:stop:idx.step]
-        return self.array[idx+self.hist_len]
+#     def __getitem__(self,idx):
+#         if type(idx) is slice:
+#             start = idx.start+self.hist_len if idx.start is not None else None
+#             stop = idx.stop+self.hist_len if idx.stop is not None else None
+#             return self.array[start:stop:idx.step]
+#         return self.array[idx+self.hist_len]
 
 def test1():
     mavg = moving_average_ccc(5)

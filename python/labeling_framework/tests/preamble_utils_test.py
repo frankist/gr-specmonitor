@@ -176,71 +176,6 @@ def test2():
 
     # pdetec.work(y)
 
-def test3():
-    print 'test3: Test sync against SNR'
-    np.random.seed(1)
-
-    guard_len=5
-    awgn_len=75
-    frame_period = 1500
-    lvl2_len = 13
-    pseq_len = [13,61]
-
-    dc_offset = 0.1
-    cfo = -0.45/pseq_len[0]
-
-    pparams = preamble_utils.generate_preamble_type2(pseq_len,lvl2_len)
-    fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
-
-    num_runs = 10
-    SNRdB_range = range(-10,10)#[-7]
-    FalseAlarmRate = np.zeros(len(SNRdB_range))
-    Pdetec = np.zeros(len(SNRdB_range))
-    for si,s in enumerate(SNRdB_range):
-        amp = 10**(s/20.0)
-        for r in range(num_runs):
-            sframer = preamble_utils.SignalFramer(fparams)
-            pdetec = preamble_utils.PreambleDetectorType2(fparams,thres1=0.08,thres2=0.04)
-
-            xlen = fparams.section_duration()+guard_len*2
-            x = (np.random.randn(xlen)+np.random.randn(xlen)*1j)*0.1/np.sqrt(2)
-            y,section_ranges = sframer.frame_signal(x,1)
-            y *= amp # the preamble has amplitude 1
-            y = preamble_utils.apply_cfo(y,cfo)+dc_offset*np.exp(1j*np.random.rand()*2*np.pi)
-
-            T = 1000
-            toffset = 0#np.random.randint(0,T)
-            yoffset = np.append(np.zeros(toffset,dtype=np.complex64),y)
-            yoffset = np.append(yoffset,np.zeros(T-toffset,dtype=np.complex64))
-            awgn = (np.random.randn(yoffset.size)+np.random.randn(yoffset.size)*1j)/np.sqrt(2)
-            y_pwr = amp**2
-            awgn_pwr = np.mean(np.abs(awgn)**2)
-            yoffset += awgn
-            # print 'AWGN pwr [dB]:',10*np.log10(awgn_pwr)
-            # print 'actual SNRdB:',10*np.log10(y_pwr/awgn_pwr)
-            # plt.plot(yoffset)
-            # plt.show()
-
-            pdetec.work(yoffset)
-
-            test1 = False
-            if len(pdetec.peaks)>0:
-                max_el = np.argmax([np.abs(p.xcorr) for p in pdetec.peaks])
-                test1 = pdetec.peaks[max_el].tidx == toffset+awgn_len
-                print s,pdetec.peaks[0].tidx,toffset+awgn_len,test1
-            num_fa = len(pdetec.peaks)-1 if test1 else len(pdetec.peaks)
-            Pdetec[si] += test1
-            FalseAlarmRate[si] += num_fa
-
-            # print 'result:',test1
-            # detector_transform_visualizations(pdetec)
-    Pdetec /= float(num_runs)
-    FalseAlarmRate /= float(num_runs)
-
-    plt.plot(SNRdB_range,Pdetec,'x-')
-    plt.plot(SNRdB_range,FalseAlarmRate,'o-')
-    plt.show()
-
 test4_base_file = os.path.expanduser('~/tmp/plot_data/test4_plot_2')#test4_plot')
 test4_pkl_file = test4_base_file+'.pickle'
 
@@ -254,7 +189,7 @@ def test4():
     # preamble params
     guard_len=5
     awgn_len=200
-    frame_period = 3000
+    frame_period = 3000*2
     pseq_lvl2_len = len(random_sequence.maximum_length_sequence(13*8))#13*4
     pseq_len = [13,199]
     nrepeats0 = 1
@@ -265,8 +200,8 @@ def test4():
     pparams = preamble_utils.generate_preamble_type2(pseq_len,pseq_lvl2_len,nrepeats0)
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
 
-    num_runs = 500
-    SNRdB_range = range(-20,15)
+    num_runs = 10
+    SNRdB_range = range(-20,0)
     FalseAlarmRate = np.zeros(len(SNRdB_range))
     Pdetec = np.zeros(len(SNRdB_range))
     amp_stats = []
@@ -284,7 +219,7 @@ def test4():
         amp = 10**(s/20.0)
         for r in range(num_runs):
             sframer = preamble_utils.SignalFramer(fparams)
-            pdetec = preamble_utils.PreambleDetectorType2(fparams,pseq_len[0]*8,0.05,0.04)#0.08,0.04)
+            pdetec = preamble_utils.PreambleDetectorType2(fparams,pseq_len[0]*8,0.045,0.045)#0.08,0.04)
 
             xlen = int(fparams.frame_period*1.5)#fparams.section_duration()+guard_len*2
             # print 'xlen:',guard_len*2
@@ -293,8 +228,8 @@ def test4():
             y *= amp # the preamble has amplitude 1
             y = preamble_utils.apply_cfo(y,cfo)
 
-            T = 1000
-            toffset = 0#np.random.randint(0,T-pparams.preamble_len+fparams.awgn_len)
+            T = 1000*2
+            toffset = 0 #np.random.randint(0,T-pparams.preamble_len+fparams.awgn_len)
             preamble_start = toffset+awgn_len
             yoffset = np.append(np.zeros(toffset,dtype=np.complex64),y)
             yoffset = np.append(yoffset,np.zeros(T-toffset,dtype=np.complex64))

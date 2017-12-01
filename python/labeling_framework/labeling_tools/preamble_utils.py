@@ -25,6 +25,7 @@ import os
 import matplotlib.pyplot as plt
 
 from ..utils.basic_algorithms import *
+from ..utils.array_view import *
 import random_sequence
 
 class preamble_params:
@@ -225,15 +226,12 @@ class PreambleDetectorType2:
         self.xdc_mavg_h = array_with_hist(np.array([],dtype=np.complex64),self.delay_cum[2]-self.L0)
         self.xnodc_h = array_with_hist(np.array([],dtype=np.complex64),self.L0+self.delay_cum[0]+self.margin+self.l1)#self.hist_len2)
         self.xschmidl_nodc = array_with_hist(np.array([],dtype=np.complex64),self.L0)#self.hist_len)
-        self.xschmidl_filt_nodc = array_with_hist(np.array([],dtype=np.complex64),0)#self.__max_margin__)
+        self.xschmidl_filt_nodc = np.array([],dtype=np.complex64)#array_with_hist(np.array([],dtype=np.complex64),0)#self.__max_margin__)
         self.xcorr_nodc = array_with_hist(np.array([],dtype=np.float32),self.L0)
-        self.xcorr_filt_nodc = array_with_hist(np.array([],dtype=np.float32),0)#self.__max_margin__+self.lvl2_len*self.pseq0.size)
+        self.xcorr_filt_nodc = np.array([],dtype=np.float32)#self.__max_margin__+self.lvl2_len*self.pseq0.size)
         self.Ldiff = max(self.l1-self.__max_margin__,0) # this guarantees that the peak1 fits in window
         self.xcrossautocorr_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__+self.Ldiff)
-        #NOTE: self.xfinal_view is just an offset view of self.xcrossautocorr_nodc
-        self.xfinal_view = array_hist_view(self.xcrossautocorr_nodc,-self.Ldiff)
-
-        self.local_max_finder_h = sliding_window_max_hist(self.__max_margin__)
+        self.local_max_finder_h = SlidingWindowMax_hist(self.__max_margin__)
 
     def find_crosscorr_peak(self,tpeak): # this is for high precision time sync
         # compensate CFO
@@ -242,36 +240,14 @@ class PreambleDetectorType2:
         pseq = self.params.pseq_list_norm[1]#self.params.preamble
         plen = len(pseq)
         twin = (tpeak-self.margin+toffset,tpeak+plen+self.margin+toffset)
-        # # dc_mavg2 = np.array([np.mean(self.x_h[i:i+self.params.length()]) for i in range(twin[0],twin[1])])
-        # # print twin[0]-self.awgn_len, self.x_h.hist_len
-        # # global min_idx
-        # # min_idx = min(min_idx,twin[0]-self.awgn_len)
-        # dc_mavg2 = np.array([np.mean(self.x_h[i-self.awgn_len:i]) for i in range(twin[0],twin[1])])
-        # xnodc = self.x_h[twin[0]:twin[1]]-dc_mavg2
-        # y = compensate_cfo(xnodc,cfo)
-        # print 'lengths:',plen+self.margin+toffset, ',', self.xnodc_h.hist_len, ',', tpeak, ',', self.xnodc_h[0::].size
+
         y = compensate_cfo(self.xnodc_h[twin[0]:twin[1]],cfo)
-        # y = compensate_cfo(self.x_h[tpeak-self.margin:tpeak+self.params.length()+self.margin],cfo)
         ycorr = np.correlate(y,pseq)
         maxi = np.argmax(np.abs(ycorr))
         ymag2 = np.mean(np.abs(self.xnodc_h[twin[0]+maxi:twin[0]+maxi+self.l1])**2)
-        xcorr = np.abs(ycorr[maxi]/plen)**2/ymag2
-        # tnew = tpeak + maxi-self.margin
-        # if tnew!=tpeak:
-        #     cfo = cfo + (tnew-tpeak)*0.5/self.pseq0.size # compensate the residual CFO
-        #     tnew = tpeak # we trust more the autocorrelation
-        #     # cfo = compute_schmidl_cox_cfo(self.xschmidl_filt_nodc[tnew+self.delay_cum[2]],self.pseq0.size)
-        # mavg1 = moving_average_no_hist(np.abs(self.xnodc_h[twin[0]:twin[1]])**2,plen)
-        # plt.plot(np.abs(ycorr/plen)**2/mavg1)
-        # plt.show()
-        # visualization: compare preamble with signal to see if they match in shape
-        # print xcorr,maxi,tpeak,tnew,cfo
-        # plt.plot(self.params.preamble)
-        # ytmp = y[maxi:maxi+self.params.length()]
-        # ytmp = ytmp*np.exp(-1j*np.angle(ytmp[0]/self.params.preamble[0])) # align phase for comparison
-        # plt.plot(ytmp,'x')
-        # plt.show()
-        return (tpeak,xcorr,cfo)#,mavg1)
+        xcorr = np.abs(ycorr[maxi]/plen)**2
+
+        return (tpeak,xcorr,cfo,ymag2)
 
     def work(self,x):
         l0 = self.pseq0.size
@@ -281,21 +257,20 @@ class PreambleDetectorType2:
         self.x_h.push(x) # [hist | x]
         self.xdc_mavg_h.push(moving_average_with_hist(self.x_h,L0)) # delay=delay_cum[0]=L0-1
         self.xnodc_h.push(self.x_h[-L0+1:self.x_h.size-L0+1]-self.xdc_mavg_h[0::]) # delay_cum[0]
-        # self.xnodc_h.push(self.x_h[0::]-self.xdc_mavg_h[0::]) # delay_cum[0]
         self.xschmidl_nodc.push(compute_schmidl_cox_with_hist(self.xnodc_h,l0)/l0) # delay_cum[1]
         if self.nread<self.delay_cum[1]: # if first run, null the history to avoid transients
             self.xschmidl_nodc[0:min((self.delay_cum[1]-self.nread),self.xschmidl_nodc.size)] = 0
-        self.xschmidl_filt_nodc.push(interleaved_crosscorrelate_with_hist(self.xschmidl_nodc,self.lvl2_seq_diff,l0)/len(self.lvl2_seq_diff)) # delay d[2]
+        self.xschmidl_filt_nodc = interleaved_crosscorrelate_with_hist(self.xschmidl_nodc,self.lvl2_seq_diff,l0)/len(self.lvl2_seq_diff) # delay d[2]
 
         self.xcorr_nodc.push(np.abs(correlate_with_hist(self.xnodc_h,self.params.pseq_list_norm[0])/l0)**2) #delay delay1_cum[0]
-        self.xcorr_filt_nodc.push(interleaved_sum_with_hist(self.xcorr_nodc,self.lvl2_len,l0)/self.lvl2_len) # delay=delay1_cum[0]
-        self.xcrossautocorr_nodc.push(np.abs(self.xschmidl_filt_nodc[0::])*self.xcorr_filt_nodc[0::])
+        self.xcorr_filt_nodc = interleaved_sum_with_hist(self.xcorr_nodc,self.lvl2_len,l0)/self.lvl2_len # delay=delay1_cum[0]
+        self.xcrossautocorr_nodc.push(np.abs(self.xschmidl_filt_nodc)*self.xcorr_filt_nodc)
 
-        # NOTE: problem with the first version is that the peak1 may not fit if __max_margin__ is small enough
+        # NOTE: I need to create a view that a starts further in the past, bc if __max_margin__ is very small, peak1 may not be inside the window. I have to create the view here, bc self.xcrossautocorr may change its address when it grows in size
         # local_peaks2 = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
-        assert np.array_equal(self.xfinal_view[0:len(x)],self.xcrossautocorr_nodc[-self.Ldiff:-self.Ldiff+len(x)])
-        # assert self.xfinal_view.__array_h__ is self.xcrossautocorr_nodc
-        local_peaks = self.local_max_finder_h.work(self.xfinal_view,len(x))
+        xfinaltest = offset_array_view(self.xcrossautocorr_nodc.array_h,self.xcrossautocorr_nodc.hist_len-self.Ldiff)
+        assert np.array_equal(xfinaltest[0::],self.xcrossautocorr_nodc[-self.Ldiff::])
+        local_peaks = self.local_max_finder_h.work(xfinaltest,len(x))#self.xfinal_view,len(x))
         local_peaks = [l-self.Ldiff for l in local_peaks]
         # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
@@ -309,11 +284,11 @@ class PreambleDetectorType2:
 #             # print 'time:',t+self.nread, peak0_mag2_nodc, xautocorr_nodc
             if xautocorr_nodc>self.thres1*peak0_mag2_nodc:
                 # print 'peak:',t+self.nread,':',i+self.nread,xautocorr_nodc,'>',self.thres1*peak0_mag2_nodc
-                tpeak,xcorr,cfo = self.find_crosscorr_peak(t)
+                tpeak,xcorr,cfo,l1mag2 = self.find_crosscorr_peak(t)
                 dc_offset = np.mean(self.x_h[tpeak-self.awgn_len:tpeak])
                 xmag2_mavg_nodc = np.mean(np.abs(self.x_h[tpeak:tpeak+L]-dc_offset)**2) # for the whole preamble
                 # xmag2_mavg = np.mean(self.xmag2_h[tpeak:tpeak+L]) # for the whole preamble
-                if xcorr <= self.thres2*xmag2_mavg_nodc:
+                if xcorr <= self.thres2*l1mag2:#xmag2_mavg_nodc:
                     continue
                 # recompute values for the new peak
                 # if tpeak!=t:
@@ -335,115 +310,3 @@ def compensate_cfo(x,cfo):
     assert x.size==cfo.size
     return x * np.exp(-1j*2*np.pi*cfo,dtype=np.complex64)
 
-# class PreambleDetectorType1:
-#     def __init__(self, fparams, thres1=0.3, thres2=0.3):#params, awgn_len):
-#         self.frame_params = fparams
-#         self.thres1 = thres1
-#         self.thres2 = thres2
-
-#         # derived
-#         self.params = self.frame_params.preamble_params
-#         self.lvl2_len = len(self.params.pseq_list_seq)-1
-#         self.lvl2_seq = self.params.pseq_list_coef[0:-1]
-#         self.lvl2_seq_diff = get_schmidl_sequence(self.lvl2_seq)
-#         self.pseq0 = self.params.pseq_list_norm[0]
-#         self.pseq0_tot_len = self.pseq0.size*self.lvl2_len
-#         self.awgn_len = self.frame_params.awgn_len
-#         self.hist_len = self.awgn_len + self.params.preamble_len
-#         self.margin = 16
-
-#         self.nread = 0
-#         self.peaks = []
-
-#         # i keep these vars in mem for debug
-#         # self.x_h = []
-#         # self.xmag2_h = []
-#         self.xcorr_filt = np.array([],np.complex64)
-#         self.__max_margin__ = self.pseq0_tot_len
-#         self.delay = [self.pseq0_tot_len, self.pseq0.size*2-1, len(self.lvl2_seq_diff)*self.pseq0.size]
-#         self.delay_cum = np.cumsum(self.delay)
-#         # self.hist_len2 = self.hist_len+self.__max_margin__+self.delay_cum[0]
-#         self.hist_len2 = np.sum(self.delay_cum[1:3])+self.params.length()+self.awgn_len+2*self.margin
-#         # self.xmag2_mavg = []
-#         self.xschmidlmag2_h = []
-#         self.x_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
-#         self.xdc_mavg_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)# check if this size is fine
-#         self.xnodc_h = array_with_hist(np.array([],dtype=np.complex64),self.hist_len2)
-#         self.xschmidl_nodc = array_with_hist(np.array([],dtype=np.complex64),self.hist_len)# check if this size is fine
-#         self.xschmidl_filt_nodc = array_with_hist(np.array([],dtype=np.complex64),self.__max_margin__)
-#         self.xschmidl_filt_mag2_nodc = array_with_hist(np.array([],dtype=np.float32),self.__max_margin__)
-
-#         self.local_max_finder_h = sliding_window_max_hist(self.__max_margin__)
-
-#     def find_crosscorr_peak(self,tpeak): # this is for high precision time sync
-#         # compensate CFO
-#         cfo = compute_schmidl_cox_cfo(self.xschmidl_filt_nodc[tpeak+self.delay_cum[2]],self.pseq0.size)
-#         if np.abs(tpeak-75)<4:
-#             print '(t,cfo):',tpeak,cfo
-#         twin = (tpeak-self.margin,tpeak+self.params.length()+self.margin)
-#         # dc_mavg2 = np.array([np.mean(self.x_h[i:i+self.params.length()]) for i in range(twin[0],twin[1])])
-#         # print twin[0]-self.awgn_len, self.x_h.hist_len
-#         # global min_idx
-#         # min_idx = min(min_idx,twin[0]-self.awgn_len)
-#         dc_mavg2 = np.array([np.mean(self.x_h[i-self.awgn_len:i]) for i in range(twin[0],twin[1])])
-#         xnodc = self.x_h[twin[0]:twin[1]]-dc_mavg2
-#         y = compensate_cfo(xnodc,cfo)
-#         # y = compensate_cfo(self.x_h[tpeak-self.margin:tpeak+self.params.length()+self.margin],cfo)
-#         ycorr = np.correlate(y,self.params.preamble)
-#         maxi = np.argmax(np.abs(ycorr))
-#         xcorr = np.abs(ycorr[maxi]/self.params.length())**2
-#         tnew = tpeak + maxi-self.margin
-#         if tnew!=tpeak:
-#             cfo = compute_schmidl_cox_cfo(self.xschmidl_filt_nodc[tnew+self.delay_cum[2]],self.pseq0.size)
-#         # plt.plot(np.abs(ycorr))
-#         # plt.show()
-#         # visualization: compare preamble with signal to see if they match in shape
-#         # print xcorr,maxi,tpeak,tnew,cfo
-#         # plt.plot(self.params.preamble)
-#         # ytmp = y[maxi:maxi+self.params.length()]
-#         # ytmp = ytmp*np.exp(-1j*np.angle(ytmp[0]/self.params.preamble[0])) # align phase for comparison
-#         # plt.plot(ytmp,'x')
-#         # plt.show()
-#         return (tnew,xcorr,cfo)
-
-#     def work(self,x):
-#         l0 = self.pseq0.size
-#         L0 = self.delay_cum[0]
-#         L = self.params.length()
-#         # print 'window:',self.nread,self.nread+x.size
-#         self.x_h.push(x) # [hist | x]
-#         self.xdc_mavg_h.push(moving_average_with_hist(self.x_h,L0)) # delay=d[0]
-#         self.xnodc_h.push(self.x_h[-L0:self.x_h.size-L0]-self.xdc_mavg_h[0::]) # delay=d[0]
-#         self.xschmidl_nodc.push(compute_schmidl_cox_with_hist(self.xnodc_h,l0)/l0) # delay d[1]
-#         self.xschmidl_filt_nodc.push(interleaved_crosscorrelate_with_hist(self.xschmidl_nodc,self.lvl2_seq_diff,l0)/len(self.lvl2_seq_diff)) # delay d[2]
-#         self.xschmidl_filt_mag2_nodc.push(np.abs(self.xschmidl_filt_nodc[0::]))
-
-#         # if self.xschmidl_filt.size>=self.xschmidl_filt_delay:
-#         #     assert np.max(np.abs(np.abs(xtmp[0::])**2-self.xschmidl_filt_mag2[self.xschmidl_filt_delay::]))<0.00001
-
-#         local_peaks = self.local_max_finder_h.work(self.xschmidl_filt_mag2_nodc)
-#         print 'peaks:',[p-self.delay_cum[2] for p in local_peaks]
-
-#         for i in local_peaks:
-#             t = i-self.delay_cum[2]
-#             dc0 = self.xdc_mavg_h[t+L0] #np.mean(self.x_h[t:t+L0])
-#             peak0_mag2_nodc = np.mean(np.abs(self.x_h[t:t+L0]-dc0)**2)
-#             # peak0_mag2 = np.mean(self.xmag2_h[t:t+self.pseq0_tot_len])
-#             xautocorr_nodc = self.xschmidl_filt_mag2_nodc[i]
-#             # print 'time:',t+self.nread, peak0_mag2_nodc, xautocorr_nodc
-#             if xautocorr_nodc>self.thres1*peak0_mag2_nodc:
-#                 tpeak,xcorr,cfo = self.find_crosscorr_peak(t)
-#                 dc_offset = np.mean(self.x_h[tpeak-self.awgn_len:tpeak])
-#                 xmag2_mavg_nodc = np.mean(np.abs(self.x_h[tpeak:tpeak+L]-dc_offset)**2) # for the whole preamble
-#                 # xmag2_mavg = np.mean(self.xmag2_h[tpeak:tpeak+L]) # for the whole preamble
-#                 if xcorr <= self.thres2*xmag2_mavg_nodc:
-#                     continue
-#                 # recompute values for the new peak
-#                 if tpeak!=t:
-#                     xautocorr_nodc = self.xschmidl_filt_mag2_nodc[tpeak+self.delay_cum[2]]
-#                 awgn_estim_nodc = np.mean(np.abs(self.x_h[tpeak-self.awgn_len:tpeak]-dc_offset)**2)
-#                 # awgn_estim = np.mean(self.xmag2_h[tpeak-self.awgn_len:tpeak])
-#                 p = tracked_peak(tpeak+self.nread,xcorr,xautocorr_nodc,cfo,xmag2_mavg_nodc,awgn_estim_nodc,dc_offset)
-#                 self.peaks.append(p)
-#                 # print p
-#         self.nread += x.size
