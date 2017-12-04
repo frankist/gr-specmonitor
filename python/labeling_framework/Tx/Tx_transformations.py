@@ -26,7 +26,8 @@ from gnuradio import blocks
 from gnuradio import analog
 from gnuradio import channels
 
-from ..labeling_tools.bounding_box import *
+# from ..labeling_tools.bounding_box import *
+from ..data_representation import timefreq_box as tfbox
 from ..sig_format import pkl_sig_format
 from ..labeling_tools import preamble_utils
 from ..sig_format import sig_data_access as filedata
@@ -39,15 +40,15 @@ def generate_section_partitions(section_size,guard_band,num_sections):
 # this function returns the boxes intersected with the section of interest. It also
 # offsets the boxes time stamp to be relative with the section start.
 def compute_new_bounding_boxes(time_offset,section_size,freq_offset,box_list):
-    boi = intersect_boxes_with_section(box_list,(time_offset,time_offset+section_size))
-    boi_offset = add_offset(boi,-time_offset,freq_offset)
+    boi = tfbox.intersect_boxes_with_section(box_list,(time_offset,time_offset+section_size))
+    boi_offset = tfbox.add_offset(boi,-time_offset,freq_offset)
     return list(boi_offset)
 
 # this function picks the boxes within the window (toffset:toffset+num_samples) that were offset by -toffset
 # and breaks them into sections. It also offsets the box start to coincide with the section
 def partition_boxes_into_sections(box_list,section_size,guard_band,num_sections):
     section_ranges = generate_section_partitions(section_size,guard_band,num_sections)
-    return [list(intersect_and_offset_box(box_list,s)) for s in section_ranges]
+    return [list(tfbox.intersect_and_offset_box(box_list,s)) for s in section_ranges]
 
 def apply_framing_and_offsets(args):
     params = args['parameters']
@@ -112,7 +113,7 @@ def apply_framing_and_offsets(args):
     assert y.size==num_samples_with_framing
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
-    prev_boxes = filedata.get_stage_derived_parameter(stage_data,'bounding_boxes')
+    prev_boxes = filedata.get_stage_derived_parameter(stage_data,'timefreq_boxes')
 
     try:
         box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
@@ -124,7 +125,7 @@ def apply_framing_and_offsets(args):
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
     stage_data['IQsamples'] = y # overwrites the generated samples
     filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounds',section_bounds)
-    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounding_boxes',section_boxes)
+    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_timefreq_boxes',section_boxes)
 
     assert y.size >= np.max([s[1] for s in section_bounds])
     for i in range(num_sections):

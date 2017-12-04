@@ -61,6 +61,9 @@ RF_params = [
     ('rf_frequency', 2.35e9)
 ]
 
+spectrogram_representation = {'format_type':'spectrogram','boxlabel':'waveform',
+                              'fftsize':64,'cancel_DC_offset':True}
+
 stage_params = {
     'wifi':
     {
@@ -71,7 +74,8 @@ stage_params = {
             ('sample_rate',20e6),
             ('encoding',[0]),#range(0,7)),
             ('pdu_length',[500,750,1000,1250]), # 50-1500
-            ('pad_interval',5000) # spaces between packets. I may make it random
+            ('pad_interval',5000), # spaces between packets. I may make it random
+            ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params_wifi,
         'RF': RF_params
@@ -83,7 +87,8 @@ stage_params = {
             ('waveform',['square','saw']),
             ('sample_rate',20e6),
             ('frequency',[1e4,5e5]),
-            ('number_samples',wf_gen_samps)
+            ('number_samples',wf_gen_samps),
+            ('signal_representation',[spectrogram_representation])
             # ('skip_samples',skip_samps)
         ],
         'Tx': Tx_params,
@@ -104,7 +109,8 @@ stage_params = {
             ('excess_bw',0.25),
             ('pre_diff_code',False),
             ('burst_len',5000),
-            ('zero_pad_len',5000)
+            ('zero_pad_len',5000),
+            ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params,
         'RF': RF_params

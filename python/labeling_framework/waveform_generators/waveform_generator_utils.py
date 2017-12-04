@@ -18,63 +18,36 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 #
+
 import numpy as np
 
 from ..sig_format import sig_data_access as sda
-from ..labeling_tools import bounding_box as bb
+from ..data_representation import image_representation as imgrep
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
-
 
 def print_params(params,name):
     logger.debug('%s waveform generator starting',name)
     for k, v in params.iteritems():
         logger.debug('%s: %s (type=%s)', k, v, type(v))
 
-def create_waveform_sig_data(IQsamples,args,box_list,box_pwr_list):
-    """
-    This function should return a dictionary/obj with: IQsamples,
-    stage parameters that were passed, and the derived bounding_boxes
-    """
+def create_new_sigdata(args):
     logger.debug('Going to fill the stage data structure')
     # generate a sig object/dict
     v = sda.init_metadata()
 
-    # fill with samples
-    v['IQsamples'] = IQsamples
-
     # add the stage parameters that were passed to the waveform generator
     sda.set_stage_parameters(v, args['stage_name'], args['parameters'])
 
-    # add the parameters that were derived
-    sda.set_stage_derived_parameter(v, args['stage_name'], 'bounding_boxes',
-                                    box_list)
-    sda.set_stage_derived_parameter(v, args['stage_name'], 'bounding_boxes_power',
-                                    box_pwr_list)
-
     return v
-
-def derive_bounding_boxes(x):
-    logger.debug('Going to compute Bounding Boxes')
-    box_list = bb.compute_bounding_boxes(x)
-    logger.debug('Finished computing the Bounding Boxes')
-
-    # normalize the power of the signal
-    box_pwr_list = bb.compute_boxes_pwr(x, box_list)
-    max_pwr_box = np.max(box_pwr_list)
-    y = x/np.sqrt(max_pwr_box)
-    box_pwr_list_norm = [b/max_pwr_box for b in box_pwr_list]
-
-    #debug
-    # plt.plot(np.abs(gen_data))
-    # plt.plot(np.abs(gen_data0),'r')
-    # plt.show()
-    return (y,box_pwr_list,box_pwr_list_norm)
 
 def transform_IQ_to_sig_data(x,args):
-    y,box_pwr_list,box_list = derive_bounding_boxes(x)
-    v = create_waveform_sig_data(y,args,box_list,box_pwr_list)
+    """
+    This function should return a dictionary/obj with: IQsamples,
+    stage parameters that were passed, and the derived bounding_boxes
+    """
+    v = create_new_sigdata(args)
+    signalimg = imgrep.get_signal_to_img_converter(args['signal_representation'])
+    # sigdata is going to be filled with boxes, their power and label
+    signalimg.set_derived_sigdata(v,x,args)
     return v
-
-if __name__ == '__main__':
-    pass

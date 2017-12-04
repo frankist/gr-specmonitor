@@ -24,7 +24,7 @@ import os
 import pickle
 import json
 
-from ..labeling_tools.bounding_box import *
+# from ..labeling_tools.bounding_box import *
 from ..labeling_tools import preamble_utils
 from ..sig_format import pkl_sig_format
 from ..sig_format import sig_data_access as filedata
