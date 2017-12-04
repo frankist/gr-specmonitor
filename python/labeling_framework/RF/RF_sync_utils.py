@@ -23,6 +23,7 @@ import sys
 import os
 import pickle
 import json
+import numpy as np
 
 # from ..labeling_tools.bounding_box import *
 from ..labeling_tools import preamble_utils
@@ -134,7 +135,9 @@ def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsu
         y = ret[2]
 
         # assert section_bounds do not go over superframe size
-        section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
+        spec_metadata = filedata.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
+        section_bounds = [s.section_bounds for s in spec_metadata]
+        # section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
         assert Nsuperframe>=np.max([s[1] for s in section_bounds])
 
         # write the selected samples and preamble peaks to the target file

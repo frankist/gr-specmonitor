@@ -27,11 +27,12 @@ from ..labeling_tools import bounding_box as bndbox
 Represents time through sample indices and freq through the normalized [-0.5,0.5] space
 '''
 class TimeFreqBox:
-    def __init__(self,time_bounds,freq_norm_bounds,label):
-        TimeFreqBox.assert_validity(time_bounds,freq_bounds)
+    def __init__(self,time_bounds,freq_norm_bounds,label=None):
+        TimeFreqBox.assert_validity(time_bounds,freq_norm_bounds)
         self.time_bounds = time_bounds
         self.freq_bounds = tuple([float(f) for f in freq_norm_bounds])
         self.params = {} # other params like power or label
+        self.params['label'] = None
 
     @staticmethod
     def assert_validity(time_bounds,freq_bounds):
@@ -51,6 +52,12 @@ class TimeFreqBox:
             logger.error(err_msg)
             logger.error('Reconsider changing the waveform params (freq offset range/signal duration)')
             raise AssertionError(err_msg)
+
+    def label(self):
+        return self.params['label']
+
+    def set_label(self,lbl):
+        self.params['label'] = lbl
 
     def is_equal(self,box):
         return box.time_bounds==self.time_bounds and box.freq_bounds==self.freq_bounds
@@ -159,6 +166,13 @@ def scale_time_range_to_image_rows(trange,nrows,section_size):
 def compute_boxes_pwr(x, box_list):
     # NOTE: I convert to float bc I want the json of the labels to look nice
     return [float(np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2)) for b in box_list]
+
+def normalize_boxes_pwr(box_list, x):
+    box_pwr_list = compute_boxes_pwr(x,box_list)
+    max_pwr_box = np.max(box_pwr_list)
+    for i in range(len(box_pwr_list)):
+        box_list[i].params['power'] = box_pwr_list[i]/max_pwr_box
+    return (box_list,max_pwr_box)
 
 def compute_signal_time_bounds(xorig,dist_margin=0,thres=1e-12):
     """

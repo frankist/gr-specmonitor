@@ -20,6 +20,7 @@
 #
 import sys
 import pickle
+import numpy as np
 
 from gnuradio import gr
 from gnuradio import blocks
@@ -27,6 +28,7 @@ from gnuradio import analog
 from gnuradio import channels
 
 # from ..labeling_tools.bounding_box import *
+from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
 from ..sig_format import pkl_sig_format
 from ..labeling_tools import preamble_utils
@@ -113,7 +115,8 @@ def apply_framing_and_offsets(args):
     assert y.size==num_samples_with_framing
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
-    prev_boxes = filedata.get_stage_derived_parameter(stage_data,'timefreq_boxes')
+    specimgmetadata = filedata.get_stage_derived_parameter(stage_data,'spectrogram_img_metadata')
+    prev_boxes = specimgmetadata.tfreq_boxes
 
     try:
         box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
@@ -123,9 +126,15 @@ def apply_framing_and_offsets(args):
         raise
     section_boxes = partition_boxes_into_sections(box_list,section_size,fparams.guard_len,num_sections)
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
+
+    # fill new file
     stage_data['IQsamples'] = y # overwrites the generated samples
-    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounds',section_bounds)
-    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_timefreq_boxes',section_boxes)
+    l = []
+    sig2img_params = filedata.get_stage_parameter(stage_data,'signal_representation')
+    signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
+    for i in range(len(section_bounds)):
+        l.append(signalimgmetadata(section_boxes[i],section_bounds[i],specimgmetadata.input_params))
+    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_spectrogram_img_metadata',l)
 
     assert y.size >= np.max([s[1] for s in section_bounds])
     for i in range(num_sections):

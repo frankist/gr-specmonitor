@@ -7,6 +7,7 @@ from labeling_framework.core.LuigiSimulatorHandler import *
 from labeling_framework.visualization.visualization_modules import ImgSpectrogramBoundingBoxTask
 from labeling_framework.visualization.inspect_labels import Labels2JsonTask
 from labeling_framework.RF import RF_scripts
+from labeling_framework.data_representation import voc_annotations
 from labeling_framework.utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -51,6 +52,14 @@ class RFImg(ImgSpectrogramBoundingBoxTask):
 class RFLabels(Labels2JsonTask):
     def requires(self):
         return RF(self.session_args,self.stage_idxs[0:-1])
+
+class RFVOCFormat(StageLuigiTask):
+    def requires(self):
+        return RF(self.session_args,self.stage_idxs[0:-1])
+
+    def run(self):
+        this_run_params = self.get_run_parameters()
+        voc_annotations.create_image_and_annotation(this_run_params)
 
 class AWGNCmdSession(CmdSession):
     def get_stage_caller(self,stage_name): # I need to look at the local scope to get the stage_caller

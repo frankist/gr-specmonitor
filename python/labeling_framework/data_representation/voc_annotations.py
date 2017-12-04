@@ -19,39 +19,41 @@
 # Boston, MA 02110-1301, USA.
 #
 
+import os
 import numpy as np
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+from PIL import Image
+import pickle
 
+from ..sig_format import sig_data_access as sda
+from ..sig_format import pkl_sig_format
+import image_representation as imrep
+import timefreq_box as tfbox
 from ..labeling_tools import bounding_box as bbox
 
 def prettify_xml(elem):
     """Return a pretty-printed XML string for the Element.
     """
-    rough_string = ElementTree.tostring(elem, 'utf-8')
+    rough_string = ET.tostring(elem, 'utf-8')
     reparsed = minidom.parseString(rough_string)
     return reparsed.toprettyxml(indent="  ")
 
-def convert_annotations_to_VOC(args):
-    params = args['parameters']
-    sourcefilename = args['sourcefilename']
-    targetfilename = args['targetfilename']
-
+def convert_annotations_to_VOC(img_filename,sourcefilename):
     ### get dependency file, and create a new stage_data object
     freader = pkl_sig_format.WaveformPklReader(sourcefilename)
     stage_data = freader.data()
-    bbox_list = get_stage_derived_parameter(stage_data,'bounding_boxes')
-
-    imgbbox_list = [bbox.ImageBoundingBox.convert_from_BoundingBox(b,img_shape,section_size) for b in bbox_list]
+    spec_metadata = sda.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
+    x = freader.read_section()
 
     # document
     root = ET.Element("annotation")
 
     # folder
-    ET.SubElement(root, "folder").text = os.path.dirname(os.path.dirname(targetfilename))
+    ET.SubElement(root, "folder").text = os.path.dirname(os.path.dirname(img_filename))
 
     # filename
-    ET.SubElement(root, "filename").text = os.path.basename(targetfilename)
+    ET.SubElement(root, "filename").text = os.path.basename(img_filename)
 
     # source
     xmlsource = ET.SubElement(root, "source")
@@ -61,37 +63,66 @@ def convert_annotations_to_VOC(args):
     xmlowner = ET.SubElement(root, "owner").text = "Faceless man"
 
     xmlsize = ET.SubElement(root, "size")
-    ET.SubElement(xmlsize, "width").text = img_shape[1]
-    ET.SubElement(xmlsize, "height").text = img_shape[0]
-    ET.SubElement(xmlsize, "depth").text = img_depth
+    ET.SubElement(xmlsize, "width").text = str(spec_metadata[0].img_size[1])
+    ET.SubElement(xmlsize, "height").text = str(spec_metadata[0].img_size[0])
+    ET.SubElement(xmlsize, "depth").text = str(spec_metadata[0].depth)
 
-    ET.SubElement(root, "segmented").text = 0
+    ET.SubElement(root, "segmented").text = "0"
 
-    for b in imgbbox_list:
-        xmlobject = ET.SubElement(root, "object")
-        ET.SubElement(xmlobject, "name").text = b.label
-        ET.SubElement(xmlobject, "pose").text = "Unspecified"
-        ET.SubElement(xmlobject, "truncated").text = 0
-        ET.SubElement(xmlobject, "difficult").text = 0
-        xmlbndbox = ET.SubElement(xmlobject, "bndbox")
-        ET.SubElement(xmlbndbox, "xmin").text = b.row_bounds[0]
-        ET.SubElement(xmlbndbox, "xmax").text = b.row_bounds[1]
-        ET.SubElement(xmlbndbox, "ymin").text = b.col_bounds[0]
-        ET.SubElement(xmlbndbox, "ymax").text = b.col_bounds[1]
+    assert len(spec_metadata)==1 # FIXME: Implement it for more
+    for i in range(len(spec_metadata)):
+        # get img bounding boxes
+        imgboxes = spec_metadata[i].generate_img_bounding_boxes()
+
+        for b in imgboxes:
+            xmlobject = ET.SubElement(root, "object")
+            ET.SubElement(xmlobject, "name").text = b.params['label']
+            ET.SubElement(xmlobject, "pose").text = b.params.get('pose',"Unspecified")
+            ET.SubElement(xmlobject, "truncated").text = "0"
+            ET.SubElement(xmlobject, "difficult").text = "0"
+            xmlbndbox = ET.SubElement(xmlobject, "bndbox")
+            ET.SubElement(xmlbndbox, "xmin").text = str(b.colmin)
+            ET.SubElement(xmlbndbox, "xmax").text = str(b.colmax)
+            ET.SubElement(xmlbndbox, "ymin").text = str(b.rowmin)
+            ET.SubElement(xmlbndbox, "ymax").text = str(b.rowmax)
 
     return prettify_xml(root)
 
-def write_VOC_annotations(args):
-    targetfilename = args['targetfilename']
-    basefolder = os.path.dirname(targetfilename)
-    fname = os.path.splitext(os.path.basename(targetfilename))[0]
-    annotation_filename = basefolder+'/Annotations/'+fname+'.xml'
-
-    xml_str = convert_annotations_to_VOC(args)
+def write_VOC_annotations(annotation_filename,img_filename,sourcefilename):
+    xml_str = convert_annotations_to_VOC(img_filename,sourcefilename)
     with open(annotation_filename,'w') as f:
         f.write(xml_str)
 
+def write_signal_to_jpeg(img_filename,sourcefilename):
+    ### get dependency file, and create a new stage_data object
+    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
+    stage_data = freader.data()
+    section = freader.read_section()
+
+    spec_metadata = sda.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
+
+    assert len(spec_metadata)==1
+    for i in range(len(spec_metadata)):
+        Sxx = spec_metadata[i].image_data(section)
+        im = Image.fromarray(np.uint8(Sxx*255))
+        im.save(img_filename,'JPEG')
+
 def create_image_and_annotation(args):
-    write_VOC_annotations(args)
-    write_signal_as_img(args)
+    targetfilename = args['targetfilename']
+    sourcefilename = args['sourcefilename']
+    basefolder = os.path.dirname(targetfilename)
+    fname = os.path.splitext(os.path.basename(targetfilename))[0]
+    annotation_folder = basefolder+'/Annotations'
+    img_folder = basefolder+'/Images'
+    if not os.path.exists(annotation_folder):
+        os.mkdir(annotation_folder)
+    if not os.path.exists(img_folder):
+        os.mkdir(img_folder)
+    annotation_filename = annotation_folder+'/'+fname+'.xml'
+    img_filename = img_folder+'/'+fname+'.xml'
+
+    write_VOC_annotations(annotation_filename,img_filename,sourcefilename)
+    write_signal_to_jpeg(img_filename,sourcefilename)
+    with open(targetfilename,'w') as f:
+        pickle.dump({'status':'done'},f)
 

@@ -40,7 +40,7 @@ import pmt
 
 # labeling_framework package
 from waveform_generator_utils import *
-from utils import logging_utils
+from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):

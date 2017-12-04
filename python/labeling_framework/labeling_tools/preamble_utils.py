@@ -27,6 +27,8 @@ import matplotlib.pyplot as plt
 from ..utils.basic_algorithms import *
 from ..utils.array_view import *
 import random_sequence
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 class preamble_params:
     def __init__(self, pseq_list, pseq_list_seq, pseq_list_coef = None):
@@ -192,8 +194,6 @@ class PreambleDetectorType2:
         self.frame_params = fparams
         self.thres1 = thres1
         self.thres2 = thres2
-        self.__max_margin__ = autocorr_margin if autocorr_margin is not None else self.pseq0_tot_len
-        assert isinstance(self.__max_margin__,int)
 
         # derived
         self.params = self.frame_params.preamble_params
@@ -207,6 +207,8 @@ class PreambleDetectorType2:
         self.pseq0_tot_len = self.l0*self.lvl2_len
         self.L0 = self.pseq0_tot_len
         self.awgn_len = self.frame_params.awgn_len
+        self.__max_margin__ = autocorr_margin if autocorr_margin is not None else self.pseq0_tot_len
+        assert isinstance(self.__max_margin__,int)
 
         # object state variables
         self.nread = 0
@@ -268,14 +270,16 @@ class PreambleDetectorType2:
 
         # NOTE: I need to create a view that a starts further in the past, bc if __max_margin__ is very small, peak1 may not be inside the window. I have to create the view here, bc self.xcrossautocorr may change its address when it grows in size
         # local_peaks2 = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
-        xfinaltest = offset_array_view(self.xcrossautocorr_nodc.array_h,self.xcrossautocorr_nodc.hist_len-self.Ldiff)
+        xfinaltest = offset_array_view(self.xcrossautocorr_nodc.array_h,self.xcrossautocorr_nodc.hist_len-self.Ldiff,len(x))
         assert np.array_equal(xfinaltest[0::],self.xcrossautocorr_nodc[-self.Ldiff::])
         local_peaks = self.local_max_finder_h.work(xfinaltest,len(x))#self.xfinal_view,len(x))
         local_peaks = [l-self.Ldiff for l in local_peaks]
         # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
-            assert i>=0 # I make this assumption for the history len of the arrays
+            if i<-self.Ldiff:
+                logger.error('this peak index {} is not valid. Detected peaks: {}'.format(i,local_peaks))
+                AssertionError('i>=-self.Ldiff')
             t = i-self.delay_cum[2]
             dc0 = self.xdc_mavg_h[t+L0] #np.mean(self.x_h[t:t+L0])
             peak0_mag2_nodc = np.mean(np.abs(self.x_h[t:t+L0]-dc0)**2)

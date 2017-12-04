@@ -36,11 +36,12 @@ class ImgBoundingBox(object):
         self.colmin=colmin
         self.colmax=colmax
         self.img_size = img_size
-        self.label = label
+        self.params = {}
+        self.params['label'] = label
         self.assert_validity()
 
     def is_labeled(self):
-        return self.label is not None
+        return self.params['label'] is not None
 
     def is_equal(self,box):
         assert type(box)==type(self)

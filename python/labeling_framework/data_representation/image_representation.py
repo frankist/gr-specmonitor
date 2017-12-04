@@ -21,6 +21,8 @@
 
 import numpy as np
 import importlib
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 ############ data transformation helpers ##############
 
@@ -30,6 +32,7 @@ def normalize_image_data(img_data):
     assert np.max(data_norm)<=1.0 and np.min(data_norm)>=0
     return data_norm
 
+# consider deleting
 class SignalImgConverter(object):
     @staticmethod
     def set_derived_sigdata(stage_data,x,args):
@@ -47,16 +50,18 @@ class SignalImgConverter(object):
 
 __format_types__ = {}
 
-def register_image_representation(name,signal_img_child):
+def register_signal_to_img_converter(name,signal_img_child):
     __format_types__[name] = signal_img_child
 
 def get_signal_to_img_converter(params):
     assert isinstance(params,dict)
     format_name = params['format_type']
 
-    # this adds to the known img formats the one we need
-    filename = format_name+'.py'
-    importlib.import_module(filename)
+    if format_name not in __format_types__:
+        logger.info('Going to import the input representation {}'.format(format_name))
+        # this adds to the known img formats the one we need
+        filename = 'labeling_framework.data_representation.'+format_name#+'.py'
+        importlib.import_module(filename)
 
     # delegate
-    return known_img_formats[format_name]
+    return __format_types__[format_name]

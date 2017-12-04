@@ -200,8 +200,8 @@ def test4():
     pparams = preamble_utils.generate_preamble_type2(pseq_len,pseq_lvl2_len,nrepeats0)
     fparams = preamble_utils.frame_params(pparams,guard_len,awgn_len,frame_period)
 
-    num_runs = 10
-    SNRdB_range = range(-20,0)
+    num_runs = 500
+    SNRdB_range = range(-20,21)
     FalseAlarmRate = np.zeros(len(SNRdB_range))
     Pdetec = np.zeros(len(SNRdB_range))
     amp_stats = []
