@@ -90,13 +90,13 @@ def compute_freq_norm_bounds(Sxx_norm, section_size, tinterv_list = None, thresd
 
 def compute_freq_col_bounds(Sxx_norm, row_bounds = None, thresdB = -15):
     # convert argument to list
-    if tinterv_list is None:
-        tinterv_list = [(0,Sxx_norm.shape[0])] # beginning to end
-    assert isinstance(tinterv_list,list)
+    if row_bounds is None:
+        row_bounds = [(0,Sxx_norm.shape[0])] # beginning to end
+    assert isinstance(row_bounds,list)
     thres = 10**(thresdB/10.0)
     l = []
-    for twin in tinterv_list:
-        Sxx_slice = Sxx_norm[row_bounds[0]:row_bounds[1],:]
+    for row_win in row_bounds:
+        Sxx_slice = Sxx_norm[row_win[0]:row_win[1],:]
         Sfreq = np.mean(Sxx_slice,axis=0) # Basically the freq. psd
 
         # these are in column indices
@@ -170,7 +170,7 @@ class SectionSpectrogramMetadata(object):
         section = x[self.section_bounds[0]:self.section_bounds[1]]
         Sxx = make_normalized_spectrogram_image(section,self.input_params)
         if Sxx.shape!=self.img_size:
-            raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {}.'.format(Sxx.shape,self.img_size,section.size))
+            raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size,section.size,self.section_duration()))
         return Sxx
 
     def generate_img_bounding_boxes(self):

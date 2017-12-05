@@ -128,18 +128,12 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     spec_metadata = fdh.get_stage_derived_parameter(sig_data,'section_spectrogram_img_metadata')
     num_sections = len(spec_metadata)
     assert num_sections==1 # TODO: Implement this for several subsections
+    section_size = fdh.get_stage_derived_parameter(sig_data,'section_size')
 
     for i in range(num_sections):
-        section_bounds = spec_metadata[i].section_bounds
-        box_list = spec_metadata[i].tfreq_boxes
-        # print 'section:',section_bounds[i]
-        section = x[section_bounds[0]:section_bounds[1]]
-        assert section.size == section_bounds[1]-section_bounds[0]
-
         # get the image bounding boxes
-        section_tfbox_list = box_list if mark_boxes is True else []
-        imgboxes = spec_metadata[i].generate_img_bounding_boxes()
-        Sxx = spec_metadata[i].image_data(section)
+        imgboxes = spec_metadata[i].generate_img_bounding_boxes() if mark_boxes==True else []
+        Sxx = spec_metadata[i].image_data(x)
 
         # convert image data to img format
         im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))

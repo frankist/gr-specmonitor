@@ -32,7 +32,7 @@ class TimeFreqBox:
         self.time_bounds = time_bounds
         self.freq_bounds = tuple([float(f) for f in freq_norm_bounds])
         self.params = {} # other params like power or label
-        self.params['label'] = None
+        self.params['label'] = label
 
     @staticmethod
     def assert_validity(time_bounds,freq_bounds):
@@ -83,12 +83,14 @@ class TimeFreqBox:
         fintersect = self.freq_intersection(box.freq_bounds)
         if fintersect is None:
             return None
-        return TimeFreqBox(tintersect,fintersect)
+        assert self.label() is None or box.label() is None or self.label()==box.label()
+        new_label = self.label() if self.label() is not None else box.label()
+        return TimeFreqBox(tintersect,fintersect,new_label)
 
     def add(self,time=0,freq=0):
         tvec = (self.time_bounds[0]+time,self.time_bounds[1]+time)
         fvec = (self.freq_bounds[0]+freq,self.freq_bounds[1]+freq)
-        return TimeFreqBox(tvec,fvec)
+        return TimeFreqBox(tvec,fvec,self.label())
 
     def __str__(self):
         return '[({},{}),({},{})]'.format(self.time_bounds[0],self.time_bounds[1],self.freq_bounds[0],self.freq_bounds[1])

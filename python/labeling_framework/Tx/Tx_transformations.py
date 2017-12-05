@@ -118,6 +118,7 @@ def apply_framing_and_offsets(args):
     specimgmetadata = filedata.get_stage_derived_parameter(stage_data,'spectrogram_img_metadata')
     prev_boxes = specimgmetadata.tfreq_boxes
 
+    # intersect the boxes with the section boundaries
     try:
         box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
     except AssertionError:
@@ -133,6 +134,8 @@ def apply_framing_and_offsets(args):
     sig2img_params = filedata.get_stage_parameter(stage_data,'signal_representation')
     signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
     for i in range(len(section_bounds)):
+        assert section_bounds[i][1]-section_bounds[i][0] == section_size
+        assert all(s.label() is not None for s in section_boxes[i])
         l.append(signalimgmetadata(section_boxes[i],section_bounds[i],specimgmetadata.input_params))
     filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_spectrogram_img_metadata',l)
 

@@ -60,7 +60,8 @@ def convert_annotations_to_VOC(img_filename,sourcefilename):
     ET.SubElement(xmlsource, "database").text = "An RF signal database"
     ET.SubElement(xmlsource, "annotation").text = "PASCAL VOC2017"
 
-    xmlowner = ET.SubElement(root, "owner").text = "Faceless man"
+    xmlowner = ET.SubElement(root, "owner")
+    xmlownername = ET.SubElement(xmlowner, "name").text = "Faceless man"
 
     xmlsize = ET.SubElement(root, "size")
     ET.SubElement(xmlsize, "width").text = str(spec_metadata[0].img_size[1])
@@ -76,6 +77,7 @@ def convert_annotations_to_VOC(img_filename,sourcefilename):
 
         for b in imgboxes:
             xmlobject = ET.SubElement(root, "object")
+            assert b.params['label'] is not None
             ET.SubElement(xmlobject, "name").text = b.params['label']
             ET.SubElement(xmlobject, "pose").text = b.params.get('pose',"Unspecified")
             ET.SubElement(xmlobject, "truncated").text = "0"
@@ -113,13 +115,13 @@ def create_image_and_annotation(args):
     basefolder = os.path.dirname(targetfilename)
     fname = os.path.splitext(os.path.basename(targetfilename))[0]
     annotation_folder = basefolder+'/Annotations'
-    img_folder = basefolder+'/Images'
+    img_folder = basefolder+'/JPEGImages'
     if not os.path.exists(annotation_folder):
         os.mkdir(annotation_folder)
     if not os.path.exists(img_folder):
         os.mkdir(img_folder)
     annotation_filename = annotation_folder+'/'+fname+'.xml'
-    img_filename = img_folder+'/'+fname+'.xml'
+    img_filename = img_folder+'/'+fname+'.jpg'
 
     write_VOC_annotations(annotation_filename,img_filename,sourcefilename)
     write_signal_to_jpeg(img_filename,sourcefilename)
