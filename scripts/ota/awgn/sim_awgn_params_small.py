@@ -22,7 +22,7 @@
 import numpy as np
 
 num_sections = 1
-section_size = 50000
+section_size = 100000
 toffset_range = [100]
 frequency_offset = 0.3
 skip_samps = 0
@@ -34,9 +34,10 @@ stage_dependency_tree = {
     'Tx':'waveform',
     'RF':'Tx',
     'TxImg':'Tx',
+    'Rx':'RF',
     'RFImg':'RF',
     'RFLabels':'RF',
-    'RFVOCFormat':'RF'
+    'RFVOCFormat':'Rx'
 }
 
 Tx_params = [
@@ -59,6 +60,16 @@ RF_params = [
     ('rf_frequency', 2.35e9)
 ]
 
+Rx_params = [
+    ('n_fft_averages',10),
+    ('img_row_offset',[0,50]),
+    ('img_n_rows',104),
+]
+
+RFVOCFormat_params = [
+    ('img_size',[(104,104)])
+]
+
 spectrogram_representation = {'format_type':'spectrogram','boxlabel':'waveform',
                               'fftsize':64,'cancel_DC_offset':True}
 
@@ -76,7 +87,9 @@ stage_params = {
             ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params_wifi,
-        'RF': RF_params
+        'RF': RF_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
     },
     'sig':
     {
@@ -89,7 +102,9 @@ stage_params = {
             ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params,
-        'RF': RF_params
+        'RF': RF_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
     },
     'psk':
     {
@@ -110,6 +125,8 @@ stage_params = {
             ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params,
-        'RF': RF_params
+        'RF': RF_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
     }
 }

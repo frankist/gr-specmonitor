@@ -15,7 +15,7 @@ class waveform(StageLuigiTask):
         print 'running waveform ',self.stage_idxs
         with self.output().open('w') as out_file:
             print 'creating file'
-    
+
 class Tx(StageLuigiTask):
     def requires(self):
         return waveform(self.cfg_params,self.stage_idxs[0:-1])

@@ -84,7 +84,7 @@ class sliding_window_max: # this works with any array but keeps a buffer
 
 #tested
 class SlidingWindowMax_hist: # this only works with an array with history
-    def __init__(self,margin,dtype=np.float32):
+    def __init__(self,margin):
         self.margin = margin
         self.xidx = 0
 

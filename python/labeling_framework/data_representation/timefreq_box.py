@@ -22,6 +22,8 @@
 import numpy as np
 
 from ..labeling_tools import bounding_box as bndbox
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 '''
 Represents time through sample indices and freq through the normalized [-0.5,0.5] space
@@ -111,9 +113,14 @@ def intersect_boxes_with_section(box_list,section_interv):
     return (w.box_intersection(b) for b in box_list if w.box_intersection(b)!=None)
 
 # This function intersects with the boundaries and makes the time offset relative to the beginning of the section
-def intersect_and_offset_box(box_list,section_interv):
+def intersect_and_offset_box(box_list,section_interv,freq_offset=0):
+    """
+    This function picks a timefreq_box list, and intersects the boxes with a
+    section time window. The boxes should not go out of the boundaries. So, their final duration may be different.
+    We then compensate the boxes' offset, to make their start relative to the section boundaries
+    """
     blist = intersect_boxes_with_section(box_list,section_interv)
-    return add_offset(blist,toffset=-section_interv[0])
+    return list(add_offset(blist,toffset=-section_interv[0],foffset=freq_offset))
 
 ######## Conversion Normalized to Integer Frequency #############
 
@@ -147,8 +154,8 @@ def scale_time_bounds(old_sample_bounds,new_section_size,old_section_size):
     assert tmax>=tmin+1 and tmin>=0
     tmax = min(tmax,new_section_size)
     if max(tmin,tmax)>new_section_size:
-        logger.error('Tiem window mismatch with the image dimensions. tlims: {},window size:{}'.format((tmin,tmax),new_section_size))
-        raise AssertionError()
+        logger.error('Time window mismatch with the image dimensions. tlims: {},new window size:{},old sample_bounds:{},old section size:{}'.format((tmin,tmax),new_section_size,old_sample_bounds,old_section_size))
+        raise AssertionError('The scaling of the time bounds failed')
     return (tmin,tmax)
 
 # Utils to convert bounding box to image bounding box

@@ -134,6 +134,17 @@ def compute_timefreq_boxes(x,spec_params):
     boxes = [tfbox.TimeFreqBox(time_bounds[i],freq_bounds[i]) for i in range(n_boxes)]
     return boxes
 
+def time_average_Sxx(Sxx,num_averages,step):
+    if num_averages==1 and step==1:
+        return Sxx
+    n_rows = int(np.floor((Sxx.shape[0]-(num_averages-step))/step))
+    Syy = np.zeros((n_rows,Sxx.shape[1]))
+
+    for r in range(Syy.shape[0]):
+        Syy[r,:] = np.mean(Sxx[r*step:r*step+num_averages,:],axis=0)
+
+    return Syy
+
 # class SpectrogramImgConverter(SignalImgConverter):
 #     @staticmethod
 #     def generate_unlabeled_timefreq_boxes(x,params):
@@ -157,11 +168,17 @@ class SectionSpectrogramMetadata(object):
         self.input_params = input_params
         self.tfreq_boxes = tfreq_boxes
         self.section_bounds = section_bounds
-        fftsize = input_params['fftsize']
-        num_rows = int(np.ceil((self.section_duration()-fftsize)/float(fftsize))) # CHECK
-        # assert num_rows == make_normalized_spectrogram_image(x,input_params) #TMP
-        self.img_size = (num_rows,fftsize)
         self.depth = 1
+        self.fftsize = self.input_params['fftsize']
+        self.num_fft_avgs = 1
+        self.num_fft_step = 1
+
+    def img_size(self):
+        # This is the number of rows without any averaging
+        num_rows = int(np.ceil((self.section_duration()-self.fftsize)/float(self.fftsize)))
+        # we apply the averaging now
+        num_rows = int(np.floor((num_rows-(self.num_fft_avgs-self.num_fft_step))/self.num_fft_step))
+        return (num_rows,self.fftsize)
 
     def section_duration(self):
         return self.section_bounds[1]-self.section_bounds[0]
@@ -169,13 +186,53 @@ class SectionSpectrogramMetadata(object):
     def image_data(self,x):
         section = x[self.section_bounds[0]:self.section_bounds[1]]
         Sxx = make_normalized_spectrogram_image(section,self.input_params)
-        if Sxx.shape!=self.img_size:
-            raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size,section.size,self.section_duration()))
+        Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
+        if Sxx.shape!=self.img_size():
+            logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
+            raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size(),section.size,self.section_duration()))
         return Sxx
 
     def generate_img_bounding_boxes(self):
-        bbox_list = [convert_timefreq_to_bounding_box(b,self.img_size,self.section_duration()) for b in self.tfreq_boxes]
+        bbox_list = [convert_timefreq_to_bounding_box(b,self.img_size(),self.section_duration()) for b in self.tfreq_boxes]
         return bbox_list
+
+    def set_num_fft_averages(self,Nfftwin,Nfftstep):
+        self.num_fft_avgs = Nfftwin
+        self.num_fft_step = Nfftstep
+        assert self.img_size()[0]>0
+
+    def filter_boxes(self):
+        self.tfreq_boxes = tfbox.intersect_and_offset_box(self.tfreq_boxes,self.section_bounds)
+        self.assert_validity()
+
+    def slice_section(self,idx_start,idx_stop):
+        assert min(idx_start,idx_stop)>=self.section_bounds[0] and max(idx_stop,idx_start)<=self.section_bounds[1]
+        assert idx_stop>idx_start
+
+        self.section_bounds = (idx_start,idx_stop)
+        self.filter_boxes()
+
+    def slice_by_img_dims(self,idx_start,idx_stop):
+        imgsize = self.img_size()
+        assert min(idx_start,idx_stop)>=0 and max(idx_start,idx_stop)<=imgsize[0]
+        assert idx_stop>idx_start
+
+        # new section
+        section_dur = self.section_duration()
+        new_section_start = int(section_dur*idx_start/float(imgsize[0])) + self.section_bounds[0]
+        new_section_stop = int(section_dur*idx_stop/float(imgsize[0])) + self.section_bounds[0]
+
+        # update section_bounds
+        self.section_bounds = (new_section_start,new_section_stop)
+        self.filter_boxes()
+
+    def assert_validity(self):
+        for b in self.tfreq_boxes:
+            test1 = min(b.time_bounds[0],b.time_bounds[1])>=0
+            test1 &= max(b.time_bounds[0],b.time_bounds[1])<=self.section_duration()
+            if test1==False:
+                logger.error('These were the dims:{},{}'.format(b.time_bounds,self.section_duration()))
+                raise AssertionError('The boxes do not fit in the section provided.')
 
     @classmethod
     def generate_metadata(cls,x,section_bounds,input_params,label):

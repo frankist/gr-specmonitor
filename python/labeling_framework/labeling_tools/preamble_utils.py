@@ -277,9 +277,6 @@ class PreambleDetectorType2:
         # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
-            if i<-self.Ldiff:
-                logger.error('this peak index {} is not valid. Detected peaks: {}'.format(i,local_peaks))
-                AssertionError('i>=-self.Ldiff')
             t = i-self.delay_cum[2]
             dc0 = self.xdc_mavg_h[t+L0] #np.mean(self.x_h[t:t+L0])
             peak0_mag2_nodc = np.mean(np.abs(self.x_h[t:t+L0]-dc0)**2)

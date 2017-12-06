@@ -31,21 +31,17 @@ from ..sig_format import pkl_sig_format
 import image_representation as imrep
 import timefreq_box as tfbox
 from ..labeling_tools import bounding_box as bbox
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 def prettify_xml(elem):
     """Return a pretty-printed XML string for the Element.
     """
     rough_string = ET.tostring(elem, 'utf-8')
     reparsed = minidom.parseString(rough_string)
-    return reparsed.toprettyxml(indent="  ")
+    return reparsed.toprettyxml(indent="\t")
 
-def convert_annotations_to_VOC(img_filename,sourcefilename):
-    ### get dependency file, and create a new stage_data object
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    spec_metadata = sda.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
-    x = freader.read_section()
-
+def convert_annotations_to_VOC(img_filename,spec_metadata,img_size):
     # document
     root = ET.Element("annotation")
 
@@ -64,13 +60,12 @@ def convert_annotations_to_VOC(img_filename,sourcefilename):
     xmlownername = ET.SubElement(xmlowner, "name").text = "Faceless man"
 
     xmlsize = ET.SubElement(root, "size")
-    ET.SubElement(xmlsize, "width").text = str(spec_metadata[0].img_size[1])
-    ET.SubElement(xmlsize, "height").text = str(spec_metadata[0].img_size[0])
+    ET.SubElement(xmlsize, "width").text = str(img_size[0])#spec_metadata[0].img_size[1])
+    ET.SubElement(xmlsize, "height").text = str(img_size[1])#spec_metadata[0].img_size[0])
     ET.SubElement(xmlsize, "depth").text = str(spec_metadata[0].depth)
 
     ET.SubElement(root, "segmented").text = "0"
 
-    assert len(spec_metadata)==1 # FIXME: Implement it for more
     for i in range(len(spec_metadata)):
         # get img bounding boxes
         imgboxes = spec_metadata[i].generate_img_bounding_boxes()
@@ -90,24 +85,29 @@ def convert_annotations_to_VOC(img_filename,sourcefilename):
 
     return prettify_xml(root)
 
-def write_VOC_annotations(annotation_filename,img_filename,sourcefilename):
-    xml_str = convert_annotations_to_VOC(img_filename,sourcefilename)
+def write_VOC_annotations(annotation_filename,img_filename,spec_metadata,img_size):
+    xml_str = convert_annotations_to_VOC(img_filename,spec_metadata,img_size)
     with open(annotation_filename,'w') as f:
         f.write(xml_str)
 
-def write_signal_to_jpeg(img_filename,sourcefilename):
+def write_signal_to_jpeg(img_filename,section,spec_metadata,img_size):
     ### get dependency file, and create a new stage_data object
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    section = freader.read_section()
+    Sxxdims = []
 
-    spec_metadata = sda.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
-
-    assert len(spec_metadata)==1
     for i in range(len(spec_metadata)):
         Sxx = spec_metadata[i].image_data(section)
+        Sxxdims.append(Sxx.shape)
+        if Sxx.shape!=img_size:
+            if Sxx.shape[0]>img_size[0] or Sxx.shape[1]>img_size[1]:
+                logger.error('Your spectrogram has to fit in the provided image dimensions. values: {},{}'.format(Sxx.shape,img_size))
+                raise AssertionError('Image size mismatch')
+            Syy = np.zeros(img_size)
+            Syy[0:Sxx.shape[0],0:Sxx.shape[1]] = Sxx
+            Sxx = Syy
         im = Image.fromarray(np.uint8(Sxx*255))
         im.save(img_filename,'JPEG')
+
+    return Sxxdims
 
 def create_image_and_annotation(args):
     targetfilename = args['targetfilename']
@@ -123,8 +123,21 @@ def create_image_and_annotation(args):
     annotation_filename = annotation_folder+'/'+fname+'.xml'
     img_filename = img_folder+'/'+fname+'.jpg'
 
-    write_VOC_annotations(annotation_filename,img_filename,sourcefilename)
-    write_signal_to_jpeg(img_filename,sourcefilename)
+    # get parameters
+    img_size = args['parameters']['img_size']
+    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
+    stage_data = freader.data()
+    section = freader.read_section()
+    spec_metadata = sda.get_stage_derived_parameter(stage_data,'subsection_spectrogram_img_metadata')
+    assert len(spec_metadata)==1 # for now other options are not supported
+
+    write_VOC_annotations(annotation_filename,img_filename,spec_metadata,img_size)
+    Sxxdims = write_signal_to_jpeg(img_filename,section,spec_metadata,img_size)
+
+    # NOTE: spectrogram may be smaller than image just to fit in CNN input. In such case, it is a good idea
+    # to keep the original spectrogram dimensions stored somewhere
+    d = {'spectrogram_dims':Sxxdims,'image_dims':img_size}
+    sda.set_stage_derived_parameter(stage_data,args['stage_name'],'voc_representation',d)
     with open(targetfilename,'w') as f:
-        pickle.dump({'status':'done'},f)
+        pickle.dump(stage_data,f)
 
