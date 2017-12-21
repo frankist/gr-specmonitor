@@ -41,7 +41,12 @@ include(GrTest)
 
 set(GR_TEST_TARGET_DEPS gnuradio-specmonitor)
 set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
-GR_ADD_TEST(qa_framer_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.py)
-#GR_ADD_TEST(qa_corr_est_norm_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.py)
-GR_ADD_TEST(qa_framer_snr_est_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_snr_est_cc.py)
+#GR_ADD_TEST(qa_framer_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.py)
+##GR_ADD_TEST(qa_corr_est_norm_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.py)
+#GR_ADD_TEST(qa_framer_snr_est_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_snr_est_cc.py)
 GR_ADD_TEST(qa_frame_sync_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.py)
+
+########################################################################
+# Handle more unit tests
+########################################################################
+add_subdirectory(tests)

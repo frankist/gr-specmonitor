@@ -1,0 +1,17 @@
+dataset:
+  dataset_folder: ~/Dropbox/Programming/deep_learning/RFVOCFormat2
+  tmp_folder: ./tmp
+  darkflow_folder: &flow ~/Dropbox/Programming/deep_learning/darkflow
+
+model:
+  model_path: *flow/data/yolo_new_anchors.cfg
+  train:
+    epoch:100000000
+  num_anchors: 5
+  height: 104
+  width: 104
+  find_anchors: !!bool true
+  classes:
+    - wifi
+    - PSK
+#label_path=
