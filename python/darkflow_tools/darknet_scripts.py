@@ -32,7 +32,7 @@ def write_anchors_to_file(centroids,dist,anchor_file,model_width,model_height):
         f.write('%f\n'%(dist))
 
 def print_anchors(centroids,dist,model_width,model_height):
-    fmt_str = anchors_fmt_str(centroids,model_width,model_height,'   ')
+    fmt_str = anchors_fmt_str(centroids,model_width,model_height,'  ')
     print fmt_str
     print '%f'.format(dist)
 

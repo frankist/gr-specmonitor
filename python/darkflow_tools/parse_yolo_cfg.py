@@ -54,6 +54,7 @@ def assert_yaml_cfg_correctness(cfg_params):
     assert os.path.exists(dataset['darkflow_folder'])
     assert 'model_path' in cfg_params['model']
     assert os.path.isfile(cfg_params['model']['model_path'])
+    # TODO: check if img and annotations folders exist
 
     assert_darknet_params_correctness(cfg_params)
 
