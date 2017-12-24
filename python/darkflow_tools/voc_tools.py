@@ -1,8 +1,8 @@
 import xml.etree.ElementTree as ET
-import pickle
+# import pickle
 import os
 
-import parse_yolo_cfg as yolocfg
+# import parse_yolo_cfg as yolocfg
 
 def write_tmp_imgpaths_file(outfile,images_path):
     '''
@@ -58,7 +58,7 @@ def convert_to_darknet_annotation(darknet_annotations_path,
 def generate_darknet_annotations(imgpaths_file,
                                  annotations_path,
                                  darknet_annotations_path,
-                                 classes_list)
+                                 classes_list):
     '''
     picks all the annotations of the dataset and converts
     them to darknet annotations
@@ -77,7 +77,7 @@ def generate_darknet_annotations(imgpaths_file,
 
 def write_labels_file(outfilename,classes_list):
     with open(outfilename, 'w') as fptr:
-        for c in class_list:
+        for c in classes_list:
             fptr.write('{}\n'.format(c))
 
 def setup_darknet_dataset(cfg_obj):
@@ -86,8 +86,10 @@ def setup_darknet_dataset(cfg_obj):
     annotations_path = cfg_obj.annotations_path()
     darknet_annotations_path = cfg_obj.darknet_annotations_path()
     imgpaths_file = cfg_obj.tmp_imgpaths_filename()
-    labels_file = cfg_obj.labels_filename()
     classes_list = cfg_obj.model_params()['classes']
+
+    if not os.path.exists(darknet_annotations_path):
+        os.makedirs(darknet_annotations_path)
 
     # generate a file with all the images names
     write_tmp_imgpaths_file(imgpaths_file,img_path)

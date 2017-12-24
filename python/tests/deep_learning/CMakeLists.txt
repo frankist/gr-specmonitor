@@ -1,3 +1,8 @@
+# Copy dataset to build subfolder to avoid generated files to pollute your repository
+
+message("-- Copying test dataset to build folder")
+file(COPY dataset DESTINATION ./)
+
 ########################################################################
 # Include python install macros
 ########################################################################

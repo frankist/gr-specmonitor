@@ -5,7 +5,7 @@ import ConfigParser
 class YOLOCfgPaths:
     img_foldername = 'JPEGImages'
     annotations_foldername = 'Annotations'
-    darknet_annotations_foldername = 'labels'
+    darknet_annotations_foldername = 'darknet_annotations'
 
     def __init__(self,cfg_params):
         self.cfg_params = cfg_params
@@ -24,7 +24,7 @@ class YOLOCfgPaths:
         return '{}/{}'.format(self.dataset_path(),YOLOCfgPaths.annotations_foldername)
 
     def darknet_annotations_path(self):
-        return '{}/{}'.format(self.dataset_path(),YOLOCfgPaths.darknet_annotations_foldername)
+        return '{}/{}'.format(self.tmp_path(),YOLOCfgPaths.darknet_annotations_foldername)
 
     def tmp_path(self):
         return os.path.abspath(self.cfg_params['dataset']['tmp_folder'])
@@ -36,7 +36,7 @@ class YOLOCfgPaths:
         return '{}/{}'.format(self.tmp_path(),'labels.txt')
 
     def model_params(self):
-        return self.cfg_params['model_params']
+        return self.cfg_params['model']
 
 def read_yaml_main_config(filename):
     with open(filename,'r') as f:
@@ -83,7 +83,8 @@ def assert_darknet_params_correctness(cfg_params):
     # assert that the number of filters is correct
     # NOTE: last convolutional layer wins in the parsing
     num_filters = cfgparser.getint('convolutional','filters')
-    if num_filters!=5*(num_anchors+num_classes):
-        raise AssertionError('ERROR: Set the number of filters in the last conv layer to {}'.format(5*(num_anchors+num_classes)))
+    expected_num_filters = num_anchors*(num_classes+5)
+    if num_filters!=expected_num_filters:
+        raise AssertionError('ERROR: Set the number of filters in the last conv layer to {}'.format(expected_num_filters))
 
     # TODO: check if the number of anchors is equal to num
