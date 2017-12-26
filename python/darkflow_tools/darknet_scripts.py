@@ -161,6 +161,7 @@ def generate_anchors(imglist_file,darknet_annotations_path,num_anchors):
         print "Darknet Centroids (13x13):"
         l = ['{},{}'.format(centroids[i,0]*13,centroids[i,1]*13) for i in range(len(centroids))]
         print ',  '.join(l)
+        print "Copy these anchors to your darknet .cfg file"
     return centroids_list
 
 def write_anchors_from_yml_params(cfg_obj):

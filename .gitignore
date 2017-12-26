@@ -10,3 +10,4 @@ scripts/simulations/awgn/sim0/*
 scripts/ota/awgn/sim0/*
 .vscode/
 *logs/
+.ipynb_checkpoints/
