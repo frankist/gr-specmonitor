@@ -25,6 +25,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from PIL import Image
 import pickle
+import cv2
 
 from ..sig_format import sig_data_access as sda
 from ..sig_format import pkl_sig_format
@@ -46,7 +47,8 @@ def convert_annotations_to_VOC(img_filename,spec_metadata,img_size):
     root = ET.Element("annotation")
 
     # folder
-    ET.SubElement(root, "folder").text = os.path.dirname(os.path.dirname(img_filename))
+    foldername = os.path.basename(os.path.dirname(os.path.dirname(img_filename)))
+    ET.SubElement(root, "folder").text = foldername
 
     # filename
     ET.SubElement(root, "filename").text = os.path.basename(img_filename)
@@ -90,7 +92,7 @@ def write_VOC_annotations(annotation_filename,img_filename,spec_metadata,img_siz
     with open(annotation_filename,'w') as f:
         f.write(xml_str)
 
-def write_signal_to_jpeg(img_filename,section,spec_metadata,img_size):
+def write_signal_to_img(img_filename,section,spec_metadata,img_size):
     ### get dependency file, and create a new stage_data object
     Sxxdims = []
 
@@ -104,8 +106,17 @@ def write_signal_to_jpeg(img_filename,section,spec_metadata,img_size):
             Syy = np.zeros(img_size)
             Syy[0:Sxx.shape[0],0:Sxx.shape[1]] = Sxx
             Sxx = Syy
-        im = Image.fromarray(np.uint8(Sxx*255))
-        im.save(img_filename,'JPEG')
+
+        # Save spectrogram as JPEG or PNG
+        Sxx_bytes = np.uint8(Sxx*255)
+        imgformat = os.path.splitext(img_filename)[1]
+        if imgformat=='.jpeg' or imgformat=='.jpg':
+            cv2.imwrite(img_filename, Sxx_bytes,
+                        [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+        else:
+            cv2.imwrite(img_filename, Sxx_bytes)
+        # im = Image.fromarray(np.uint8(Sxx*255))
+        # im.save(img_filename,'JPEG')
 
     return Sxxdims
 
@@ -115,13 +126,13 @@ def create_image_and_annotation(args):
     basefolder = os.path.dirname(targetfilename)
     fname = os.path.splitext(os.path.basename(targetfilename))[0]
     annotation_folder = basefolder+'/Annotations'
-    img_folder = basefolder+'/JPEGImages'
+    img_folder = os.path.join(basefolder,'Images') #'/JPEGImages'
     if not os.path.exists(annotation_folder):
         os.mkdir(annotation_folder)
     if not os.path.exists(img_folder):
         os.mkdir(img_folder)
     annotation_filename = annotation_folder+'/'+fname+'.xml'
-    img_filename = img_folder+'/'+fname+'.jpg'
+    img_filename = img_folder+'/'+fname+'.png' #'.jpg'
 
     # get parameters
     img_size = args['parameters']['img_size']
@@ -132,7 +143,7 @@ def create_image_and_annotation(args):
     assert len(spec_metadata)==1 # for now other options are not supported
 
     write_VOC_annotations(annotation_filename,img_filename,spec_metadata,img_size)
-    Sxxdims = write_signal_to_jpeg(img_filename,section,spec_metadata,img_size)
+    Sxxdims = write_signal_to_img(img_filename,section,spec_metadata,img_size)
 
     # NOTE: spectrogram may be smaller than image just to fit in CNN input. In such case, it is a good idea
     # to keep the original spectrogram dimensions stored somewhere

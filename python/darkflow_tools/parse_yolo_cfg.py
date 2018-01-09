@@ -6,7 +6,7 @@ import os
 import configparser
 
 class YOLOCfgPaths(object):
-    img_foldername = 'JPEGImages'
+    img_foldername = 'Images'#'JPEGImages'
     annotations_foldername = 'Annotations'
     darknet_annotations_foldername = 'darknet_annotations'
 
