@@ -31,4 +31,5 @@ except ImportError:
 	pass
 
 # import any pure python here
+from darkflow_ckpt_classifier_c import darkflow_ckpt_classifier_c
 #

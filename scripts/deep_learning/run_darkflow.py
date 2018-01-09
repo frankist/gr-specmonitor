@@ -38,7 +38,7 @@ def darkflow_parse_config(cfg_obj):
         'dataset': cfg_obj.images_path(),
         'annotation': cfg_obj.annotations_path(),
         'labels': cfg_obj.labels_filename(),
-        'backup': darkflow_bin_folder + '/ckpt/',
+        'backup': cfg_obj.backup_path(),
         'imgdir': cfg_obj.images_path(),
         'bin': cfg_obj.bin_path(),
         'summary': cfg_obj.summary_path(),

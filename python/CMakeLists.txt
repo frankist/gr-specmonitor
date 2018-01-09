@@ -31,7 +31,7 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    DESTINATION ${GR_PYTHON_DIR}/specmonitor
+    darkflow_ckpt_classifier_c.py DESTINATION ${GR_PYTHON_DIR}/specmonitor
 )
 
 ########################################################################
@@ -50,3 +50,4 @@ GR_ADD_TEST(qa_frame_sync_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa
 # Handle more unit tests
 ########################################################################
 add_subdirectory(tests)
+GR_ADD_TEST(qa_darkflow_ckpt_classifier_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_ckpt_classifier_c.py)

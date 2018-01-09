@@ -107,17 +107,23 @@ def compute_freq_col_bounds(Sxx_norm, row_bounds = None, thresdB = -15):
         l.append(interv)
     return l
 
-def make_normalized_spectrogram_image(x,params):
-        fftsize = params.get('fftsize',64)
-        cancel_DC_offset = params.get('cancel_DC_offset',False)
+def normalize_spectrogram(Sxx):
+    return imgfmt.normalize_image_data(Sxx)
 
-        Sxx = compute_spectrogram(x,fftsize)
-        if cancel_DC_offset:
-            pwr_min = np.min(Sxx)
-            Sxx[0,:] = pwr_min # the spectrogram is still not transposed
-        Sxxnorm = imgfmt.normalize_image_data(Sxx)
-        assert Sxxnorm.shape[0]>=1 and Sxxnorm.shape[1]>=1
-        return Sxxnorm
+def make_spectrogram_image(x,params):
+    fftsize = params.get('fftsize',64)
+    cancel_DC_offset = params.get('cancel_DC_offset',False)
+    Sxx = compute_spectrogram(x,fftsize)
+    if cancel_DC_offset:
+        pwr_min = np.min(Sxx)
+        Sxx[0,:] = pwr_min # the spectrogram is still not transposed
+    assert Sxx.shape[0]>=1 and Sxx.shape[1]>=1
+    return Sxx
+
+def make_normalized_spectrogram_image(x,params):
+    Sxx = make_spectrogram_image(x,params)
+    Sxxnorm = imgfmt.normalize_image_data(Sxx)
+    return Sxxnorm
 
 def convert_timefreq_to_bounding_box(box,img_size,section_size):
     row_lims = tfbox.scale_time_bounds(box.time_bounds,img_size[0],section_size)
@@ -185,8 +191,11 @@ class SectionSpectrogramMetadata(object):
 
     def image_data(self,x):
         section = x[self.section_bounds[0]:self.section_bounds[1]]
-        Sxx = make_normalized_spectrogram_image(section,self.input_params)
+        Sxx = make_spectrogram_image(section, self.input_params)
         Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
+        Sxx = normalize_spectrogram(Sxx)
+        # Sxx = make_normalized_spectrogram_image(section,self.input_params)
+        # Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
         if Sxx.shape!=self.img_size():
             logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
             raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size(),section.size,self.section_duration()))

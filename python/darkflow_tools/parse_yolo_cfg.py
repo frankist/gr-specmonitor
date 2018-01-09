@@ -1,21 +1,28 @@
+from future import standard_library
+standard_library.install_aliases()
+from builtins import object
 import yaml
 import os
-import ConfigParser
+import configparser
 
-class YOLOCfgPaths:
+class YOLOCfgPaths(object):
     img_foldername = 'JPEGImages'
     annotations_foldername = 'Annotations'
     darknet_annotations_foldername = 'darknet_annotations'
 
-    def __init__(self,cfg_params):
+    def __init__(self,cfg_params, yml_path):
         self.cfg_params = dict(cfg_params)
+        self.yml_path = yml_path
         self.assert_validity()
+
+    def abspath(self, relative_path):
+        return os.path.normpath(os.path.join(self.yml_path, relative_path))
 
     def assert_validity(self):
         assert_yaml_cfg_correctness(self)
 
     def dataset_path(self):
-        return os.path.abspath(os.path.expanduser(self.cfg_params['dataset']['dataset_folder']))
+        return self.abspath(os.path.expanduser(self.cfg_params['dataset']['dataset_folder']))
 
     def images_path(self):
         return '{}/{}'.format(self.dataset_path(),YOLOCfgPaths.img_foldername)
@@ -27,7 +34,7 @@ class YOLOCfgPaths:
         return '{}/{}'.format(self.tmp_path(),YOLOCfgPaths.darknet_annotations_foldername)
 
     def tmp_path(self):
-        return os.path.abspath(os.path.expanduser(self.cfg_params['dataset']['tmp_folder']))
+        return self.abspath(os.path.expanduser(self.cfg_params['dataset']['tmp_folder']))
 
     def tmp_imgpaths_filename(self):
         return '{}/{}'.format(self.tmp_path(),'dataset_img_paths.txt')
@@ -39,10 +46,10 @@ class YOLOCfgPaths:
         return self.cfg_params['model']
 
     def model_path(self):
-        return os.path.abspath(os.path.expanduser(self.cfg_params['model']['model_path']))
+        return self.abspath(os.path.expanduser(self.cfg_params['model']['model_path']))
 
     def darkflow_bin_path(self):
-        return os.path.abspath(os.path.expanduser(self.cfg_params['dataset']['darkflow_folder']))
+        return self.abspath(os.path.expanduser(self.cfg_params['dataset']['darkflow_folder']))
 
     def summary_path(self):
         return '{}/{}'.format(self.tmp_path(),'summary')
@@ -51,17 +58,20 @@ class YOLOCfgPaths:
         return '{}/{}'.format(self.tmp_path(),'bin')
 
     def backup_path(self):
-        return '{}/{}'.format(self.tmp_path(),'backup_path')
+        return '{}/{}'.format(self.tmp_path(),'ckpt')
 
 def read_yaml_main_config(filename):
+    this_cwd = os.path.dirname(os.path.abspath(filename))
     with open(filename,'r') as f:
         cfg_params = yaml.load(f)
-    return YOLOCfgPaths(cfg_params)
+    return YOLOCfgPaths(cfg_params,this_cwd)
 
 def assert_yaml_cfg_correctness(yolo_cfg):
     cfg_params = yolo_cfg.cfg_params
-    def assert_path_exists(path):
-        if not os.path.exists(path):
+    def assert_path_exists(path,check_file=False):
+        test = not os.path.exists(path)
+        test |= check_file and not os.path.isfile(path)
+        if test:
             raise AssertionError('Path {} does not exist.'.format(path))
 
     assert 'dataset' in cfg_params
@@ -73,17 +83,18 @@ def assert_yaml_cfg_correctness(yolo_cfg):
     assert_path_exists(yolo_cfg.tmp_path())
     assert_path_exists(yolo_cfg.darkflow_bin_path())
     assert 'model_path' in cfg_params['model']
-    assert os.path.isfile(cfg_params['model']['model_path'])
+    assert_path_exists(yolo_cfg.model_path(),True)
     # TODO: check if img and annotations folders exist
 
-    assert_darknet_params_correctness(cfg_params)
+    assert_darknet_params_correctness(yolo_cfg)
 
-def assert_darknet_params_correctness(cfg_params):
+def assert_darknet_params_correctness(yolo_cfg):
+    cfg_params = yolo_cfg.cfg_params
     model_params = cfg_params['model']
 
     # read cfg file
-    cfgparser = ConfigParser.ConfigParser()
-    cfgparser.read(model_params['model_path'])
+    cfgparser = configparser.ConfigParser(strict=False)
+    cfgparser.read(yolo_cfg.model_path())
 
     # assert height/width correctness
     w = cfgparser.getint('net','width')
@@ -108,3 +119,24 @@ def assert_darknet_params_correctness(cfg_params):
         raise AssertionError('ERROR: Set the number of filters in the last conv layer to {}'.format(expected_num_filters))
 
     # TODO: check if the number of anchors is equal to num
+
+def generate_darkflow_args(cfg_obj):
+    def add_optional(options,obj,name):
+        if name in obj:
+            options[name] = obj[name]
+    yaml_options = {
+        'model': cfg_obj.model_path(),
+        'dataset': cfg_obj.images_path(),
+        'annotation': cfg_obj.annotations_path(),
+        'labels': cfg_obj.labels_filename(),
+        'backup': cfg_obj.backup_path(),
+        'imgdir': cfg_obj.images_path(),
+        'bin': cfg_obj.bin_path(),
+        'summary': cfg_obj.summary_path(),
+        'train': False
+    }
+    cfg_train = cfg_obj.model_params()['train']
+    add_optional(yaml_options,cfg_train,'epoch')
+    if 'gpu' in cfg_train and (cfg_train['gpu']==True or cfg_train['gpu']=="true"):
+        yaml_options['gpu'] = 1.0
+    return yaml_options

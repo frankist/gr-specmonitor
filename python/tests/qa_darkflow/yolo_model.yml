@@ -1,5 +1,5 @@
 dataset:
-  dataset_folder: ~/Dropbox/Programming/deep_learning/test_voc
+  dataset_folder: ../deep_learning/dataset
   tmp_folder: ~/tmp/generated_files/tmp
   darkflow_folder: &flow ~/Dropbox/Programming/deep_learning/darkflow
 

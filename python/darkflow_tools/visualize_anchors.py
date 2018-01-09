@@ -1,3 +1,4 @@
+from __future__ import print_function
 import cv2
 import numpy as np
 import sys
@@ -23,7 +24,7 @@ def draw_anchors(anchors_list,model_width, model_height):
     for i,anchor in enumerate(anchors_list):
         w=int(anchor[0]*W/13.0)#stride)
         h=int(anchor[1]*H/13.0)#stride)
-        print w,h
+        print(w,h)
 
         pts = (pt0[0]+i*stride_w,pt0[0]+i*stride_h)
         pt1 = (max(0,pts[0]+min(0,(W-(pts[0]+w)))),

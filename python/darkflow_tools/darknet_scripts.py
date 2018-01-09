@@ -1,3 +1,7 @@
+from __future__ import division
+from __future__ import print_function
+from builtins import map
+from builtins import range
 from os import listdir
 from os.path import isfile
 import argparse
@@ -37,8 +41,8 @@ def write_anchors_to_file(centroids,dist,anchor_file,model_width,model_height):
 
 def print_anchors(centroids,dist,model_width,model_height):
     fmt_str = anchors_fmt_str(centroids,model_width,model_height,'  ')
-    print fmt_str
-    print '%f'.format(dist)
+    print(fmt_str)
+    print('%f'.format(dist))
 
 def IOU(x,centroids):
     similarities = []
@@ -81,7 +85,7 @@ def kmeans(X,centroids,eps):
             D.append(d)
         D = np.array(D) # D.shape = (N,k)
 
-        print "iter {}: dists = {}".format(iter,np.sum(np.abs(old_D-D)))
+        print("iter {}: dists = {}".format(iter,np.sum(np.abs(old_D-D))))
 
         #assign samples to centroids
         assignments = np.argmin(D,axis=1)
@@ -111,7 +115,7 @@ def compute_kmeans_centroids(annotation_dims,num_anchors,num_attempts=10):
     eps = 0.005
     for trial in range(num_attempts):
         # create the initial cluster centroids. Make them unique
-        indices = range(possible_dims.shape[0])
+        indices = list(range(possible_dims.shape[0]))
         random.shuffle(indices)
         indices = indices[0:num_anchors]
         centroids = annotation_dims[indices]
@@ -142,7 +146,7 @@ def read_annotation_dims(imglist_file,darknet_annotation_path):
                     line = line.rstrip('\n')
                     w,h = line.split(' ')[3:]
                     #print w,h
-                    annotation_dims.append(map(float,(w,h)))
+                    annotation_dims.append(list(map(float,(w,h))))
     annotation_dims = np.array(annotation_dims)
     return annotation_dims
 
@@ -157,11 +161,11 @@ def generate_anchors(imglist_file,darknet_annotations_path,num_anchors):
     for a in num_anchors:
         centroids,dist = compute_kmeans_centroids(annotation_dims,a)
         centroids_list.append((centroids,dist))
-        print "Normalized Centroids:\n",centroids
-        print "Darknet Centroids (13x13):"
+        print("Normalized Centroids:\n", centroids)
+        print("Darknet Centroids (13x13):")
         l = ['{},{}'.format(centroids[i,0]*13,centroids[i,1]*13) for i in range(len(centroids))]
-        print ',  '.join(l)
-        print "Copy these anchors to your darknet .cfg file"
+        print(',  '.join(l))
+        print("Copy these anchors to your darknet .cfg file")
     return centroids_list
 
 def write_anchors_from_yml_params(cfg_obj):

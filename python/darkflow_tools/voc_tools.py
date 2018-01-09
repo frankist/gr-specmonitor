@@ -1,3 +1,6 @@
+from __future__ import division
+from __future__ import print_function
+from builtins import str
 import xml.etree.ElementTree as ET
 # import pickle
 import os
