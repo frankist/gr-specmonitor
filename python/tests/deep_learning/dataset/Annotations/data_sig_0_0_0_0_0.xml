@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <annotation>
 	<folder>RFVOCFormat</folder>
-	<filename>data_sig_0_0_0_0_0.jpg</filename>
+	<filename>data_sig_0_0_0_0_0.png</filename>
 	<source>
 		<database>An RF signal database</database>
 		<annotation>PASCAL VOC2017</annotation>

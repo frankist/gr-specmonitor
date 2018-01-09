@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <annotation>
-	<folder>RFVOCFormat2</folder>
-	<filename>data_wifi_0_0_0_0_0.jpg</filename>
+	<folder>RFVOCFormat</folder>
+	<filename>data_wifi_0_0_0_0_0.png</filename>
 	<source>
 		<database>An RF signal database</database>
 		<annotation>PASCAL VOC2017</annotation>

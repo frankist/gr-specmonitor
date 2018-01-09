@@ -31,43 +31,51 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
     """
     docstring for block darkflow_ckpt_classifier_c
     """
-    def __init__(self, yaml_config):
+    def __init__(self, yaml_config, vlen, cancel_DCoffset=True, avgsize = 1):
         self.yaml_file = yaml_config
         self.classifier = DarkflowCkptClassifier(self.yaml_file)
-        self.ncols = self.classifier.cfg_obj.model_params()['width']
-        self.nrows = self.classifier.cfg_obj.model_params()['height']
+        model_params = self.classifier.cfg_obj.model_params()
+        self.ncols = model_params['width']
+        self.nrows = model_params['height']
+        self.vlen = vlen
         self.count = 0
-        self.imgnp = np.zeros((self.nrows,self.ncols),np.float32)
+        self.imgnp = np.zeros((self.nrows,self.vlen),np.float32)
         self.imgcv = np.zeros((self.nrows,self.ncols,3),np.uint8)
         gr.sync_block.__init__(self,
             name="darkflow_ckpt_classifier_c",
-            in_sig = [(np.float32,self.ncols)],
+            in_sig = [(np.float32,self.vlen)],
             out_sig = None)#[])#np.complex64)
         self.message_port_register_out(pmt.intern('msg_out'))
         # FIXME: ncols is different than vector size!
         self.nsamplesread = 0
         self.img_tstamp = 0
-        self.vlen = self.ncols
+        self.avgsize = avgsize
+        self.countavg = 0
+        self.cancel_DCoffset = cancel_DCoffset
         self.last_result = []
 
     def work(self, input_items, output_items):
         in0 = input_items[0]
         #out = output_items[0]
         for idx in range(in0.shape[0]):
-            self.imgnp[self.count,:] = in0[idx,:]
-            self.count += 1
+            self.imgnp[self.count,:] += in0[idx,:]
+            self.countavg+=1
+            if self.countavg==self.avgsize:
+                self.count += 1
+                self.countavg=0
             self.nsamplesread += len(in0[idx,:])
             if self.count == self.nrows:
-                Sxx = spectrogram.normalize_spectrogram(self.imgnp)
-                # im = Image.fromarray(np.uint8(self.imgnp*255))
-                # im = cv2.fromarray(np.uint8(Sxx*255))
-                self.imgcv[:,:,0] = np.uint8(Sxx*255)
+                Sxx = spectrogram.normalize_spectrogram(self.imgnp)#/self.avgsize)
+                if self.cancel_DCoffset:
+                    pwr_min = np.min(Sxx)
+                    Sxx[:,Sxx.shape[1]/2] = pwr_min # FIXME
+                self.imgcv[:,0:self.vlen,0] = np.uint8(Sxx*255)
                 self.imgcv[:,:,1] = self.imgcv[:,:,0]
                 self.imgcv[:,:,2] = self.imgcv[:,:,0]
                 self.count = 0
+                self.imgnp[:] = 0
                 detected_boxes = self.classifier.classify(self.imgcv)
                 self.last_result = detected_boxes
-                # print detected_boxes
                 for box in detected_boxes:
                     d = pmt.make_dict()
                     d = pmt.dict_add(d, pmt.intern('tstamp'), pmt.from_long(self.img_tstamp))
@@ -91,7 +99,6 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
                     self.message_port_pub(pmt.intern('msg_out'),d)
                 # self.message_port_pub(pmt.intern('boxes'), pmt.intern(detected_boxes))
                 self.img_tstamp += int(self.vlen*self.nrows)
-        #out[:] = in0
-        # return 0
+
         return len(input_items[0])
 

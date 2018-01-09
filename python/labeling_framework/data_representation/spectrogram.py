@@ -37,6 +37,7 @@ def compute_spectrogram(x,fftsize):
     """
     _,_,Sxx=signal.spectrogram(x,1.0,noverlap=0,nperseg=fftsize,return_onesided=False,detrend=False)
     Sxxshifted = np.fft.fftshift(np.transpose(Sxx),axes=(1,))
+    assert Sxxshifted.shape[0]>=1 and Sxxshifted.shape[1]>=1
     return Sxxshifted
 
 def get_img_bounding_box(timefreq_box,signal_duration,img_shape):
@@ -110,20 +111,10 @@ def compute_freq_col_bounds(Sxx_norm, row_bounds = None, thresdB = -15):
 def normalize_spectrogram(Sxx):
     return imgfmt.normalize_image_data(Sxx)
 
-def make_spectrogram_image(x,params):
-    fftsize = params.get('fftsize',64)
-    cancel_DC_offset = params.get('cancel_DC_offset',False)
-    Sxx = compute_spectrogram(x,fftsize)
-    if cancel_DC_offset:
-        pwr_min = np.min(Sxx)
-        Sxx[0,:] = pwr_min # the spectrogram is still not transposed
-    assert Sxx.shape[0]>=1 and Sxx.shape[1]>=1
+def cancel_spectrogram_DCoffset(Sxx):
+    pwr_min = np.min(Sxx)
+    Sxx[:,Sxx.shape[1]/2] = pwr_min
     return Sxx
-
-def make_normalized_spectrogram_image(x,params):
-    Sxx = make_spectrogram_image(x,params)
-    Sxxnorm = imgfmt.normalize_image_data(Sxx)
-    return Sxxnorm
 
 def convert_timefreq_to_bounding_box(box,img_size,section_size):
     row_lims = tfbox.scale_time_bounds(box.time_bounds,img_size[0],section_size)
@@ -132,7 +123,12 @@ def convert_timefreq_to_bounding_box(box,img_size,section_size):
 
 # timefreq_box is very dependent on the spectrogram parameters. The two concepts are coupled
 def compute_timefreq_boxes(x,spec_params):
-    Sxx = make_normalized_spectrogram_image(x,spec_params)
+    # get non-time averaged spectrogram
+    Sxx = compute_spectrogram(x,spec_params['fftsize'])
+    Sxx = normalize_spectrogram(Sxx)
+    if spec_params.get('cancel_DC_offset',False)==True:
+        Sxx = cancel_spectrogram_DCoffset(Sxx)
+
     time_bounds = tfbox.compute_signal_time_bounds(x,Sxx.shape[1]/2)
     n_boxes = len(time_bounds)
     freq_bounds = compute_freq_norm_bounds(Sxx,len(x),time_bounds)
@@ -191,11 +187,11 @@ class SectionSpectrogramMetadata(object):
 
     def image_data(self,x):
         section = x[self.section_bounds[0]:self.section_bounds[1]]
-        Sxx = make_spectrogram_image(section, self.input_params)
+        Sxx = compute_spectrogram(section, self.input_params['fftsize'])
         Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
         Sxx = normalize_spectrogram(Sxx)
-        # Sxx = make_normalized_spectrogram_image(section,self.input_params)
-        # Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
+        if self.input_params.get('cancel_DC_offset',False)==True:
+            Sxx = cancel_spectrogram_DCoffset(Sxx)
         if Sxx.shape!=self.img_size():
             logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
             raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size(),section.size,self.section_duration()))
