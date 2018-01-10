@@ -58,13 +58,17 @@ class DarkflowFlowGraph(gr.top_block):
         self.fftblock = fft.fft_vcc(64,True,signal.get_window(('tukey',0.25),64),True)
         self.mag2 = blocks.complex_to_mag_squared(64)
         self.classifier = darkflow_ckpt_classifier_c(self.yaml_config, 64,
-                                                     True, 10, 100)
+                                                     True, 10, 10000)
+        # self.tostream = blocks.vector_to_stream(gr.sizeof_float,64)
+        # self.null_sink = blocks.null_sink(gr.sizeof_float)
 
         # make flowgraph
-        self.connect(self.usrprx,self.toparallel)
+        self.connect(self.usrp_source,self.toparallel)
         self.connect(self.toparallel,self.fftblock)
         self.connect(self.fftblock,self.mag2)
         self.connect(self.mag2,self.classifier)
+        # self.connect(self.mag2,self.tostream)
+        # self.connect(self.tostream,self.null_sink)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Setup the files for training/testing')

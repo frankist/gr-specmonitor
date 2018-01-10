@@ -49,7 +49,6 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
             in_sig = [(np.float32,self.vlen)],
             out_sig = None)#[])#np.complex64)
         self.message_port_register_out(pmt.intern('msg_out'))
-        # FIXME: ncols is different than vector size!
         self.nsamplesread = 0
         self.img_tstamp = 0
         self.avgsize = avgsize
@@ -63,13 +62,15 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
         in0 = input_items[0]
         #out = output_items[0]
         for idx in range(in0.shape[0]):
+            self.nsamplesread += len(in0[idx,:])
+            # continue#return len(input_items[0])
             self.imgnp[self.count,:] += in0[idx,:]
             self.countavg+=1
             if self.countavg==self.avgsize:
-                self.count += 1
                 self.countavg=0
-            self.nsamplesread += len(in0[idx,:])
+                self.count += 1
             if self.count == self.nrows:
+                self.count = 0
                 self.dropcount += 1
                 if self.dropcount>=self.n_drops:
                     self.dropcount = 0
@@ -104,7 +105,6 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
                         # print 'gonna send:',pmt.write_string(d)
                         self.message_port_pub(pmt.intern('msg_out'),d)
                     # self.message_port_pub(pmt.intern('boxes'), pmt.intern(detected_boxes))
-                self.count = 0
                 self.imgnp[:] = 0
                 self.img_tstamp += int(self.vlen*self.nrows)
 

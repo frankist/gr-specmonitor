@@ -29,8 +29,8 @@ list(APPEND specmonitor_sources
     framer_c_impl.cc
     #corr_est_norm_cc_impl.cc
     framer_snr_est_cc_impl.cc
-    frame_sync_cc_impl.cc
-)
+    #frame_sync_cc_impl.cc
+    )
 
 set(specmonitor_sources "${specmonitor_sources}" PARENT_SCOPE)
 if(NOT specmonitor_sources)
@@ -64,7 +64,7 @@ include_directories(${CPPUNIT_INCLUDE_DIRS})
 list(APPEND test_specmonitor_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/test_specmonitor.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/qa_specmonitor.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.cc
+#    ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.cc
     #${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.cc
 )
