@@ -23,7 +23,10 @@ import numpy as np
 from gnuradio import gr
 import pmt
 import cv2
+import sys
+import os
 
+print 'this is the path',__file__
 from darkflow_tools.darkflow_ckpt_classifier import *
 from labeling_framework.data_representation import spectrogram
 
@@ -31,7 +34,7 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
     """
     docstring for block darkflow_ckpt_classifier_c
     """
-    def __init__(self, yaml_config, vlen, cancel_DCoffset=True, avgsize = 1):
+    def __init__(self, yaml_config, vlen, cancel_DCoffset=True, avgsize = 1, n_drops = 0):
         self.yaml_file = yaml_config
         self.classifier = DarkflowCkptClassifier(self.yaml_file)
         model_params = self.classifier.cfg_obj.model_params()
@@ -53,6 +56,8 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
         self.countavg = 0
         self.cancel_DCoffset = cancel_DCoffset
         self.last_result = []
+        self.n_drops = n_drops
+        self.dropcount = 0
 
     def work(self, input_items, output_items):
         in0 = input_items[0]
@@ -65,39 +70,42 @@ class darkflow_ckpt_classifier_c(gr.sync_block):
                 self.countavg=0
             self.nsamplesread += len(in0[idx,:])
             if self.count == self.nrows:
-                Sxx = spectrogram.normalize_spectrogram(self.imgnp)#/self.avgsize)
-                if self.cancel_DCoffset:
-                    pwr_min = np.min(Sxx)
-                    Sxx[:,Sxx.shape[1]/2] = pwr_min # FIXME
-                self.imgcv[:,0:self.vlen,0] = np.uint8(Sxx*255)
-                self.imgcv[:,:,1] = self.imgcv[:,:,0]
-                self.imgcv[:,:,2] = self.imgcv[:,:,0]
+                self.dropcount += 1
+                if self.dropcount>=self.n_drops:
+                    self.dropcount = 0
+                    Sxx = spectrogram.normalize_spectrogram(self.imgnp)#/self.avgsize)
+                    if self.cancel_DCoffset:
+                        pwr_min = np.min(Sxx)
+                        Sxx[:,Sxx.shape[1]/2] = pwr_min
+                    self.imgcv[:,0:self.vlen,0] = np.uint8(Sxx*255)
+                    self.imgcv[:,:,1] = self.imgcv[:,:,0]
+                    self.imgcv[:,:,2] = self.imgcv[:,:,0]
+                    detected_boxes = self.classifier.classify(self.imgcv)
+                    self.last_result = detected_boxes
+                    for box in detected_boxes:
+                        d = pmt.make_dict()
+                        d = pmt.dict_add(d, pmt.intern('tstamp'), pmt.from_long(self.img_tstamp))
+                        for k,v in box.items():
+                            if k=='topleft' or k=='bottomright':
+                                pmt_val = pmt.make_dict()
+                                pmt_val = pmt.dict_add(pmt_val,
+                                                    pmt.intern('x'),
+                                                    pmt.from_long(v['x']))
+                                pmt_val = pmt.dict_add(pmt_val,
+                                                    pmt.intern('y'),
+                                                    pmt.from_long(v['y']))
+                            elif k=='confidence':
+                                pmt_val = pmt.from_float(float(v))
+                            elif k=='label':
+                                pmt_val = pmt.string_to_symbol(v)
+                            else:
+                                raise NotImplementedError('Did not expect parameter {}'.format(k))
+                            d = pmt.dict_add(d, pmt.intern(k), pmt_val)
+                        # print 'gonna send:',pmt.write_string(d)
+                        self.message_port_pub(pmt.intern('msg_out'),d)
+                    # self.message_port_pub(pmt.intern('boxes'), pmt.intern(detected_boxes))
                 self.count = 0
                 self.imgnp[:] = 0
-                detected_boxes = self.classifier.classify(self.imgcv)
-                self.last_result = detected_boxes
-                for box in detected_boxes:
-                    d = pmt.make_dict()
-                    d = pmt.dict_add(d, pmt.intern('tstamp'), pmt.from_long(self.img_tstamp))
-                    for k,v in box.items():
-                        if k=='topleft' or k=='bottomright':
-                            pmt_val = pmt.make_dict()
-                            pmt_val = pmt.dict_add(pmt_val,
-                                                   pmt.intern('x'),
-                                                   pmt.from_long(v['x']))
-                            pmt_val = pmt.dict_add(pmt_val,
-                                                   pmt.intern('y'),
-                                                   pmt.from_long(v['y']))
-                        elif k=='confidence':
-                            pmt_val = pmt.from_float(float(v))
-                        elif k=='label':
-                            pmt_val = pmt.string_to_symbol(v)
-                        else:
-                            raise NotImplementedError('Did not expect parameter {}'.format(k))
-                        d = pmt.dict_add(d, pmt.intern(k), pmt_val)
-                    # print 'gonna send:',pmt.write_string(d)
-                    self.message_port_pub(pmt.intern('msg_out'),d)
-                # self.message_port_pub(pmt.intern('boxes'), pmt.intern(detected_boxes))
                 self.img_tstamp += int(self.vlen*self.nrows)
 
         return len(input_items[0])
