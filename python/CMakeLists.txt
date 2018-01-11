@@ -31,7 +31,8 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    darkflow_ckpt_classifier_c.py DESTINATION ${GR_PYTHON_DIR}/specmonitor
+    darkflow_ckpt_classifier_c.py
+    darkflow_ckpt_classifier_msg.py DESTINATION ${GR_PYTHON_DIR}/specmonitor
 )
 
 ########################################################################
@@ -55,3 +56,4 @@ GR_ADD_TEST(qa_darkflow_ckpt_classifier_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_S
 add_subdirectory(tests)
 
 GR_ADD_TEST(qa_spectrogram_img_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_spectrogram_img_c.py)
+GR_ADD_TEST(qa_darkflow_ckpt_classifier_msg ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_ckpt_classifier_msg.py)
