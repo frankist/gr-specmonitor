@@ -39,7 +39,7 @@ if(NOT specmonitor_sources)
 endif(NOT specmonitor_sources)
 
 add_library(gnuradio-specmonitor SHARED ${specmonitor_sources})
-target_link_libraries(gnuradio-specmonitor ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES} gnuradio-filter)
+target_link_libraries(gnuradio-specmonitor ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES} gnuradio-filter gnuradio-blocks)
 set_target_properties(gnuradio-specmonitor PROPERTIES DEFINE_SYMBOL "gnuradio_specmonitor_EXPORTS")
 
 if(APPLE)

@@ -42,6 +42,8 @@ namespace gr {
 
       int d_avg_count;
       int d_idx_offset;
+      int d_img_size;
+      int d_IQ_per_img;
 
       volk_utils::volk_array<float> d_mag2;
       volk_utils::volk_array<float> d_mag2_sum;

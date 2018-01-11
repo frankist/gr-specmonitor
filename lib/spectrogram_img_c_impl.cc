@@ -26,6 +26,7 @@
 #include "spectrogram_img_c_impl.h"
 #include <gnuradio/blocks/api.h>
 #include <gnuradio/blocks/pdu.h>
+#include <algorithm>
 
 using namespace gr::blocks::pdu;
 
@@ -59,12 +60,16 @@ namespace gr {
       d_idx_offset(0),
       d_pdu_vector(pmt::PMT_NIL)
     {
-      d_mag2.resize(d_fftsize);
+      const size_t nitems = 64*1024;
+      d_mag2.resize(nitems);
       d_mag2_sum.resize(d_fftsize*d_nrows);
       d_mag2_byte.resize(d_fftsize*d_nrows);
+      d_img_size = d_fftsize*d_nrows;
+      d_IQ_per_img = d_fftsize*d_nrows*d_n_avgs;
 
+      std::fill(&d_mag2_sum[0], &d_mag2_sum[d_img_size], 0);
       // register message ports
-      // message_port_register_out(pmt::mp("imgcv"));
+      message_port_register_out(pmt::mp("imgcv"));
     }
 
     /*
@@ -80,56 +85,69 @@ namespace gr {
         gr_vector_void_star &output_items)
     {
       const gr_complex *in = (const gr_complex *) input_items[0];
+      // unsigned int n_samples = d_fftsize*noutput_items;
       // unsigned int input_data_size = input_signature()->sizeof_stream_item (0);
+      // std::cout << "This is the input size:" << input_data_size << std::endl;
 
-      volk_32fc_magnitude_squared_32f(&d_mag2[0], &in[0], d_fftsize);
+      volk_32fc_magnitude_squared_32f(&d_mag2[0], &in[0], d_fftsize*noutput_items);
 
-      // TODO: check if this works
-      volk_32f_x2_add_32f(&d_mag2_sum[d_idx_offset], &d_mag2[0], &d_mag2_sum[d_idx_offset], d_fftsize);
-      d_avg_count++;
-      if(d_avg_count==d_n_avgs) {
-        d_avg_count=0;
-        d_idx_offset+=d_fftsize;
-        if(d_idx_offset==d_mag2_sum.capacity()) {
-          // the image is ready here
-          d_idx_offset=0;
+      for(int nblock = 0; nblock < noutput_items; ++nblock) {
+        // TODO: check if this works
+        volk_32f_x2_add_32f(&d_mag2_sum[d_idx_offset], &d_mag2[nblock*d_fftsize], &d_mag2_sum[d_idx_offset], d_fftsize);
 
-          // cancel DC offset
-          float min_val = *std::min_element(&d_mag2_sum[0], &d_mag2_sum[d_mag2_sum.capacity()]);
-          if(d_cancel_DC) {
-            for(int i = d_fftsize/2; i < d_mag2_sum.capacity(); i+=d_fftsize)
-              d_mag2_sum[i] = min_val;
+        d_avg_count++;
+        if(d_avg_count==d_n_avgs) {
+          d_avg_count=0;
+          d_idx_offset+=d_fftsize;
+          if(d_idx_offset==d_img_size) {
+            // the image is ready here
+            d_idx_offset=0;
+
+            // cancel DC offset
+            float min_val = *std::min_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
+            if(d_cancel_DC) {
+              for(int i = d_fftsize/2; i < d_img_size; i+=d_fftsize)
+                d_mag2_sum[i] = min_val;
+            }
+
+            // normalize spectrogram
+            float max_val = *std::max_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
+            // unsigned int max_i;
+            // volk_32f_index_max_16u(&max_i, &d_mag2_sum[0], d_mag2_sum.size());
+            for(int i = 0; i < d_img_size; ++i)
+              d_mag2_byte[i] = (d_mag2_sum[i] - min_val)*255/(max_val-min_val);
+
+            // create an opencv byte image with number of channels=3
+            // d_img_mat = cv::Mat::zeros(d_nrows,d_ncols,cv::CV_8UC3);//CV_8U); // it has 3 channels
+            // for(int i = 0; i < d_nrows; ++i)
+            //   for(int j = 0; j < d_fftsize; ++j) {
+            //     unsigned char val = (d_mag2_sum[i] - min_val)*255/(max_val-min_val);
+            //     d_img_mat.at(i,j,0) = val;
+            //     d_img_mat.at(i,j,1) = val;
+            //     d_img_mat.at(i,j,2) = val;
+            //   }
+            // std::vector<cv::Mat> images(3);
+            // images.at(0) = blue;
+            // images.at(1) = green;
+            // images.at(2) = red;
+            // cv::Mat color;
+            // cv::merge(images, color);
+
+            // NOTE: Inspired by https://github.com/gnuradio/gnuradio/blob/master/gr-blocks/lib/tagged_stream_to_pdu_impl.cc
+            // move image created to pmt message buffer
+            // d_pdu_vector = pdu::make_pdu_vector(d_type, d_img_mat.begin(), d_mag2_sum.size()*3);
+            // pmt::pmt_t msg = pmt::cons(d_pdu_meta, d_pdu_vector);
+
+            // d_pdu_vector = make_pdu_vector(byte_t, &d_mag2_byte[0], d_img_size);
+            // std::cout << "vec: [";
+            // for(int k = 0; k < d_img_size; ++k)
+            //   std::cout << (int)d_mag2_byte[k] << ",";
+            // std::cout << "]" << std::endl;
+            d_pdu_vector = pmt::init_u8vector(d_img_size, &d_mag2_byte[0]);
+            message_port_pub(pmt::mp("imgcv"), d_pdu_vector);
+
+            std::fill(&d_mag2_sum[0], &d_mag2_sum[d_img_size], 0);
           }
-
-          // normalize spectrogram
-          float max_val = *std::max_element(&d_mag2_sum[0], &d_mag2_sum[d_mag2_sum.capacity()]);
-          // unsigned int max_i;
-          // volk_32f_index_max_16u(&max_i, &d_mag2_sum[0], d_mag2_sum.size());
-          for(int i = 0; i < d_mag2_sum.capacity(); ++i)
-            d_mag2_byte[i] = (d_mag2_sum[i] - min_val)*255/(max_val-min_val);
-
-          // create an opencv byte image with number of channels=3
-          // d_img_mat = cv::Mat::zeros(d_nrows,d_ncols,cv::CV_8UC3);//CV_8U); // it has 3 channels
-          // for(int i = 0; i < d_nrows; ++i)
-          //   for(int j = 0; j < d_fftsize; ++j) {
-          //     unsigned char val = (d_mag2_sum[i] - min_val)*255/(max_val-min_val);
-          //     d_img_mat.at(i,j,0) = val;
-          //     d_img_mat.at(i,j,1) = val;
-          //     d_img_mat.at(i,j,2) = val;
-          //   }
-          // std::vector<cv::Mat> images(3);
-          // images.at(0) = blue;
-          // images.at(1) = green;
-          // images.at(2) = red;
-          // cv::Mat color;
-          // cv::merge(images, color);
-
-          // NOTE: Inspired by https://github.com/gnuradio/gnuradio/blob/master/gr-blocks/lib/tagged_stream_to_pdu_impl.cc
-          // move image created to pmt message buffer
-          // d_pdu_vector = pdu::make_pdu_vector(d_type, d_img_mat.begin(), d_mag2_sum.size()*3);
-          // pmt::pmt_t msg = pmt::cons(d_pdu_meta, d_pdu_vector);
-          d_pdu_vector = make_pdu_vector(byte_t, &d_mag2_byte[0], d_mag2_byte.capacity());
-          message_port_pub(pmt::mp("imgcv"), d_pdu_vector);
         }
       }
 
