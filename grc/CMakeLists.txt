@@ -22,5 +22,6 @@ install(FILES
     #specmonitor_corr_est_norm_cc.xml
     specmonitor_framer_snr_est_cc.xml
     #specmonitor_frame_sync_cc.xml
-    specmonitor_darkflow_ckpt_classifier_c.xml DESTINATION share/gnuradio/grc/blocks
+    specmonitor_darkflow_ckpt_classifier_c.xml
+    specmonitor_spectrogram_img_c.xml DESTINATION share/gnuradio/grc/blocks
 )

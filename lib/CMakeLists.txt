@@ -30,7 +30,7 @@ list(APPEND specmonitor_sources
     #corr_est_norm_cc_impl.cc
     framer_snr_est_cc_impl.cc
     #frame_sync_cc_impl.cc
-    )
+    spectrogram_img_c_impl.cc )
 
 set(specmonitor_sources "${specmonitor_sources}" PARENT_SCOPE)
 if(NOT specmonitor_sources)

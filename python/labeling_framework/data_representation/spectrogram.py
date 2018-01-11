@@ -125,9 +125,9 @@ def convert_timefreq_to_bounding_box(box,img_size,section_size):
 def compute_timefreq_boxes(x,spec_params):
     # get non-time averaged spectrogram
     Sxx = compute_spectrogram(x,spec_params['fftsize'])
-    Sxx = normalize_spectrogram(Sxx)
     if spec_params.get('cancel_DC_offset',False)==True:
         Sxx = cancel_spectrogram_DCoffset(Sxx)
+    Sxx = normalize_spectrogram(Sxx)
 
     time_bounds = tfbox.compute_signal_time_bounds(x,Sxx.shape[1]/2)
     n_boxes = len(time_bounds)
@@ -189,9 +189,9 @@ class SectionSpectrogramMetadata(object):
         section = x[self.section_bounds[0]:self.section_bounds[1]]
         Sxx = compute_spectrogram(section, self.input_params['fftsize'])
         Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
-        Sxx = normalize_spectrogram(Sxx)
         if self.input_params.get('cancel_DC_offset',False)==True:
             Sxx = cancel_spectrogram_DCoffset(Sxx)
+        Sxx = normalize_spectrogram(Sxx)
         if Sxx.shape!=self.img_size():
             logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
             raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size(),section.size,self.section_duration()))

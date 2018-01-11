@@ -54,3 +54,4 @@ set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
 GR_ADD_TEST(qa_darkflow_ckpt_classifier_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_ckpt_classifier_c.py)
 add_subdirectory(tests)
 
+GR_ADD_TEST(qa_spectrogram_img_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_spectrogram_img_c.py)
