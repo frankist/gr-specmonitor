@@ -27,6 +27,8 @@
 #include <gnuradio/blocks/api.h>
 #include <gnuradio/blocks/pdu.h>
 
+using namespace gr::blocks::pdu;
+
 namespace gr {
   namespace specmonitor {
 
@@ -126,7 +128,7 @@ namespace gr {
           // move image created to pmt message buffer
           // d_pdu_vector = pdu::make_pdu_vector(d_type, d_img_mat.begin(), d_mag2_sum.size()*3);
           // pmt::pmt_t msg = pmt::cons(d_pdu_meta, d_pdu_vector);
-          d_pdu_vector = pdu::make_pdu_vector(pdu::byte_t, &d_mag2_byte[0], d_mag2_byte.capacity());
+          d_pdu_vector = make_pdu_vector(byte_t, &d_mag2_byte[0], d_mag2_byte.capacity());
           message_port_pub(pmt::mp("imgcv"), d_pdu_vector);
         }
       }
