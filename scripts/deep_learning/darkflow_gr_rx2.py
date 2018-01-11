@@ -30,7 +30,7 @@ import sys
 from scipy import signal
 import argparse
 
-from specmonitor.spectrogram_img_c import spectrogram_img_c
+from specmonitor import spectrogram_img_c
 
 class DarkflowFlowGraph(gr.top_block):
     def __init__(self,yaml_config=''):

@@ -26,7 +26,6 @@ import cv2
 import sys
 import os
 
-print 'this is the path',__file__
 from darkflow_tools.darkflow_ckpt_classifier import *
 from labeling_framework.data_representation import spectrogram
 
