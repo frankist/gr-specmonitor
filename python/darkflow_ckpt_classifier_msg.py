@@ -60,7 +60,7 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.imgcv[:,0:self.fftsize:,2] = u8img
         detected_boxes = self.classifier.classify(self.imgcv)
         self.last_result = detected_boxes
-        print 'new classification'
+        # print 'new classification'
         # self.imgnp[:] = 0
 
         # for box in detected_boxes:

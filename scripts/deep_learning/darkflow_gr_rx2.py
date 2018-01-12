@@ -63,7 +63,7 @@ class DarkflowFlowGraph(gr.top_block):
         self.connect(self.usrp_source,self.toparallel)
         self.connect(self.toparallel,self.fftblock)
         self.connect(self.fftblock,self.spectroblock)
-        self.tb.msg_connect(self.spectroblock, "imgcv", self.classifier, "gray_img")
+        self.msg_connect(self.spectroblock, "imgcv", self.classifier, "gray_img")
 
     # def run(self):
     #     # GNURadio has some bug when using streams. It hangs
@@ -74,10 +74,10 @@ class DarkflowFlowGraph(gr.top_block):
     #     # yolo_result = classifier.last_result
 
 if __name__=='__main__':
-    # parser = argparse.ArgumentParser(description='Setup the files for training/testing')
-    # parser.add_argument('--config', type=str,
-    #                     help='YAML file for config', required=True)
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Setup the files for training/testing')
+    parser.add_argument('--config', type=str,
+                        help='YAML file for config', required=True)
+    args = parser.parse_args()
 
-    tb = DarkflowFlowGraph()#args.config)
+    tb = DarkflowFlowGraph(args.config)
     tb.run()
