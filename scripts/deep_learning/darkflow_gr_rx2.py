@@ -31,6 +31,7 @@ from scipy import signal
 import argparse
 
 from specmonitor import spectrogram_img_c
+from specmonitor import darkflow_ckpt_classifier_msg
 
 class DarkflowFlowGraph(gr.top_block):
     def __init__(self,yaml_config=''):
@@ -56,11 +57,21 @@ class DarkflowFlowGraph(gr.top_block):
         self.toparallel = blocks.stream_to_vector(gr.sizeof_gr_complex, 64)
         self.fftblock = fft.fft_vcc(64,True,signal.get_window(('tukey',0.25),64),True)
         self.spectroblock = spectrogram_img_c(64,104,104,10,True)
+        self.classifier = darkflow_ckpt_classifier_msg(self.yaml_config, 64)
 
         # make flowgraph
         self.connect(self.usrp_source,self.toparallel)
         self.connect(self.toparallel,self.fftblock)
         self.connect(self.fftblock,self.spectroblock)
+        self.tb.msg_connect(self.spectroblock, "imgcv", self.classifier, "gray_img")
+
+    # def run(self):
+    #     # GNURadio has some bug when using streams. It hangs
+    #     self.run()
+    #     # self.tb.start()
+    #     # self.stop()
+    #     # self.wait()
+    #     # yolo_result = classifier.last_result
 
 if __name__=='__main__':
     # parser = argparse.ArgumentParser(description='Setup the files for training/testing')
