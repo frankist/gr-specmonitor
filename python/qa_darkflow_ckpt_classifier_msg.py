@@ -28,10 +28,14 @@ import numpy as np
 from scipy import signal
 import os
 import pmt
-import matplotlib.pyplot as plt
+import time
+# import matplotlib.pyplot as plt
 
 from labeling_framework.sig_format import pkl_sig_format
 from labeling_framework.sig_format import sig_data_access as sda
+from darkflow_tools.darkflow_ckpt_classifier import *
+
+print 'this is the file:',__file__
 
 class qa_darkflow_ckpt_classifier_msg(gr_unittest.TestCase):
 
@@ -56,6 +60,8 @@ class qa_darkflow_ckpt_classifier_msg(gr_unittest.TestCase):
         Sxx_img[:,0:Sxx_bytes.shape[1], 0] = Sxx_bytes
         Sxx_img[:,0:Sxx_bytes.shape[1], 1] = Sxx_bytes
         Sxx_img[:,0:Sxx_bytes.shape[1], 2] = Sxx_bytes
+        classifier_base = DarkflowCkptClassifier(yaml_file)
+        yolo_result_base = classifier_base.classify(Sxx_img)
 
         section_bounds = spec_metadata[0].section_bounds
         xsection = x[section_bounds[0]::] # let the block head finish the section
@@ -78,13 +84,26 @@ class qa_darkflow_ckpt_classifier_msg(gr_unittest.TestCase):
         self.tb.connect(tostream,dst)
         self.tb.msg_connect(spectroblock, "imgcv", classifier, "gray_img")
 
-        self.tb.run()
+        # GNURadio has some bug when using streams. It hangs
+        # self.tb.run()
+        self.tb.start()
+        while dst.nitems_read(0) < 104*64*10:
+            time.sleep(0.01)
+        self.tb.stop()
+        self.tb.wait()
         xout = dst.data()
+        yolo_result = classifier.last_result
 
+        # print 'diff:',np.mean(np.abs(Sxx_img-classifier.imgcv)**2)
+        # print yolo_result
+        # print yolo_result_base
         self.assertEqual(len(xout),104*64*10)
         self.assertTrue(len(classifier.last_result)!=0)
-
-        print 'diff:',np.mean(np.abs(Sxx_img-classifier.imgcv)**2)
+        self.assertAlmostEqual(np.mean(np.abs(Sxx_img-classifier.imgcv)**2),0,3)
+        self.assertEqual(len(yolo_result),len(yolo_result_base))
+        for idx in range(len(yolo_result)):
+            for k,v in yolo_result[idx].items():
+                self.assertAlmostEqual(v,yolo_result_base[idx][k],2)
 
 
 if __name__ == '__main__':

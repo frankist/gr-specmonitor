@@ -31,11 +31,11 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
     docstring for block darkflow_ckpt_classifier_msg
     """
     def __init__(self, yaml_config, fftsize):
-
         self.yaml_file = yaml_config
         self.fftsize = fftsize
 
         self.classifier = DarkflowCkptClassifier(self.yaml_file)
+
         model_params = self.classifier.cfg_obj.model_params()
         self.ncols = model_params['width']
         self.nrows = model_params['height']
