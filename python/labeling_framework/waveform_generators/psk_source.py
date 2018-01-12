@@ -23,6 +23,7 @@ import numpy as np
 import os
 import pickle
 import time
+import types
 # import matplotlib.pyplot as plt
 
 # gnuradio dependencies
@@ -32,6 +33,7 @@ from gnuradio import digital
 
 # labeling_framework package
 from waveform_generator_utils import *
+from ..utils import typesystem_utils as ts
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -77,6 +79,8 @@ class GeneralModFlowgraph(gr.top_block):
         self.linear_gain = float(linear_gain)
         self.burst_len = burst_len
         self.zero_pad_len = zero_pad_len
+        # self.burst_len = burst_len if not issubclass(burst_len.__class__,ts.ValueGenerator) else burst_len.generate()
+        # self.zero_pad_len = zero_pad_len  if not issubclass(zero_pad_len.__class__,ts.ValueGenerator) else zero_pad_len.generate()
         data2send = np.random.randint(0,256,1000)
 
         # phy
@@ -125,17 +129,23 @@ def run(args):
     d = args['parameters']
     print_params(d,__name__)
 
-    # create general_mod block
-    tb = GeneralModFlowgraph.load_flowgraph(d)
+    while True:
+        # create general_mod block
+        tb = GeneralModFlowgraph.load_flowgraph(d)
 
-    logger.info('Starting GR waveform generator script for PSK')
-    tb.run()
-    logger.info('GR script finished')
+        logger.info('Starting GR waveform generator script for PSK')
+        tb.run()
+        logger.info('GR script finished')
 
-    gen_data = np.array(tb.dst.data())
-    # gen_data0 = np.array(gen_data)
+        gen_data = np.array(tb.dst.data())
+        # gen_data0 = np.array(gen_data)
 
-    v = transform_IQ_to_sig_data(gen_data,args)
+        try:
+            v = transform_IQ_to_sig_data(gen_data,args)
+        except RuntimeError, e:
+            logger.warning('Going to re-run radio')
+            continue
+        break
 
     # save file
     fname = os.path.expanduser(args['targetfilename'])

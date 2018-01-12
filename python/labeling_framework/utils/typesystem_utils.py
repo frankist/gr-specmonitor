@@ -25,9 +25,13 @@ import copy
 from . import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
+class ValueGenerator(object):
+    def generate(self):
+        pass
+
 # NOTE: Test this properly. What happens to dictionaries?
 def convert2list(v):
-    if not isinstance(v,Iterable) or isinstance(v,basestring):
+    if not isinstance(v,Iterable) or isinstance(v,basestring) or issubclass(v.__class__,ValueGenerator):
         return [v]
     elif not isinstance(v,list):
         return list(v)
@@ -50,9 +54,12 @@ def np_to_native(v):
     elif isinstance(v,np.ndarray): # it is an np.array
         ret = v.tolist()
     elif is_class_instance(v): # it is a class object
-        ret = copy.deepcopy(v)
-        for member,val in vars(ret).items():
-            setattr(ret,member,np_to_native(val))
+        if issubclass(v.__class__,ValueGenerator): # create an instance
+            ret = v.generate()
+        else:
+            ret = copy.deepcopy(v)
+            for member,val in vars(ret).items():
+                setattr(ret,member,np_to_native(val))
     elif not isinstance(v,Iterable) or isinstance(v,basestring): # it is POD type or string
         ret = v # it is already a native
     elif isinstance(v,list):

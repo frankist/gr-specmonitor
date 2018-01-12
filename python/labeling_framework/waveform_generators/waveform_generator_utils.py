@@ -42,7 +42,7 @@ def create_new_sigdata(args):
 
     return v
 
-def set_derived_sigdata(stage_data,x,args):
+def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sig2img_params = args['parameters']['signal_representation']
     signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
     box_label = args['parameters'][sig2img_params['boxlabel']]
@@ -52,6 +52,8 @@ def set_derived_sigdata(stage_data,x,args):
     
     # normalize boxes power
     tfreq_boxes = sigmetadata.tfreq_boxes
+    if len(tfreq_boxes)==0 and fail_at_noTx:
+        raise RuntimeError('There were no Transmissions')
     tfreq_boxes,max_pwr = tfbox.normalize_boxes_pwr(tfreq_boxes,x)
     sigmetadata.tfreq_boxes = tfreq_boxes
     y = x/np.sqrt(max_pwr)
@@ -60,15 +62,18 @@ def set_derived_sigdata(stage_data,x,args):
     stage_data['IQsamples'] = y
     sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
 
-def transform_IQ_to_sig_data(x,args):
+def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
     """
     This function should return a dictionary/obj with: IQsamples,
     stage parameters that were passed, and the derived bounding_boxes
     """
     try:
         v = create_new_sigdata(args)
-        set_derived_sigdata(v,x,args)
+        set_derived_sigdata(v,x,args,fail_at_noTx)
     except KeyError, e:
         logger.error('The input arguments do not seem valid. I received: {}'.format(args))
         raise
+    except RuntimeError, e:
+        logger.warning('There were no transmissions during the specified window')
+        raise e
     return v
