@@ -90,8 +90,8 @@ namespace gr {
       }
       else if(d_distname=="uniform") {
         if(d_params.size()!=2)
-          throw std::invalid_argument("Invalid number of parameters for the distribution")
-        d_dist = new UniformDist(d_params[0],d_params[1]);
+          throw std::invalid_argument("Invalid number of parameters for the distribution");
+        d_dist = new UniformIntDist(d_params[0],d_params[1]);
         param_idx+=2;
       }
       else {

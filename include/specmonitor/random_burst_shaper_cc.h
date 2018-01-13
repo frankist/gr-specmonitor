@@ -49,7 +49,7 @@ namespace gr {
       static sptr make(std::string dist,
                        const std::vector<float>& params,
                        int pre_padding = 0,
-                       const std::vector<float>& freq_offset_values = {0},
+                       const std::vector<float>& freq_offset_values = std::vector<float>(1,0),
                        const std::string &length_tag_name = "packet_len");
     };
 

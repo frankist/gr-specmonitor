@@ -212,7 +212,7 @@ def compute_signal_time_bounds(xorig,dist_margin=0,thres=1e-12):
         i2 = stepdowns[j] if j<len(stepdowns) else len(x)
         i = stepups[j] if j<len(stepups) and stepups[j]<i2 else prev
         l[j] = (i,i2)
-        if i2==len(x):
+        if i2==len(x) or j>=len(stepups):
             break
         prev = stepups[j]
         # i = stepups[j+jinc]
