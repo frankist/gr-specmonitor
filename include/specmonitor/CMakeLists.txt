@@ -26,5 +26,6 @@ install(FILES
     #corr_est_norm_cc.h
     framer_snr_est_cc.h
     #frame_sync_cc.h
-    spectrogram_img_c.h DESTINATION include/specmonitor
+    spectrogram_img_c.h
+    random_burst_shaper_cc.h DESTINATION include/specmonitor
 )

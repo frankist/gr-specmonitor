@@ -6,26 +6,26 @@ sys.path.append('../../../python/')
 from labeling_framework.utils import typesystem_utils
 
 # NOTE: python generators are not pickeable :(
-class SuperPoissonGenerator(typesystem_utils.ValueGenerator):
-    def __init__(self,mean,offset=0,upbound=np.inf):
-        self.mean = mean
-        self.offset = offset
-        self.upbound = upbound
+# class SuperPoissonGenerator(typesystem_utils.ValueGenerator):
+#     def __init__(self,mean,offset=0,upbound=np.inf):
+#         self.mean = mean
+#         self.offset = offset
+#         self.upbound = upbound
 
-    def generate(self):
-        return min(self.offset+np.random.poisson(self.mean),self.upbound)
+#     def generate(self):
+#         return min(self.offset+np.random.poisson(self.mean),self.upbound)
 
-# def super_poisson(mean,offset,upbound=np.inf):
-#     return np.min(offset+np.random.poisson(mean),upbound)
+# # def super_poisson(mean,offset,upbound=np.inf):
+# #     return np.min(offset+np.random.poisson(mean),upbound)
 
-# def generic_generator(func,*args):
-#     while True:
-#         yield func(*args)
+# # def generic_generator(func,*args):
+# #     while True:
+# #         yield func(*args)
 
 num_sections = 1
 section_size = 100000
 toffset_range = [100]
-frequency_offset = [-0.325,-0.125,0.125,0.325] #[-0.5,0.5]
+frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 
@@ -121,13 +121,14 @@ stage_params = {
             ('samples_per_symbol',10),
             ('excess_bw',0.25),
             ('pre_diff_code',False),
-            ('burst_len', [('poisson',3000,1000)]),
+            ('burst_len', 1000),#[('poisson',3000,1000)]),
             #SuperPoissonGenerator(3000,1000)),
             #generic_generator(super_poisson,3000,1000)),
-            ('zero_pad_len',[('poisson',5000)]),
+            ('zero_pad_len',[('uniform',(1,5000))]),
             #SuperPoissonGenerator(5000)),
             #generic_generator(np.random.poisson,5000)),#5000),
-            ('signal_representation',[spectrogram_representation])
+            ('signal_representation',[spectrogram_representation]),
+            ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))])
         ],
         'Tx': Tx_params,
         'RF': RF_params,

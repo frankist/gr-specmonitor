@@ -68,7 +68,8 @@ class GeneralModFlowgraph(gr.top_block):
                  excess_bw,
                  burst_len,
                  zero_pad_len,
-                 linear_gain=1.0):
+                 linear_gain=1.0,
+                 frequency_offset=0.0):
         super(GeneralModFlowgraph, self).__init__()
 
         # params
@@ -78,7 +79,18 @@ class GeneralModFlowgraph(gr.top_block):
         self.excess_bw = excess_bw # TODO
         self.linear_gain = float(linear_gain)
         self.burst_len = burst_len
-        self.zero_pad_len = zero_pad_len
+        # TODO: make burst_len also variable
+        if isinstance(zero_pad_len,tuple):
+            self.zero_pad_len = [zero_pad_len[1]]
+            self.pad_dist = zero_pad_len[0]
+        else:
+            self.zero_pad_len = zero_pad_len
+            self.pad_dist = 'constant'
+        if isinstance(frequency_offset,tuple):
+            assert frequency_offset[0]=='uniform'
+            self.frequency_offset = frequency_offset[1]
+        else: # it is just a value
+            self.frequency_offset = [frequency_offset]
         # self.burst_len = burst_len if not issubclass(burst_len.__class__,ts.ValueGenerator) else burst_len.generate()
         # self.zero_pad_len = zero_pad_len  if not issubclass(zero_pad_len.__class__,ts.ValueGenerator) else zero_pad_len.generate()
         data2send = np.random.randint(0,256,1000)
@@ -90,7 +102,8 @@ class GeneralModFlowgraph(gr.top_block):
                                        #self.pre_diff_code,
                                        excess_bw=self.excess_bw)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.burst_len,"packet_len")
-        self.burst_shaper = digital.burst_shaper_cc((1+0*1j,),100,self.zero_pad_len,False)
+        # self.burst_shaper = digital.burst_shaper_cc((1+0*1j,),100,self.zero_pad_len,False)
+        self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist,self.zero_pad_len,prepad,self.frequency_offset,"packet_len")
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
         self.dst = blocks.vector_sink_c()
         # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
@@ -123,7 +136,8 @@ class GeneralModFlowgraph(gr.top_block):
         excess_bw = params['excess_bw']
         zero_pad_len = params['zero_pad_len']
         burst_len = params['burst_len']
-        return cls(n_written_samples,constellation_obj,samples_per_symbol,excess_bw,burst_len,zero_pad_len,linear_gain=1.0)
+        frequency_offset = params.get('frequency_offset',0)
+        return cls(n_written_samples,constellation_obj,samples_per_symbol,excess_bw,burst_len,zero_pad_len,linear_gain=1.0,frequency_offset=0.0)
 
 def run(args):
     d = args['parameters']
