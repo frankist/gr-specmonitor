@@ -87,9 +87,9 @@ namespace gr {
     };
 
     struct DistAbstract {
-      std::uint32_t seed;
+      unsigned int seed;
       boost::random::mt19937 rng;
-      DistAbstract() : seed(static_cast<std::uint32_t>(std::time(0))), rng(seed)
+      DistAbstract() : seed(static_cast<unsigned int>(std::time(0))), rng(seed)
       {}
       virtual int gen() = 0;
     };

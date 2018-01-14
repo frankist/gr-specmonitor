@@ -69,7 +69,7 @@ namespace gr {
       d_state(STATE_WAIT),
       d_phase_init(0),
       d_bufnread(0),
-      d_rng(static_cast<std::uint32_t>(std::time(0)))
+      d_rng(static_cast<unsigned int>(std::time(0)))
     {
       int param_idx = 0;
       if(d_distname=="poisson") {
