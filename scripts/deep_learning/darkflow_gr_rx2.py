@@ -40,8 +40,8 @@ class DarkflowFlowGraph(gr.top_block):
         # params
         self.yaml_config = yaml_config
         sample_rate = 20.0e6
-        centre_freq = 3.5e9
-        gaindB = 30
+        centre_freq = 2.35e9#3.5e9
+        gaindB = 10#30
 
         # flowgraph blocks
         self.usrp_source = uhd.usrp_source(

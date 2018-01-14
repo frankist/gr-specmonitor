@@ -5,26 +5,9 @@ import sys
 sys.path.append('../../../python/')
 from labeling_framework.utils import typesystem_utils
 
-# NOTE: python generators are not pickeable :(
-# class SuperPoissonGenerator(typesystem_utils.ValueGenerator):
-#     def __init__(self,mean,offset=0,upbound=np.inf):
-#         self.mean = mean
-#         self.offset = offset
-#         self.upbound = upbound
-
-#     def generate(self):
-#         return min(self.offset+np.random.poisson(self.mean),self.upbound)
-
-# # def super_poisson(mean,offset,upbound=np.inf):
-# #     return np.min(offset+np.random.poisson(mean),upbound)
-
-# # def generic_generator(func,*args):
-# #     while True:
-# #         yield func(*args)
-
 num_sections = 1
 section_size = 500000#100000
-toffset_range = [100]
+toffset_range = [50,100]
 frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
@@ -46,7 +29,7 @@ Tx_params = [
     ('time_offset',toffset_range),
     ('section_size',section_size),
     ('num_sections',num_sections),
-    ('soft_gain',[1.0]),
+    ('soft_gain',[0.1,1.0]),
     ('noise_voltage',[0])
 ]
 Tx_params_wifi = list(Tx_params)
@@ -55,15 +38,15 @@ for i,e in enumerate(Tx_params_wifi):
         Tx_params_wifi[i] = ('frequency_offset',0)
 
 RF_params = [
-    ('tx_gain_norm', 0.99),#10.0**np.arange(-20,0,5)),#range(0, 21, 10)),  #range(0,30,15)),
+    ('tx_gain_norm', [0.01,0.1,0.99]),#10.0**np.arange(-20,0,5)),#range(0, 21, 10)),  #range(0,30,15)),
     ('settle_time', 0.25),
-    ('rx_gaindB', 10.0),#range(0, 21, 10)),
+    ('rx_gaindB', [10.0]),#range(0, 21, 10)),
     ('rf_frequency', 2.35e9)
 ]
 
 Rx_params = [
     ('n_fft_averages',50),
-    ('img_row_offset',[0,50]),
+    ('img_row_offset',[0,10,20,30,40,50]),
     ('img_n_rows',104),
 ]
 
@@ -83,8 +66,8 @@ stage_params = {
             ('number_samples',wf_gen_samps),
             ('sample_rate',20e6),
             ('encoding',[0]),
-            ('pdu_length',[1000]),
-            ('pad_interval',5000),
+            ('pdu_length',[750]),
+            ('pad_interval',15000),
             ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params_wifi,
