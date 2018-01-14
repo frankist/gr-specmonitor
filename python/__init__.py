@@ -33,4 +33,5 @@ except ImportError:
 # import any pure python here
 from darkflow_ckpt_classifier_c import darkflow_ckpt_classifier_c
 from darkflow_ckpt_classifier_msg import darkflow_ckpt_classifier_msg
+from darkflow_statistics_collector import darkflow_statistics_collector
 #

@@ -25,6 +25,7 @@ import pmt
 import cv2
 
 from darkflow_tools.darkflow_ckpt_classifier import *
+from darkflow_statistics_collector import *
 
 class darkflow_ckpt_classifier_msg(gr.basic_block):
     """
@@ -49,6 +50,10 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
             out_sig=None)
         self.message_port_register_in(pmt.intern("gray_img"))
         self.set_msg_handler(pmt.intern("gray_img"), self.run_darkflow)
+        self.message_port_register_out(pmt.intern('darkflow_out'))
+
+        # tmp FIXME
+        self.stats = darkflow_statistics_collector()
 
 
     def run_darkflow(self, msg):
@@ -63,22 +68,25 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         # print 'new classification'
         # self.imgnp[:] = 0
 
-        # for box in detected_boxes:
-        #     d = pmt.make_dict()
-        #     d = pmt.dict_add(d, pmt.intern('tstamp'), pmt.from_long(self.img_tstamp))
-        #     for k,v in box.items():
-        #         if k=='topleft' or k=='bottomright':
-        #             pmt_val = pmt.make_dict()
-        #             pmt_val = pmt.dict_add(pmt_val,
-        #                                 pmt.intern('x'),
-        #                                 pmt.from_long(v['x']))
-        #             pmt_val = pmt.dict_add(pmt_val,
-        #                                 pmt.intern('y'),
-        #                                 pmt.from_long(v['y']))
-        #         elif k=='confidence':
-        #             pmt_val = pmt.from_float(float(v))
-        #         elif k=='label':
-        #             pmt_val = pmt.string_to_symbol(v)
-        #         else:
-        #             raise NotImplementedError('Did not expect parameter {}'.format(k))
-        #         d = pmt.dict_add(d, pmt.intern(k), pmt_val)
+        for box in detected_boxes:
+            d = pmt.make_dict()
+            # d = pmt.dict_add(d, pmt.intern('tstamp'), pmt.from_long(self.img_tstamp))
+            for k,v in box.items():
+                if k=='topleft' or k=='bottomright':
+                    pmt_val = pmt.make_dict()
+                    pmt_val = pmt.dict_add(pmt_val,
+                                        pmt.intern('x'),
+                                        pmt.from_long(v['x']))
+                    pmt_val = pmt.dict_add(pmt_val,
+                                        pmt.intern('y'),
+                                        pmt.from_long(v['y']))
+                elif k=='confidence':
+                    pmt_val = pmt.from_float(float(v))
+                elif k=='label':
+                    pmt_val = pmt.string_to_symbol(v)
+                else:
+                    raise NotImplementedError('Did not expect parameter {}'.format(k))
+                d = pmt.dict_add(d, pmt.intern(k), pmt_val)
+            self.stats.process_darkflow_results(d)
+            self.message_port_pub(pmt.intern('darkflow_out'),d)
+
