@@ -49,6 +49,8 @@ class TxFromFile(gr.top_block):
         # tmp_filename = os.path.join(tmp_path,'tmp_tx.32fc')
         freader = pkl_sig_format.WaveformPklReader(pkl_file)
         x = freader.read_section()
+        stage_data = freader.data()
+        spec_metadata = sda.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
         section_bounds = spec_metadata[0].section_bounds
         xsection = x[section_bounds[0]:section_bounds[1]]
         xtuple = tuple([complex(i) for i in xsection])
