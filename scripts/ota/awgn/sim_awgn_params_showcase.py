@@ -23,7 +23,7 @@ from labeling_framework.utils import typesystem_utils
 # #         yield func(*args)
 
 num_sections = 1
-section_size = 100000
+section_size = 500000#100000
 toffset_range = [100]
 frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
@@ -62,7 +62,7 @@ RF_params = [
 ]
 
 Rx_params = [
-    ('n_fft_averages',10),
+    ('n_fft_averages',50),
     ('img_row_offset',[0,50]),
     ('img_n_rows',104),
 ]
@@ -83,26 +83,11 @@ stage_params = {
             ('number_samples',wf_gen_samps),
             ('sample_rate',20e6),
             ('encoding',[0]),
-            ('pdu_length',[500]),
+            ('pdu_length',[1000]),
             ('pad_interval',5000),
             ('signal_representation',[spectrogram_representation])
         ],
         'Tx': Tx_params_wifi,
-        'RF': RF_params,
-        'Rx': Rx_params,
-        'RFVOCFormat': RFVOCFormat_params
-    },
-    'sig':
-    {
-        'waveform':
-        [
-            ('waveform',['square','saw']),
-            ('sample_rate',20e6),
-            ('frequency',[1e4,5e5]),
-            ('number_samples',wf_gen_samps),
-            ('signal_representation',[spectrogram_representation])
-        ],
-        'Tx': Tx_params,
         'RF': RF_params,
         'Rx': Rx_params,
         'RFVOCFormat': RFVOCFormat_params
@@ -121,12 +106,8 @@ stage_params = {
             ('samples_per_symbol',10),
             ('excess_bw',0.25),
             ('pre_diff_code',False),
-            ('burst_len', 1000),#[('poisson',3000,1000)]),
-            #SuperPoissonGenerator(3000,1000)),
-            #generic_generator(super_poisson,3000,1000)),
-            ('zero_pad_len',[('uniform',(10,5000))]),
-            #SuperPoissonGenerator(5000)),
-            #generic_generator(np.random.poisson,5000)),#5000),
+            ('burst_len', 5000),#[('poisson',3000,1000)]),
+            ('zero_pad_len',[('uniform',(10,50000))]),
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))])
         ],

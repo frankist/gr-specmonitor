@@ -177,7 +177,7 @@ class SectionSpectrogramMetadata(object):
 
     def img_size(self):
         # This is the number of rows without any averaging
-        num_rows = int(np.ceil((self.section_duration()-self.fftsize)/float(self.fftsize)))
+        num_rows = int(np.floor((self.section_duration()-self.fftsize)/float(self.fftsize))+1)
         # we apply the averaging now
         num_rows = int(np.floor((num_rows-(self.num_fft_avgs-self.num_fft_step))/self.num_fft_step))
         return (num_rows,self.fftsize)

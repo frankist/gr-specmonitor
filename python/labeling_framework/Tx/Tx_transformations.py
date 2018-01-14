@@ -73,7 +73,7 @@ def apply_framing_and_offsets(args):
     epsilon = params.get('epsilon',1)
     taps = None
     seed = 0
-    num_samples = num_sections*section_size
+    num_samples = int(num_sections*section_size)
     hist_len = 3 # compensate for block history# channel is hier block with taps in it
 
     ### Create preamble and frame structure
