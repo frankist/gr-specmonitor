@@ -66,7 +66,10 @@ namespace gr {
       d_index(0),
       d_length_tag_offset(0),
       d_finished(false),
-      d_state(STATE_WAIT)
+      d_state(STATE_WAIT),
+      d_phase_init(0),
+      d_bufnread(0),
+      d_rng(static_cast<std::uint32_t>(std::time(0)))
     {
       int param_idx = 0;
       if(d_distname=="poisson") {
@@ -99,6 +102,8 @@ namespace gr {
         throw std::invalid_argument(errmsg);
       }
 
+      d_cur_freq_offset = d_freq_dist(d_rng);
+
       update_npostpad();
       set_tag_propagation_policy(TPP_DONT);
     }
@@ -108,7 +113,7 @@ namespace gr {
      */
     random_burst_shaper_cc_impl::~random_burst_shaper_cc_impl()
     {
-      std::cout << "Going to auto destruct" << std::endl;
+      // std::cout << "Going to auto destruct" << std::endl;
       if(d_dist!=NULL)
         delete d_dist;
       d_dist = NULL;
@@ -118,12 +123,17 @@ namespace gr {
     random_burst_shaper_cc_impl::forecast (int noutput_items,
                                            gr_vector_int &ninput_items_required)
     {
-      if(STATE_POSTPAD) {
+      if(d_state==STATE_POSTPAD) {
         ninput_items_required[0] = 0;
       }
       else {
-        ninput_items_required[0] = noutput_items;
+        if(d_state==STATE_PREPAD or d_state==STATE_WAIT) {
+          ninput_items_required[0] = std::max(noutput_items-d_bufnread,1);
+        }
+        else
+          ninput_items_required[0] = std::max(noutput_items-d_bufnread,0);
       }
+      // std::cout << "FORECAST CALLED: " << d_state << "," << ninput_items_required[0] << std::endl;
     }
 
     int
@@ -132,8 +142,8 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-      const gr_complex *in = reinterpret_cast<const gr_complex *>(input_items[0]);
-      gr_complex *out = reinterpret_cast<gr_complex *>(output_items[0]);
+      const gr_complex *xin = reinterpret_cast<const gr_complex *>(input_items[0]);
+      gr_complex *xout = reinterpret_cast<gr_complex *>(output_items[0]);
 
       int nwritten = 0;
       int nread = 0;
@@ -141,32 +151,38 @@ namespace gr {
       int nskip = 0;
       int curr_tag_index = 0;
 
-      std::vector<tag_t> length_tags;
-      get_tags_in_window(length_tags, 0, 0, ninput_items[0], d_length_tag_key);
-      std::sort(length_tags.rbegin(), length_tags.rend(), tag_t::offset_compare);
+      get_tags_in_window(d_length_tags, 0, 0, ninput_items[0], d_length_tag_key);
+      std::sort(d_length_tags.rbegin(), d_length_tags.rend(), tag_t::offset_compare);
+
+      // std::cout << "I am at the start. Number of tags: " << d_length_tags.size()
+      //           << ", Number of input samples: " << ninput_items[0]
+      //           << ", Number of output samples: " << noutput_items
+      //           << ",state:" << d_state << ",is_WAIT:" << (d_state==STATE_WAIT)
+      //           << ",is_POSTPAD:" << (d_state==STATE_POSTPAD)
+      //           << ",d_index/d_total:" << d_index << "/" << d_limit << std::endl;
 
       while(nwritten < noutput_items) {
         // Only check the nread condition if we are actually reading
         // from the input stream.
-        if(d_state != STATE_POSTPAD) {
+        if(d_state != STATE_POSTPAD && d_state != STATE_PREPAD) {
           if(nread >= ninput_items[0]) {
             break;
           }
         }
 
-        if(d_finished) {
-          d_finished = false;
-          break;
-        }
+        // if(d_finished) {
+        //   d_finished = false;
+        //   break;
+        // }
 
         nspace = noutput_items - nwritten;
         switch(d_state) {
         case(STATE_WAIT):
-          if(!length_tags.empty()) {
-            d_length_tag_offset = length_tags.back().offset;
+          if(!d_length_tags.empty()) {
+            d_length_tag_offset = d_length_tags.back().offset;
             curr_tag_index = (int)(d_length_tag_offset - nitems_read(0));
-            d_ncopy = pmt::to_long(length_tags.back().value);
-            length_tags.pop_back();
+            d_ncopy = pmt::to_long(d_length_tags.back().value);
+            d_length_tags.pop_back();
             nskip = curr_tag_index - nread;
             add_length_tag(nwritten);
             propagate_tags(curr_tag_index, nwritten, 1, false);
@@ -174,30 +190,38 @@ namespace gr {
           }
           else {
             nskip = ninput_items[0] - nread;
+            // std::cout << "I am here! seed: " << d_dist->seed << ",nread:" << nread << ",nskip:" << nskip << std::endl;
           }
           if(nskip > 0) {
             GR_LOG_WARN(d_logger,
                         boost::format("Dropping %1% samples") %
                         nskip);
             nread += nskip;
-            in += nskip;
+            // exit(-1);
           }
           break;
 
         case(STATE_PREPAD):
-          write_padding(out, nwritten, nspace);
+          write_padding(&xout[nwritten], nwritten, nspace);
           if(d_index == d_limit)
             enter_copy();
           break;
 
         case(STATE_COPY):
-          copy_items(out, in, nwritten, nread, nspace);
+          // if(d_buffer.size()>0){
+          //   int ncopied = copy_items(&xout[nwritten],
+          //                            &d_buffer[0], nwritten,
+          //                            d_bufnread, nspace, d_buffer.size());
+          //   d_buffer.erase(d_buffer.begin(),d_buffer.begin()+ncopied);
+          // }
+          // else
+          copy_items(&xout[nwritten], &xin[nread], nwritten, nread, nspace, ninput_items[0]-nread);
           if(d_index == d_limit)
             enter_postpad();
           break;
 
         case(STATE_POSTPAD):
-          write_padding(out, nwritten, nspace);
+          write_padding(&xout[nwritten], nwritten, nspace);
           if(d_index == d_limit)
             enter_wait();
           break;
@@ -207,40 +231,50 @@ namespace gr {
         }
       }
 
+      // if(ninput_items[0]>nread) {
+      //   d_buffer.resize(ninput_items[0]-nread);
+      //   std::copy(&xin[nread], &xin[ninput_items[0]], &d_buffer[0]);
+      //   d_bufnread = -d_buffer.size();
+      // }
+
+      d_bufnread = ninput_items[0]-nread;
+      // std::cout << "I am out:" << nread << "," << ninput_items[0]
+      //           << ", this is my buffer size: " << d_bufnread << std::endl;
       consume_each(nread);
 
       return nwritten;
     }
 
-    void random_burst_shaper_cc_impl::update_npostpad() {
+    void random_burst_shaper_cc_impl::update_npostpad()
+    {
       d_npostpad = d_dist->gen();
-      // std::cout << "New postpad: " << d_npostpad << "\n";
     }
 
-    void random_burst_shaper_cc_impl::write_padding(gr_complex *&dst, int &nwritten, int nspace)
+    void random_burst_shaper_cc_impl::write_padding(gr_complex *dst, int &nwritten, int nspace)
     {
         int nprocess = std::min(d_limit - d_index, nspace);
         std::memset(dst, 0x00, nprocess * sizeof(gr_complex));
-        dst += nprocess;
         nwritten += nprocess;
         d_index += nprocess;
     }
 
-    void random_burst_shaper_cc_impl::copy_items(gr_complex *&dst,
-                                                 const gr_complex *&src,
+    int random_burst_shaper_cc_impl::copy_items(gr_complex *dst,
+                                                 const gr_complex *src,
                                                  int &nwritten,
                                                  int &nread,
-                                                 int nspace)
+                                                 int writespace,
+                                                 int readspace)
     {
-        int nprocess = std::min(d_limit - d_index, nspace);
-        propagate_tags(nread, nwritten, nprocess);
-        utils::frequency_shift<gr_complex>(dst,src,d_freq_offset_values[d_freq_dist(d_rng)],nprocess);
-        // std::memcpy(dst, src, nprocess * sizeof(gr_complex));
-        dst += nprocess;
-        nwritten += nprocess;
-        src += nprocess;
-        nread += nprocess;
-        d_index += nprocess;
+      float phase_init = (d_index==0) ? 0 : d_phase_init;
+      int nprocess = std::min(d_limit - d_index, std::min(writespace,readspace));
+      propagate_tags(nread, nwritten, nprocess);
+      d_phase_init = utils::frequency_shift<gr_complex>(dst,src,d_freq_offset_values[d_cur_freq_offset],nprocess, phase_init);
+      // std::memcpy(dst, src, nprocess * sizeof(gr_complex));
+      nwritten += nprocess;
+      nread += nprocess;
+      d_index += nprocess;
+
+      return nprocess;
     }
 
     void
@@ -280,10 +314,11 @@ namespace gr {
 
     void random_burst_shaper_cc_impl::enter_wait()
     {
-      d_finished = true;
+      //d_finished = true;
       d_index = 0;
       d_state = STATE_WAIT;
       update_npostpad();
+      d_cur_freq_offset = d_freq_dist(d_rng);
     }
 
     void random_burst_shaper_cc_impl::enter_prepad()

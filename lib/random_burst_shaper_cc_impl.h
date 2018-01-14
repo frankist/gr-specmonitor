@@ -23,6 +23,7 @@
 
 #include <specmonitor/random_burst_shaper_cc.h>
 #include <boost/random.hpp>
+#include <ctime>
 
 namespace gr {
   namespace specmonitor {
@@ -50,10 +51,15 @@ namespace gr {
       uint64_t d_length_tag_offset;
       bool d_finished;
       state_t d_state;
+      int d_cur_freq_offset;
+      std::vector<gr_complex> d_buffer;
+      float d_phase_init;
+      int d_bufnread;
+      std::vector<tag_t> d_length_tags;
 
-      void write_padding(gr_complex *&dst, int &nwritten, int nspace);
-      void copy_items(gr_complex *&dst, const gr_complex *&src, int &nwritten,
-                      int &nread, int nspace);
+      void write_padding(gr_complex *dst, int &nwritten, int nspace);
+      int copy_items(gr_complex *dst, const gr_complex *src, int &nwritten,
+                      int &nread, int nspace, int readspace);
       void add_length_tag(int offset);
       void propagate_tags(int in_offset, int out_offset, int count, bool skip=true);
       void enter_wait();
@@ -81,7 +87,10 @@ namespace gr {
     };
 
     struct DistAbstract {
+      std::uint32_t seed;
       boost::random::mt19937 rng;
+      DistAbstract() : seed(static_cast<std::uint32_t>(std::time(0))), rng(seed)
+      {}
       virtual int gen() = 0;
     };
 

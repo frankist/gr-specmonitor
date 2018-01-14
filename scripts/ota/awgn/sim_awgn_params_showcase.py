@@ -124,7 +124,7 @@ stage_params = {
             ('burst_len', 1000),#[('poisson',3000,1000)]),
             #SuperPoissonGenerator(3000,1000)),
             #generic_generator(super_poisson,3000,1000)),
-            ('zero_pad_len',[('uniform',(1,5000))]),
+            ('zero_pad_len',[('uniform',(10,5000))]),
             #SuperPoissonGenerator(5000)),
             #generic_generator(np.random.poisson,5000)),#5000),
             ('signal_representation',[spectrogram_representation]),

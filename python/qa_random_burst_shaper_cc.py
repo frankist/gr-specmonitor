@@ -98,17 +98,17 @@ class qa_random_burst_shaper_cc (gr_unittest.TestCase):
 
     def test_002_t (self):
         Nsamples = 10000
-        dist = 'poisson'
-        postpad = 400
+        dist = 'uniform'
         prepad = 0
         min_val = 10
-        max_val = 1000
-        params = (postpad,min_val,max_val)
+        max_val = 500
+        params = (min_val,max_val)
         burst_len = 500
         freq_values = (-0.325,-0.125,0.125,0.325)
         x = np.array(np.arange(100),np.complex64)#np.ones(1000,np.complex64)
         xtuple = tuple([complex(i) for i in x])
 
+        self.tb = gr.top_block ()
         vector_source = blocks.vector_source_c(xtuple,True)
         tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,burst_len,"packet_len")
         shaper = specmonitor.random_burst_shaper_cc(dist,params,prepad,freq_values,"packet_len")

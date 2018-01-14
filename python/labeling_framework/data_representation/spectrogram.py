@@ -129,7 +129,7 @@ def compute_timefreq_boxes(x,spec_params):
         Sxx = cancel_spectrogram_DCoffset(Sxx)
     Sxx = normalize_spectrogram(Sxx)
 
-    time_bounds = tfbox.compute_signal_time_bounds(x,Sxx.shape[1]/2)
+    time_bounds = tfbox.compute_signal_time_bounds(x,5)#Sxx.shape[1]/2)
     n_boxes = len(time_bounds)
     freq_bounds = compute_freq_norm_bounds(Sxx,len(x),time_bounds)
     assert len(freq_bounds)==n_boxes
