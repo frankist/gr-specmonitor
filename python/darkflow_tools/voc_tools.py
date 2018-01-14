@@ -18,6 +18,7 @@ def write_tmp_imgpaths_file(outfile,images_path):
                 continue
             # the respective annotation must exist
             fptr.write('{}\n'.format(fname))
+    print('Images path file saved in {}'.format(outfile))
 
 def convert(size, box):
     dw = 1./size[0]
@@ -57,6 +58,8 @@ def convert_to_darknet_annotation(darknet_annotations_path,
         b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
         bb = convert((w,h), b)
         out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+    out_file.close()
+    print('Darknet annotations written in',darknet_annotations_path)
 
 def generate_darknet_annotations(imgpaths_file,
                                  annotations_path,
@@ -82,6 +85,7 @@ def write_labels_file(outfilename,classes_list):
     with open(outfilename, 'w') as fptr:
         for c in classes_list:
             fptr.write('{}\n'.format(c))
+    print('Labels file written in',outfilename)
 
 def setup_darknet_dataset(cfg_obj):
     # parse needed params

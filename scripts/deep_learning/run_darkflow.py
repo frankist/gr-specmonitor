@@ -65,7 +65,7 @@ def predict_darkflow_model(cfg_obj,args):
         raise AssertionError('Please provide a ckpt number to load from.')
     options['load'] = int(args.load)
     if args.threshold is not None:
-        options['threshold'] = args.threshold
+        options['threshold'] = float(args.threshold)
 
     tfnet = TFNet(options)
     tfnet.predict()

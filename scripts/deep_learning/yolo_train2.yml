@@ -1,5 +1,5 @@
 dataset:
-  dataset_folder: ~/tmp/RFVOCFormat_showcase
+  dataset_folder: ../../python/tests/deep_learning/dataset
 #~/Dropbox/Programming/deep_learning/test_voc
   tmp_folder: ~/tmp/generated_files/tmp
   darkflow_folder: &flow ~/Dropbox/Programming/deep_learning/darkflow
@@ -16,3 +16,4 @@ model:
   classes:
     - wifi
     - generic_mod
+    - square

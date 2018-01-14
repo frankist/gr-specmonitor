@@ -56,7 +56,7 @@ class DarkflowFlowGraph(gr.top_block):
         self.usrp_source.set_gain(gaindB,0)
         self.toparallel = blocks.stream_to_vector(gr.sizeof_gr_complex, 64)
         self.fftblock = fft.fft_vcc(64,True,signal.get_window(('tukey',0.25),64),True)
-        self.spectroblock = spectrogram_img_c(64,104,104,10,True)
+        self.spectroblock = spectrogram_img_c(64,104,104,50,True)
         self.classifier = darkflow_ckpt_classifier_msg(self.yaml_config, 64)
 
         # make flowgraph
