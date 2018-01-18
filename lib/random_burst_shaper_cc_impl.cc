@@ -97,8 +97,14 @@ namespace gr {
         d_dist = new UniformIntDist(d_params[0],d_params[1]);
         param_idx+=2;
       }
+      else if(d_distname=="constant") {
+        if (d_params.size()!=1)
+          throw std::invalid_argument("Invalid number of parameters for the distribution");
+        d_dist = new ConstantValue(d_params[0]);
+        param_idx++;
+      }
       else {
-        std::string errmsg = "I do not recognise the distribution " + d_distname;
+        std::string errmsg = "I do not recognise the distribution \"" + d_distname + "\n";
         throw std::invalid_argument(errmsg);
       }
 

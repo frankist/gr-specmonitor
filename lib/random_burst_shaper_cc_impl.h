@@ -102,6 +102,14 @@ namespace gr {
       }
     };
 
+    struct ConstantValue : public DistAbstract {
+      int d_val;
+      ConstantValue(int val) : d_val(val) {}
+      int gen() {
+        return d_val;
+      }
+    };
+
     struct PoissonDist : public DistAbstract {
       boost::random::poisson_distribution<> d_dist;
       int d_offset;
