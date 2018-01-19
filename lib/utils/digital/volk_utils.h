@@ -21,6 +21,7 @@
 #include <volk/volk.h>
 #include <gnuradio/filter/fir_filter_with_buffer.h>
 #include <vector>
+#include <cassert>
 
 #ifndef VOLK_UTILS_H_
 #define VOLK_UTILS_H_
@@ -32,22 +33,22 @@ namespace volk_utils {
     T* vec;
     size_t d_capacity;
 
-    volk_array() : d_capacity(0) {
+    volk_array() : vec(NULL), d_capacity(0) {
     }
 
     volk_array(size_t cap) : d_capacity(cap) {
-      assert(cap>0);
       vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
     }
 
-    volk_array(const volk_array<T>& v) : d_capacity(0) {
+    volk_array(const volk_array<T>& v) : vec(NULL), d_capacity(0) {
       resize(v.capacity());
       std::copy(&v[0], &v[v.capacity()], &vec[0]);
     }
 
     ~volk_array() {
-      if(capacity()>0)
+      if(vec!=NULL)
         volk_free(vec);
+      vec=NULL;
     }
 
     inline size_t capacity() const { return d_capacity; }
@@ -57,10 +58,14 @@ namespace volk_utils {
     }
 
     inline void resize(size_t cap) {
-      if(d_capacity>0)
-        volk_free(vec);
-      d_capacity = cap;
+      assert(cap>=d_capacity); // FIXME: only grows for now
+      T* vec_old = vec;
       vec = (T*) volk_malloc(sizeof(T)*cap, volk_get_alignment());
+      if(vec_old!=NULL) {
+        std::copy(&vec_old[0],&vec_old[cap],&vec[0]);
+        volk_free(vec_old);
+      }
+      d_capacity = cap;
     }
 
     inline T& operator[](int i) {
@@ -82,12 +87,17 @@ namespace volk_utils {
     hist_volk_array() : d_hist_len(0) {
     }
 
-    hist_volk_array(int h_len, int len) : vec(len+h_len), d_hist_len(h_len) {
+    hist_volk_array(size_t h_len, size_t len) : vec(len+h_len), d_hist_len(h_len) {
     }
 
     void resize(int h_len, int len) {
       vec.resize(len+h_len);
       d_hist_len = h_len;
+    }
+
+    void resize(int len) {
+      assert(d_hist_len>=0);
+      vec.resize(d_hist_len+len);
     }
 
     inline T& operator[](int i) {
@@ -110,6 +120,72 @@ namespace volk_utils {
 
     inline int hist_len() const {
       return d_hist_len;
+    }
+
+    inline std::vector<T> vector_clone() const {
+      return std::vector<T>(&vec[0],&vec[vec.capacity()]);
+    }
+  };
+
+  template<typename T>
+  struct hist_volk_vector {
+    hist_volk_array<T> d_vec;
+    int d_size;
+
+    hist_volk_vector() : d_size(0) {}
+
+    hist_volk_vector(int h_len, int len) : d_vec(h_len,len), d_size(len) {}
+
+    inline void reserve(int h_len, int len) {
+      d_vec.resize(h_len,len);
+    }
+
+    inline void reserve(int len) {
+      d_vec.resize(len);
+    }
+
+    inline void resize(int new_size) {
+      if(d_vec.size()<new_size)
+        d_vec.resize(new_size);
+      d_size = new_size;
+    }
+
+    inline T& operator[](int i) {
+      return d_vec[i];
+    }
+
+    inline const T& operator[](int i) const {
+      return d_vec[i];
+    }
+
+    inline void flush() {
+      std::copy((&endref())-hist_len(), &endref(), &pastref());
+      d_size=0;
+    }
+
+    inline void flush(int new_size) {
+      flush();
+      resize(new_size);
+    }
+
+    inline int size() const {
+      return d_size;
+    }
+
+    inline int hist_len() const {
+      return d_vec.hist_len();
+    }
+
+    inline std::vector<T> vector_clone() const {
+      return std::vector<T>(&d_vec[-hist_len()],&d_vec[size()]);
+    }
+
+    inline T& endref() {return d_vec[size()];}
+    inline const T& endref() const {return d_vec[size()];}
+    inline T& pastref() {return d_vec[-hist_len()];}
+    inline const T& pastref() const {return d_vec[-hist_len()];}
+    inline void fill_history(T val) {
+      std::fill(&pastref(),&d_vec[0],val);
     }
   };
 
@@ -305,7 +381,7 @@ namespace volk_utils {
     moving_average<T>& operator=(const moving_average& m) {} // Note: disable this one too
   };
 
-  void compensate_cfo(gr_complex *y, const gr_complex* x, float frac_cfo, int len,
+  inline void compensate_cfo(gr_complex *y, const gr_complex* x, float frac_cfo, int len,
                          gr_complex phase_init = gr_complex(1.0f,0.0f)) {
     lv_32fc_t phase_increment = lv_cmake(std::cos(-frac_cfo*(float)(2*M_PI)),std::sin(-frac_cfo*(float)(2*M_PI)));
     // lv_32fc_t phase_init = lv_cmake(1.0f,0.0f);

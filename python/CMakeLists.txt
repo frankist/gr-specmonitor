@@ -60,3 +60,4 @@ GR_ADD_TEST(qa_spectrogram_img_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR
 GR_ADD_TEST(qa_darkflow_ckpt_classifier_msg ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_ckpt_classifier_msg.py)
 GR_ADD_TEST(qa_random_burst_shaper_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_random_burst_shaper_cc.py)
 GR_ADD_TEST(qa_darkflow_statistics_collector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_statistics_collector.py)
+add_test(qa_hier_preamble_detector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_hier_preamble_detector.py)

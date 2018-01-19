@@ -31,7 +31,8 @@ list(APPEND specmonitor_sources
     framer_snr_est_cc_impl.cc
     #frame_sync_cc_impl.cc
     spectrogram_img_c_impl.cc
-    random_burst_shaper_cc_impl.cc )
+    random_burst_shaper_cc_impl.cc
+    hier_preamble_detector.cc )
 
 set(specmonitor_sources "${specmonitor_sources}" PARENT_SCOPE)
 if(NOT specmonitor_sources)
@@ -65,6 +66,7 @@ include_directories(${CPPUNIT_INCLUDE_DIRS})
 list(APPEND test_specmonitor_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/test_specmonitor.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/qa_specmonitor.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/qa_hier_preamble_detector.cc
 #    ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.cc
     #${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.cc
