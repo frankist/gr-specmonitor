@@ -112,7 +112,8 @@ def normalize_spectrogram(Sxx):
     return imgfmt.normalize_image_data(Sxx)
 
 def cancel_spectrogram_DCoffset(Sxx):
-    pwr_min = np.min(Sxx)
+    # pwr_min = np.min(Sxx)
+    pwr_min = np.min(np.mean(Sxx,axis=1))
     Sxx[:,Sxx.shape[1]/2] = pwr_min
     return Sxx
 
@@ -191,6 +192,8 @@ class SectionSpectrogramMetadata(object):
         Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
         if self.input_params.get('cancel_DC_offset',False)==True:
             Sxx = cancel_spectrogram_DCoffset(Sxx)
+        if self.input_params.get('dB',False)==True:
+            Sxx = 10*np.log10(Sxx)
         Sxx = normalize_spectrogram(Sxx)
         if Sxx.shape!=self.img_size():
             logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
@@ -219,8 +222,10 @@ class SectionSpectrogramMetadata(object):
 
     def slice_by_img_dims(self,idx_start,idx_stop):
         imgsize = self.img_size()
-        assert min(idx_start,idx_stop)>=0 and max(idx_start,idx_stop)<=imgsize[0]
-        assert idx_stop>idx_start
+        test = min(idx_start,idx_stop)>=0 and max(idx_start,idx_stop)<=imgsize[0]
+        test &= idx_stop>idx_start
+        if test==False:
+            raise RuntimeError('The slice ({},{}) does not match image dims {}'.format(idx_start,idx_stop,imgsize))
 
         # new section
         section_dur = self.section_duration()

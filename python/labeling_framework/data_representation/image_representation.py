@@ -26,10 +26,20 @@ logger = logging_utils.DynamicLogger(__name__)
 
 ############ data transformation helpers ##############
 
-def normalize_image_data(img_data):
+def normalize_image_data(img_data,strict_bounds=False):
     val_range = (np.min(img_data),np.max(img_data))
     data_norm = (img_data-val_range[0])/(val_range[1]-val_range[0])
-    assert np.max(data_norm)<=1.0 and np.min(data_norm)>=0
+    if not (np.max(data_norm)<=1.0 and np.min(data_norm)>=0):
+        if strict_bounds is False and val_range[0]==-np.inf:
+            # if not strict, recompute normalized image
+            minval = np.min(np.isfinite(img_data))
+            idxs = np.isneginf(img_data)
+            img2 = np.array(img_data)
+            img2[idxs] = minval
+            data_norm = normalize_image_data(img2)
+            logger.warning('Normalization Failed. This was the img limits: {}. I am gonna set a minimum value of {}'.format(val_range,minval))
+        else:
+            raise RuntimeError('Normalization Failed. This was the img limits: {}'.format(val_range))
     return data_norm
 
 # consider deleting

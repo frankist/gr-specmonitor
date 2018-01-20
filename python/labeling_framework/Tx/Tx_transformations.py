@@ -70,9 +70,6 @@ def apply_framing_and_offsets(args):
     noise_voltage = 0#params.get('noise_voltage',0)
     freq_offset = params.get('frequency_offset',0)
     soft_gain = params.get('soft_gain',1)
-    epsilon = params.get('epsilon',1)
-    taps = None
-    seed = 0
     num_samples = int(num_sections*section_size)
     hist_len = 3 # compensate for block history# channel is hier block with taps in it
 
@@ -82,6 +79,7 @@ def apply_framing_and_offsets(args):
 
     ### Read IQsamples
     twin = (time_offset-fparams.guard_len-hist_len,time_offset+num_samples+fparams.guard_len)
+    assert twin[0]>=0
     xsections_with_hist = freader.read_section(twin[0],twin[1])
 
     ### Create GR flowgraph that picks read samples, applies freq_offset, scaling, and stores in a vector_sink

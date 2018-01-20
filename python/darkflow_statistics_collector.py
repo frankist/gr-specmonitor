@@ -47,7 +47,7 @@ class darkflow_statistics_collector(gr.basic_block):
         self.stats[label] += 1
 
         if (time.time()-self.last_print_tstamp)>self.print_period_sec:
-            # print 'stats:',self.stats
+            print 'stats:',self.stats
             kmax = self.label_mode()
             print 'STATUS: The channel contains',kmax,'signals'
             self.last_print_tstamp = time.time()

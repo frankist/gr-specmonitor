@@ -41,7 +41,7 @@ class TxFromFile(gr.top_block):
         # params
         # TODO: make reading from yaml
         sample_rate = 20.0e6
-        centre_freq = 3.5e9
+        centre_freq = 2.35e9
         gaindB = 20
 
         # write pickle to raw fc32

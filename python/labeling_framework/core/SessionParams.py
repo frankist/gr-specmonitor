@@ -171,9 +171,12 @@ def session_init(sargs):
     setup_remote_folders(sessiondata)
 
     # stores the pickle file of the session
-    logger.info('Going to save configuration of session in a pkl for fast access')
-    with open(SessionPaths.session_pkl(sessiondata),'wb') as f:
+    fname = SessionPaths.session_pkl(sessiondata)
+    logger.info('Going to save configuration of session in a pkl for fast access. This file can be found in {}'.format(fname))
+    with open(fname,'wb') as f:
         pickle.dump(sessiondata,f)
+
+    logger.trace('The session path is {}'.format(SessionPaths.session_folder(sessiondata)))
 
 # This function just checks if the hosts are reachable and sets up the session folder
 def setup_remote_folders(sessiondata):

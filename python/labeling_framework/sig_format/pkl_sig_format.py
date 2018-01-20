@@ -41,7 +41,8 @@ class WaveformPklReader:
     def read_section(self,startidx=0,endidx=None):
         if endidx is None:
             endidx = self.number_samples()
-        assert endidx <= self.number_samples() and startidx>=0
+        if endidx>self.number_samples() or startidx<0:
+            raise AssertionError('Invalid Boundaries. Is the signal to short? Boundaries: {}, Number of samples available: {}'.format((startidx,endidx), self.number_samples()))
         return self.wavdata['IQsamples'][startidx:endidx]
 
     def is_framed(self):
