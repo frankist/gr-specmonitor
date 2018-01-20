@@ -27,5 +27,6 @@ install(FILES
     specmonitor_darkflow_ckpt_classifier_msg.xml
     specmonitor_random_burst_shaper_cc.xml
     specmonitor_darkflow_statistics_collector.xml
-    specmonitor_hier_preamble_detector.xml DESTINATION share/gnuradio/grc/blocks
+    specmonitor_hier_preamble_detector.xml
+    specmonitor_foo_random_burst_shaper_cc.xml DESTINATION share/gnuradio/grc/blocks
 )

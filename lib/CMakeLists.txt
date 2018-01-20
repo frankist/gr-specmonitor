@@ -32,7 +32,8 @@ list(APPEND specmonitor_sources
     #frame_sync_cc_impl.cc
     spectrogram_img_c_impl.cc
     random_burst_shaper_cc_impl.cc
-    hier_preamble_detector.cc )
+    hier_preamble_detector.cc
+    foo_random_burst_shaper_cc_impl.cc )
 
 set(specmonitor_sources "${specmonitor_sources}" PARENT_SCOPE)
 if(NOT specmonitor_sources)

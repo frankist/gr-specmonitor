@@ -50,6 +50,7 @@ namespace gr {
       volk_utils::volk_array<unsigned char> d_mag2_byte;
       // cv::Mat d_img_mat;
       pmt::pmt_t d_pdu_vector;
+      std::vector<float> d_fft_pwr;
 
      public:
       spectrogram_img_c_impl(int fftsize, int nrows, int ncols, int n_avgs, bool cancel_DC);

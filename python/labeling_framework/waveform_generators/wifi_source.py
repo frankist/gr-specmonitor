@@ -73,13 +73,23 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
             frequency=5.89e9,  # NOTE: Rx only
             sensitivity= 0.56,  # NOTE: Rx only
         )
-        self.foo_packet_pad2 = foo.packet_pad2(
-            False, False, 0.01,
-            100, # Before padding
-            self.pad_interval)  # After padding
-        self.foo_packet_pad2.set_min_output_buffer(
-            96000)  # CHECK: What does this do?
-        # self.time_plot = gr_qtgui_utils.make_time_sink_c(1024, 20.0e6, "", 1)
+        self.packet_pad = specmonitor.foo_random_burst_shaper_cc(
+            False,
+            False,
+            0,
+            'uniform',
+            [0,self.pad_interval],
+            100, [0])
+        self.packet_pad.set_min_output_buffer(
+            96000)
+        # self.foo_packet_pad2 = foo.packet_pad2(
+        #     False, # Debug
+        #     False, 0.01,
+        #     100, # Before padding
+        #     self.pad_interval)  # After padding
+        # self.foo_packet_pad2.set_min_output_buffer(
+        #     96000)  # CHECK: What does this do?
+        # # self.time_plot = gr_qtgui_utils.make_time_sink_c(1024, 20.0e6, "", 1)
 
         self.blocks_null_source = blocks.null_source(gr.sizeof_gr_complex * 1)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
@@ -115,9 +125,9 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.connect((self.blocks_null_source, 0),
                      (self.wifi_phy_hier, 0))  # no reception
 
-        self.connect((self.wifi_phy_hier, 0), self.foo_packet_pad2)
+        self.connect((self.wifi_phy_hier, 0), self.packet_pad)
         # self.connect((self.wifi_phy_hier, 0), self.time_plot)
-        self.connect(self.foo_packet_pad2, self.head)
+        self.connect(self.packet_pad, self.head)
         self.connect(self.head, self.dst)
 
     def run(self): #NOTE: The message probe does not stop the block, so I had to find a work around

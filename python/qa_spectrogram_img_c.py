@@ -94,6 +94,7 @@ class qa_spectrogram_img_c (gr_unittest.TestCase):
         self.assertEqual(len(pmt.u8vector_elements(vecbytes_pmt)),104*64)
         self.assertEqual(imgu8.size,104*64)
         diff = np.sum(np.abs(np.array(Sxx_bytes,np.float32)-np.array(imgu8,np.float32)))
+        print 'diff:',diff
         self.assertTrue(diff<2)
         self.assertEqual(imgu8.dtype,np.uint8)
 

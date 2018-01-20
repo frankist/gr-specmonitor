@@ -28,5 +28,6 @@ install(FILES
     #frame_sync_cc.h
     spectrogram_img_c.h
     random_burst_shaper_cc.h
-    hier_preamble_detector.h DESTINATION include/specmonitor
+    hier_preamble_detector.h
+    foo_random_burst_shaper_cc.h DESTINATION include/specmonitor
 )

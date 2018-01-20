@@ -27,6 +27,7 @@
 #include <gnuradio/blocks/api.h>
 #include <gnuradio/blocks/pdu.h>
 #include <algorithm>
+#include <numeric>
 
 using namespace gr::blocks::pdu;
 
@@ -66,6 +67,7 @@ namespace gr {
       d_mag2_byte.resize(d_fftsize*d_nrows);
       d_img_size = d_fftsize*d_nrows;
       d_IQ_per_img = d_fftsize*d_nrows*d_n_avgs;
+      d_fft_pwr.resize(d_nrows);
 
       std::fill(&d_mag2_sum[0], &d_mag2_sum[d_img_size], 0);
       // register message ports
@@ -98,24 +100,30 @@ namespace gr {
         d_avg_count++;
         if(d_avg_count==d_n_avgs) {
           d_avg_count=0;
+          d_fft_pwr[d_idx_offset/d_fftsize] = std::accumulate(&d_mag2_sum[d_idx_offset],
+                                                              &d_mag2_sum[d_idx_offset+d_fftsize],
+                                                              0.0f)/d_fftsize;
           d_idx_offset+=d_fftsize;
           if(d_idx_offset==d_img_size) {
             // the image is ready here
             d_idx_offset=0;
 
             // cancel DC offset
-            float min_val = *std::min_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
             if(d_cancel_DC) {
+              float pwr_min = *std::min_element(d_fft_pwr.begin(),d_fft_pwr.end());
               for(int i = d_fftsize/2; i < d_img_size; i+=d_fftsize)
-                d_mag2_sum[i] = min_val;
+                d_mag2_sum[i] = pwr_min;
             }
 
             // normalize spectrogram
+            float min_val = *std::min_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
             float max_val = *std::max_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
             // unsigned int max_i;
             // volk_32f_index_max_16u(&max_i, &d_mag2_sum[0], d_mag2_sum.size());
+            max_val = 10*log10(max_val);
+            min_val = 10*log10(min_val);
             for(int i = 0; i < d_img_size; ++i)
-              d_mag2_byte[i] = (d_mag2_sum[i] - min_val)*255/(max_val-min_val);
+              d_mag2_byte[i] = (10*log10(d_mag2_sum[i]) - min_val)*255/(max_val-min_val);
 
             // create an opencv byte image with number of channels=3
             // d_img_mat = cv::Mat::zeros(d_nrows,d_ncols,cv::CV_8UC3);//CV_8U); // it has 3 channels

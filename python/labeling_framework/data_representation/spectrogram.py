@@ -192,7 +192,7 @@ class SectionSpectrogramMetadata(object):
         Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
         if self.input_params.get('cancel_DC_offset',False)==True:
             Sxx = cancel_spectrogram_DCoffset(Sxx)
-        if self.input_params.get('dB',False)==True:
+        if self.input_params.get('dB',True)==True:
             Sxx = 10*np.log10(Sxx)
         Sxx = normalize_spectrogram(Sxx)
         if Sxx.shape!=self.img_size():
