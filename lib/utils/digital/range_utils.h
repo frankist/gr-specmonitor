@@ -39,13 +39,14 @@ namespace utils {
     array_view(const T* b, const T* e) : d_begin(b), d_end(e) {}
     template<typename It>
     array_view(const It b, const It e) : d_begin(&(*b)), d_end(&(*e)) {}
-    void reset(T* b, T* e) {d_begin = b; d_end = e;}
+    void reset(const_iterator b, const_iterator e) {d_begin = b; d_end = e;}
+    // void reset(const T* b, const T* e) {d_begin = b; d_end = e;}
     inline array_view<T>::iterator begin() {return d_begin;}
     inline array_view<T>::iterator end() {return d_end;}
     inline array_view<T>::const_iterator begin() const {return d_begin;}
     inline array_view<T>::const_iterator end() const {return d_end;}
-    inline T* endref() {return d_end;}
-    inline const T* endref() const {return d_end;}
+    inline T& endref() {return *d_end;}
+    inline const T& endref() const {return *d_end;}
     inline T& operator[](size_t i) {
       assert(i<=size());
       return *(d_begin+i);}

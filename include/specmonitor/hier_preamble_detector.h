@@ -26,20 +26,72 @@
 #include <complex>
 #include "../../lib/utils/digital/volk_utils.h"
 #include "../../lib/utils/digital/range_utils.h"
+#include "../../lib/utils/digital/hist_algorithm.h"
+#include "frame_params.h"
+
+typedef std::complex<float> cplx;
 
 namespace gr {
 namespace specmonitor {
+  class PyFrameParams;
 
-  struct PreambleParams {
-    
+  class SPECMONITOR_API PyPreambleParams {
+  protected:
+    HierPreambleParams params;
+  public:
+    // NOTE: I didn't use inheritance because swig does not get it
+    PyPreambleParams(const std::vector<std::vector<cplx> >& plist,
+                   const std::vector<int>& plist_seq,
+                   const std::vector<cplx>& plist_coef);
+    inline const std::vector<cplx>& subseq(int i) const {return params.subseq(i);}
+    inline const std::vector<cplx>& subseq_norm(int i) const {return params.subseq_norm(i);}
+    inline const std::vector<cplx>& argcoef_subseq() const {return params.argcoef_subseq();}
+    inline const std::vector<int>& argidxs_subseq() const {return params.argidxs_subseq();}
+    inline int length() const {return params.length();}
+    inline const std::vector<cplx>& preamble() const {return params.preamble();}
+    friend class PyFrameParams;
+  };
+  // HierPreambleParams generate_hier_preamble(std::vector<int> subseq_len_list,
+  //                                        int n_subseq0, int num_repeats=1);
+
+  class SPECMONITOR_API PyFrameParams {
+    // Frame structure: [awgn_len | preamble | guard0 | guard1 | section | guard2 | guard3]
+    HierFrameParams fparams;
+  public:
+    PyFrameParams(PyPreambleParams pyparams, int glen, int awgnlen, int frameperiod);
+    inline PyPreambleParams preamble_params() const {
+      const HierPreambleParams &p = fparams.preamble_params;
+      return PyPreambleParams(p.subseq_list(),p.argidxs_subseq(),p.argcoef_subseq());
+    }
+    inline int section_duration() const {return fparams.section_duration();}
+    inline std::pair<int,int> section_interval() const {return fparams.section_interval();}
+    inline int guarded_section_duration() const {return fparams.guarded_section_duration();}
+    inline std::pair<int,int> guarded_section_interval() const {return fparams.guarded_section_interval();}
+    inline std::pair<int,int> preamble_interval() const {return fparams.preamble_interval();}
+    inline int awgn_gap_size() const {return fparams.awgn_len;}
+    inline int guard_length() const {return fparams.guard_len;}
+    inline int frame_period() const {return fparams.frame_period;}
   };
 
-  struct FrameParams {
-    PreambleParams preamble_params;
-  };
+  class SPECMONITOR_API PyTrackedPeak {
+  public:
+    int tidx;
+    float xcorr;
+    float xautocorr;
+    float cfo;
+    float preamble_mag2;
+    float awgn_mag2_nodc;
+    cplx dc_offset;
 
-  class TrackedPeak {
-
+    PyTrackedPeak(int tpeak, float xcorr_peak,
+                  float xautocorr_peak, float cfo_peak,
+                  float xmag2, float awgn_estim_nodc,
+                  cplx dc_offset_peak);
+    inline float snr() const {
+      return (preamble_mag2>=awgn_mag2_nodc) ? (preamble_mag2-awgn_mag2_nodc)/awgn_mag2_nodc : 0;
+    }
+    inline float SNRdB() const {return 10*log10(snr());}
+    std::string print();
   };
 
 /*!
@@ -49,24 +101,26 @@ namespace specmonitor {
 class SPECMONITOR_API hier_preamble_detector
 {
 public:
-  hier_preamble_detector(FrameParams fparams, int autocorr_margin = -1, float thres1 = 0.08, float thres2 = 0.04);
+  hier_preamble_detector(PyFrameParams fparams, int autocorr_margin = -1, float thres1 = 0.08, float thres2 = 0.04);
   // hier_preamble_detector() : d_fparams(), d_pparams(d_fparams.preamble_params) {}
   ~hier_preamble_detector();
-  void work(const std::vector<std::complex<float> > x_h);
-  void work(const std::complex<float>* x_h, int nsamples);
-  void work(const utils::hist_array_view<const std::complex<float> >&x_h);
+  void work(const std::vector<cplx > x_h);
+  void work(const cplx* x_h, int nsamples);
+  void work(const utils::hist_array_view<const cplx >&x_h);
+  std::vector<float> find_crosscorr_peak(int tpeak);
 
   // arguments
-  FrameParams d_fparams;
+  PyFrameParams d_fparams;
   int d_autocorr_margin;
   float d_thres1;
   float d_thres2;
 
   // derived
-  PreambleParams d_pparams;
-  utils::array_view<std::complex<float> > d_lvl2_seq;
-  std::vector<std::complex<float> > d_lvl2_seq_diff;
-  utils::array_view<std::complex<float> > d_pseq0;
+  PyPreambleParams d_pparams;
+  utils::array_view<const cplx> d_lvl2_seq;
+  std::vector<cplx> d_lvl2_seq_diff;
+  utils::array_view<const cplx> P0;
+  int L;
   int l0;
   int l1;
   int L0;
@@ -75,39 +129,78 @@ public:
 
   // internal
   long d_nread;
-  std::vector<TrackedPeak> d_peaks;
   int d_margin;
   std::vector<int> d_delay;
   std::vector<int> d_delay2;
   std::vector<int> d_delay_cum;
   std::vector<int> d_delay2_cum;
+  int d_hist_len;
   int d_hist_len2;
   int d_Ldiff;
   int d_x_hist_len;
+  std::vector<int> d_local_peaks;
+  std::vector<PyTrackedPeak> d_peaks;
 
  private:
   // internal buffers
-  volk_utils::hist_volk_array<std::complex<float> > x_h;
-  volk_utils::hist_volk_vector<std::complex<float> > xdc_mavg_h;
-  volk_utils::hist_volk_array<std::complex<float> > xnodc_h;
-  volk_utils::hist_volk_array<std::complex<float> > xschmidl_nodc_h;
-  std::vector<std::complex<float> > xschmidl_filt_nodc;
-  volk_utils::hist_volk_array<float> xcorr_nodc_h;
+  volk_utils::hist_volk_array<cplx > x_h;
+  volk_utils::hist_volk_vector<cplx > xdc_mavg_h;
+  volk_utils::hist_volk_vector<cplx > xnodc_h;
+  volk_utils::hist_volk_vector<cplx > xschmidl_nodc_h;
+  std::vector<cplx > xschmidl_filt_nodc;
+  volk_utils::hist_volk_vector<float> xcorr_nodc_h;
   std::vector<float> xcorr_filt_nodc;
-  volk_utils::hist_volk_array<float> xcrosscautocorr_nodc_h;
-  // SlidingWindowMaxHist* local_max_finder_h;
+  volk_utils::hist_volk_vector<float> xcrossautocorr_nodc_h;
+  utils::SlidingWindowMaxHist* local_max_finder_h;
 
-  // this is for debug mostly
+  std::vector<cplx> d_tmp;
+  std::vector<cplx> d_tmp2;
+
+  // this is for debug in python mostly
  public:
-  std::vector<std::complex<float> > DC_moving_average_buffer() const {
+  inline std::vector<cplx > DC_moving_average_buffer() const {
     return xdc_mavg_h.vector_clone();
   }
+  inline int DC_moving_average_buffer_hist_len() const {
+    return xdc_mavg_h.hist_len();
+  }
+  inline std::vector<cplx > DC_cancelled_buffer() const {
+    return xnodc_h.vector_clone();
+  }
+  inline int DC_cancelled_buffer_hist_len() const {
+    return xnodc_h.hist_len();
+  }
+  inline std::vector<cplx > SCox_noDC_buffer() const {
+    return xschmidl_nodc_h.vector_clone();
+  }
+  inline int SCox_noDC_hist_len() const {
+    return xschmidl_nodc_h.hist_len();
+  }
+  inline std::vector<cplx > SCox_filt_buffer() const {
+    return xschmidl_filt_nodc;
+  }
+  inline std::vector<float> crosscorrelation_noDC_buffer() const {
+    return xcorr_nodc_h.vector_clone();
+  }
+  inline int crosscorrelation_noDC_hist_len() const {
+    return xcorr_nodc_h.hist_len();
+  }
+  inline std::vector<float> crosscorrelation_filt_buffer() const {
+    return xcorr_filt_nodc;
+  }
+  inline std::vector<float> test_statistics_buffer() const {
+    return xcrossautocorr_nodc_h.vector_clone();
+  }
+  inline int test_statistics_hist_len() const {
+    return xcrossautocorr_nodc_h.hist_len();
+  }
+  inline std::vector<PyTrackedPeak> peaks() const {return d_peaks;}
 };
 
   // This is to call it from python
-  hier_preamble_detector make_hier_preamble_detector_from_json(std::string js) {
-    return hier_preamble_detector(FrameParams());
-  }
+  // hier_preamble_detector make_hier_preamble_detector_from_json(std::string js) {
+  //   return hier_preamble_detector(FrameParams());
+  // }
 
 } // namespace specmonitor
 } // namespace gr
