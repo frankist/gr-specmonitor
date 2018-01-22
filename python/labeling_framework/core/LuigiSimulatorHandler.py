@@ -27,6 +27,7 @@ import importlib
 import pickle
 
 # my package
+from . import session_settings
 from . import SessionParams as sp
 from . import StageParamData
 from ..utils.basic_utils import *
@@ -34,54 +35,15 @@ from ..utils import luigi_utils
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
-# this class stores the cmdline configuration of our session
-# loads the config_file and stores its values
-# class LuigiSessionData:
-#     def __init__(self,session_args,session_args):
-#         self.cmd_cfg = session_args
-#         self.params = session_args
-
-#     def session_name(self):
-#         return self.cmd_cfg['session_name']
-
-#     def cfg_filename(self):
-#         return self.cmd_cfg['cfg_file']
-
-#     @classmethod
-#     def load_cfg_file(cls,sim_name,cfg_file):
-#         if not os.path.isfile(cfg_file):
-#             logging.error('The provided config file %s does not seem to exist',cfg_file)
-#             exit(-1)
-#         # Remove the extension and load the cfg_file
-#         fbase = os.path.splitext(os.path.basename(cfg_file))[0]
-#         logging.info('Going to load config file %s',fbase)
-#         try:
-#             cfg_module = importlib.import_module(fbase)
-#         except Exception, e:
-#             logging.error('Could not open config file: ',str(e))
-#             exit(-1)
-#         # TODO: Parse the module to see if every variable is initialized
-#         sp = session_args.TaggedMultiStageParams(cfg_module.tags,
-#                                                    cfg_module.stage_names,
-#                                                    cfg_module.stage_params)
-#         return cls(sim_name,sp)
-
-#     @staticmethod
-#     def load_pkl(cfgparams):
-#         with open(SessionFileNames.session_pkl(cfgparams),'r') as f:
-#             return pickle.load(f)
-
 # Luigi Tasks
 
 # this task just verifies if the cfg file exists
-
 
 class LuigiSessionCfgFile(luigi.ExternalTask):
     session_args = luigi.DictParameter()  # {'session_path':x,'cfg_file':y}
 
     def output(self):
         return luigi.LocalTarget(self.session_args['cfg_file'])
-
 
 class SessionInit(luigi.Task):
     session_args = luigi.DictParameter()
@@ -155,6 +117,9 @@ class CmdSession(luigi.WrapperTask):
             callers += self.get_luigi_callers(sessiondata, s)
         return callers
 
+    def get_stage_caller(self,stage_name):
+        return session_settings.retrieve_task_handler(stage_name)
+
     # creates a list of callers respective to stage given as argument
     # each caller corresponds to a different iteration of stage parameters
     def get_luigi_callers(self, sessiondata, stage):
@@ -163,7 +128,7 @@ class CmdSession(luigi.WrapperTask):
         if not stage_task_caller:
             logger.error('Method %s not implemented', stage)
             raise NotImplementedError('Method %s not implemented' % stage)
-        return [stage_task_caller(self.session_args(), idxs) for idxs in list(stage_idx_list)]
+        return [stage_task_caller(self.session_args(), list(idxs)) for idxs in stage_idx_list]
 
 # this is for tasks that are run just once
 class SessionLuigiTask(luigi.Task):
@@ -185,13 +150,25 @@ class SessionLuigiTask(luigi.Task):
 class StageLuigiTask(luigi.Task):
     session_args = luigi.DictParameter()
     stage_idxs = luigi.ListParameter()
-    output_fmt = luigi.Parameter(significant=False,default='.pkl') 
+    output_fmt = luigi.Parameter(significant=False,default='.pkl')
 
     def load_sessiondata(self):
         return sp.load_session(self.session_args)
 
     def my_task_name(self):
         return self.__class__.__name__
+
+    @staticmethod
+    def mkdir_flag():
+        return True
+
+    def requires(self):
+        """ Default requires() is deduced from the dependency tree """
+        sessiondata = self.load_sessiondata()
+        this_stage = self.my_task_name()
+        parent_stage = sessiondata.stage_dependency_tree.get_stage_dependency(this_stage)
+        taskhandler = session_settings.retrieve_task_handler(parent_stage)
+        return taskhandler(self.session_args,self.stage_idxs[0:-1])
 
     def output(self):
         stage_name = self.my_task_name()

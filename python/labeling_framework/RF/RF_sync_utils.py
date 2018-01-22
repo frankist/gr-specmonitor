@@ -163,7 +163,7 @@ def setup_remote_rx(sessiondata,hostnames,params_to_send):
         json.dump(params_to_send,f)
     assert os.path.isfile(tmp_params_file)
 
-    # send the stored params to the remote user 
+    # send the stored params to the remote user
     if isinstance(hostnames,str):
         hostnames = [hostnames]
     for h in hostnames:

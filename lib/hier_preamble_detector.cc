@@ -247,7 +247,11 @@ std::vector<float> hier_preamble_detector::find_crosscorr_peak(int tpeak) {
   float ymag2 = utils::mean_mag2(&xnodc_h[twin0+maxi],l1);
   float xcorr = std::norm(d_tmp2[maxi]/(float)pseq1.size());
 
-  return std::vector<float>({xcorr,cfo,ymag2});
+  std::vector<float> ret;
+  ret.push_back(xcorr);
+  ret.push_back(cfo);
+  ret.push_back(ymag2);
+  return ret;//std::vector<float>({xcorr,cfo,ymag2});
 }
 
 } /* namespace specmonitor */

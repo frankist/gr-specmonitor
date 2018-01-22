@@ -36,6 +36,7 @@ from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
 import foo
 import ieee802_11
 import pmt
+import specmonitor
 # import gr_qtgui_utils
 
 # labeling_framework package
@@ -63,7 +64,12 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.pdu_length = pdu_length  # size of the message passed to the WiFi [1,1500]
         assert isinstance(encoding, (int, str))
         self.encoding = encoding if isinstance(encoding,int) else GrWifiFlowgraph.encoding_labels.index(encoding)
-        self.pad_interval = pad_interval
+        if isinstance(pad_interval,tuple):
+            self.distname = pad_interval[0]
+            self.pad_interval = pad_interval[1]
+        else:
+            self.distname = 'constant'
+            self.pad_interval = (pad_interval,)
 
         # phy
         self.wifi_phy_hier = wifi_phy_hier(
@@ -77,11 +83,11 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
             False,
             False,
             0,
-            'uniform',
-            [0,self.pad_interval],
+            self.distname,
+            self.pad_interval,
             100, [0])
         self.packet_pad.set_min_output_buffer(
-            96000)
+            200000)
         # self.foo_packet_pad2 = foo.packet_pad2(
         #     False, # Debug
         #     False, 0.01,

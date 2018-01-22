@@ -37,7 +37,12 @@ stage_dependency_tree = {
     'Rx':'RF',
     'RFImg':'RF',
     'RFLabels':'RF',
-    'RFVOCFormat':'Rx'
+    'RFVOCFormat':'Rx',
+    'waveformCleanIQ':'waveform',
+    'TxCleanIQ':'Tx',
+    'RFCleanIQ':'RF',
+    'RxCleanIQ':'Rx',
+    'RFVOCFormatCleanIQ':'RFVOCFormat'
 }
 
 Tx_params = [

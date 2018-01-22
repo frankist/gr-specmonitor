@@ -23,6 +23,7 @@ import importlib
 import pickle
 # import itertools
 
+import session_settings
 from . import StageParamData
 from . import StageDependencyTree as sdt
 from ..utils import ssh_utils
@@ -46,6 +47,9 @@ class SessionInstanceArguments:
     def session_config_file(self):
         return self.cfg_filename
 
+    def todict(self):
+        return {'session_path':self.sessionabspath,'cfg_file':self.cfg_filename}
+
     @classmethod
     def load_dict(cls,d):
         return cls(d['session_path'],d['cfg_file'])
@@ -61,7 +65,7 @@ class SessionData:
         return self.session_args
 
     def remote_exists(self):
-        return len(self.ssh_hosts)>0
+        return self.ssh_hosts is not None and len(self.ssh_hosts)>0
 
     def stage_name_list(self):
         return self.stage_dependency_tree.stage_names
@@ -85,7 +89,24 @@ class SessionData:
 
     def hosts(self):
         return self.ssh_hosts
-    
+
+    def child_stage_idxs(self,stage_name,this_stage_idxs=None):
+        child_tasks = self.stage_dependency_tree.get_stage_childs(stage_name)
+        l = {}
+        for c in child_tasks:
+            taskhandler = session_settings.retrieve_task_handler(c)
+            if this_stage_idxs is None:
+                l[taskhandler] = [stage_idxs for stage_idxs in self.get_session_idx_tuples(c)]
+            else:
+                l[taskhandler] = [stage_idxs for stage_idxs in self.get_session_idx_tuples(c) if tuple(this_stage_idxs)==stage_idxs[0:-1]]
+                # idxs_list = self.get_session_idx_tuples(c)
+            # for stage_idxs in idxs_list:
+            #     taskinstance=taskhandler(self.session_args.todict(), stage_idxs)
+            #     print 'this is the output:',taskinstance.output().path
+            #     l.append(taskinstance.output().path)
+            #     # l.append(SessionPaths.stage_outputfile(self.stage_params, c, stage_idxs,taskhandler.output_fmt))
+        return l
+
     @classmethod
     def load_cfg(cls,session_args):
         cfg_file = session_args.session_config_file()
@@ -115,7 +136,7 @@ class SessionPaths:
         elif isinstance(data,SessionData):
             return data.args()
         return SessionInstanceArguments.load_dict(data)
-        
+
     @staticmethod
     def session_folder(data):
         return SessionPaths.__session_args__(data).session_path()
@@ -206,4 +227,6 @@ def setup_local_folders(sessiondata):
 
     # setup stage folders
     for stage in stage_names:
-        try_mkdir(SessionPaths.stage_folder(sessiondata,stage))
+        stage_task = session_settings.retrieve_task_handler(stage)
+        if stage_task.mkdir_flag() is True:
+            try_mkdir(SessionPaths.stage_folder(sessiondata,stage))

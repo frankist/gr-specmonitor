@@ -47,6 +47,14 @@ class StageDependencyTree:
         else:
             return None
 
+    def get_stage_childs(self,stage_name):
+        assert stage_name in self.stage_names
+        l = []
+        for k,v in self.dep_tree.items():
+            if v==stage_name:
+                l.append(k)
+        return l
+
     def __compute_stage_names__(self):
         unique_names = set(self.dep_tree.keys()) | set(self.dep_tree.values())
         return list(unique_names)
