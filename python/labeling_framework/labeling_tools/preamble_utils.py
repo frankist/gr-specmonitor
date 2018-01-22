@@ -289,7 +289,6 @@ class PreambleDetectorType2:
                 dc_offset = np.mean(self.x_h[tpeak-self.awgn_len:tpeak])
                 xmag2_mavg_nodc = np.mean(np.abs(self.x_h[tpeak:tpeak+L]-dc_offset)**2) # for the whole preamble
                 # xmag2_mavg = np.mean(self.xmag2_h[tpeak:tpeak+L]) # for the whole preamble
-                print 'py comp:',xcorr,self.thres2,l1mag2
                 if l1mag2>0 and xcorr <= self.thres2*l1mag2:#xmag2_mavg_nodc:
                     continue
                 # recompute values for the new peak
@@ -297,7 +296,6 @@ class PreambleDetectorType2:
                 #     xautocorr_nodc = self.xschmidl_filt_mag_nodc[tpeak+self.delay_cum[2]]
                 awgn_estim_nodc = np.mean(np.abs(self.x_h[tpeak-self.awgn_len:tpeak]-dc_offset)**2)
                 xautocorr_nodc = np.abs(self.xschmidl_filt_nodc[i])
-                print 'py:',dc_offset,xmag2_mavg_nodc,awgn_estim_nodc
                 # awgn_estim = np.mean(self.xmag2_h[tpeak-self.awgn_len:tpeak])
                 p = tracked_peak(tpeak+self.nread,xcorr,xautocorr_nodc,cfo,xmag2_mavg_nodc,awgn_estim_nodc,dc_offset)
                 self.peaks.append(p)
