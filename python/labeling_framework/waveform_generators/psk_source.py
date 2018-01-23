@@ -75,6 +75,7 @@ class GeneralModFlowgraph(gr.top_block):
 
         # params
         self.n_written_samples = int(n_written_samples)
+        self.n_offset_samples = int(np.random.randint(0,self.n_written_samples))
         self.constellation_obj = constellation_obj
         self.samples_per_symbol = samples_per_symbol #TODO
         self.excess_bw = excess_bw # TODO
@@ -106,6 +107,7 @@ class GeneralModFlowgraph(gr.top_block):
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.burst_len,"packet_len")
         # self.burst_shaper = digital.burst_shaper_cc((1+0*1j,),100,self.zero_pad_len,False)
         self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist,self.zero_pad_len,0,self.frequency_offset,"packet_len")
+        self.skiphead = blocks.skiphead(gr.sizeof_gr_complex, self.n_offset_samples)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
         self.dst = blocks.vector_sink_c()
         # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
@@ -119,7 +121,8 @@ class GeneralModFlowgraph(gr.top_block):
         self.connect(self.data_gen, self.mod)
         self.connect(self.mod, self.tagger)
         self.connect(self.tagger, self.burst_shaper)
-        self.connect(self.burst_shaper, self.head)
+        self.connect(self.burst_shaper, self.skiphead)
+        self.connect(self.skiphead, self.head)
         self.connect(self.head, self.dst)
 
     def run(self): # There is some bug with this gr version when I use streams

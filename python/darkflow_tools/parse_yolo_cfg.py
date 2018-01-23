@@ -1,6 +1,7 @@
 from future import standard_library
 standard_library.install_aliases()
 from builtins import object
+from labeling_framework.utils.filesystem_utils import *
 import yaml
 import os
 import configparser
@@ -13,6 +14,7 @@ class YOLOCfgPaths(object):
     def __init__(self,cfg_params, yml_path):
         self.cfg_params = dict(cfg_params)
         self.yml_path = yml_path
+        self.setup_paths()
         self.assert_validity()
 
     def abspath(self, relative_path):
@@ -20,6 +22,12 @@ class YOLOCfgPaths(object):
 
     def assert_validity(self):
         assert_yaml_cfg_correctness(self)
+
+    def setup_paths(self):
+        # setup tmp folder which is going to be used as output
+        try_mkdir(self.tmp_path())
+        # setup ckpt folder
+        try_mkdir(os.path.join(self.tmp_path(),'ckpt'))
 
     def dataset_path(self):
         return self.abspath(os.path.expanduser(self.cfg_params['dataset']['dataset_folder']))

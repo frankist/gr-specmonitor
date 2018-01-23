@@ -100,6 +100,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         # # self.time_plot = gr_qtgui_utils.make_time_sink_c(1024, 20.0e6, "", 1)
 
         self.blocks_null_source = blocks.null_source(gr.sizeof_gr_complex * 1)
+        self.skiphead = blocks.skiphead(gr.sizeof_gr_complex, self.n_offset_samples)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
         self.dst = blocks.vector_sink_c()
         # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
