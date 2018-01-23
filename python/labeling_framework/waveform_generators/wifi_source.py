@@ -52,6 +52,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
     def __init__(self,
                  n_written_samples,
+                 n_offset_samples,
                  encoding=0,
                  pdu_length=500,
                  pad_interval=1000,
@@ -60,6 +61,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
         # params
         self.n_written_samples = int(n_written_samples)
+        self.n_offset_samples = int(n_offset_samples) if n_offset_samples is not None else np.random.randint(0,self.n_written_samples)
         self.linear_gain = float(linear_gain)
         self.pdu_length = pdu_length  # size of the message passed to the WiFi [1,1500]
         assert isinstance(encoding, (int, str))
@@ -69,7 +71,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
             self.pad_interval = pad_interval[1]
         else:
             self.distname = 'constant'
-            self.pad_interval = (pad_interval,)
+            self.pad_interval = tuple(pad_interval)
 
         # phy
         self.wifi_phy_hier = wifi_phy_hier(
@@ -133,7 +135,8 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
         self.connect((self.wifi_phy_hier, 0), self.packet_pad)
         # self.connect((self.wifi_phy_hier, 0), self.time_plot)
-        self.connect(self.packet_pad, self.head)
+        self.connect(self.packet_pad, self.skiphead)
+        self.connect(self.skiphead, self.head)
         self.connect(self.head, self.dst)
 
     def run(self): #NOTE: The message probe does not stop the block, so I had to find a work around
@@ -152,6 +155,7 @@ def run(args):
     # create Wifi block
     tb = GrWifiFlowgraph(
         d['number_samples'],
+        d.get('number_offset_samples',None),
         encoding=d['encoding'],
         pdu_length=d['pdu_length'],
         pad_interval=d['pad_interval'])
@@ -176,6 +180,7 @@ if __name__ == '__main__':
     args = {
         'parameters': {
             'number_samples': 100000,
+            'number_offset_samples': 0,
             'encoding': 0,
             'pdu_length': 500,
             'pad_interval': 5000,

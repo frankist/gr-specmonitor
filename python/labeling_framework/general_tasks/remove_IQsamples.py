@@ -33,7 +33,7 @@ from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class RemoveIQSamples(lsh.StageLuigiTask):
-    completed = luigi.Parameter(significant=False,default=False)
+    completed = luigi.BoolParameter(significant=False,default=False)
 
     def stage2clean(self):
         raise NotImplementedError('This is an abstract class')
@@ -43,9 +43,11 @@ class RemoveIQSamples(lsh.StageLuigiTask):
         return False
 
     def requires(self):
+        ret = super(RemoveIQSamples,self).requires()
+        if not isinstance(ret,list):
+            ret = [ret]
         sessiondata = self.load_sessiondata()
         resulttasktuples = sessiondata.child_stage_idxs(self.stage2clean(),self.stage_idxs[0:-1])
-        ret = []
         for taskhandler,child_stage_idx_list in resulttasktuples.items():
             if taskhandler.__name__ == self.my_task_name():
                 continue

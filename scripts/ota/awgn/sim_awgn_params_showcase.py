@@ -2,7 +2,6 @@
 
 import numpy as np
 import sys
-sys.path.append('../../../python/')
 from labeling_framework.utils import typesystem_utils
 
 num_sections = 1

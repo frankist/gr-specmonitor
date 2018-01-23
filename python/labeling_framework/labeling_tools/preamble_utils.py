@@ -332,8 +332,15 @@ def compensate_cfo(x,cfo):
 def pmt_to_tracked_peaks(pmt_vector):
     return [tracked_peak.from_pmt(pmt.vector_ref(pmt_vector,i)) for i in range(pmt.length(pmt_vector))]
 
+def to_PyPreambleParams(pparams):
+    return specmonitor.PyPreambleParams(pparams.pseq_list,pparams.pseq_list_seq,pparams.pseq_list_coef)
+
+def to_PyFrameParams(fparams):
+    pypparams = to_PyPreambleParams(fparams.preamble_params)
+    return specmonitor.PyFrameParams(pypparams,fparams.guard_len,fparams.awgn_len,fparams.frame_period)
+
 class PyHierPreambleDetector:
-    def __init__(self, fparams, autocorr_margin=None, thres1=0.08, thres2=0.04):
+    def __init__(self, fparams, autocorr_margin=-1, thres1=0.08, thres2=0.04):
         self.detec = specmonitor.hier_preamble_detector(fparams,autocorr_margin, thres1, thres2)
         self.x_hist_len = self.detec.d_x_hist_len
         self.x_hist_buffer = [complex(0,0)]*self.x_hist_len
@@ -344,7 +351,7 @@ class PyHierPreambleDetector:
         self.detec.work(x_with_hist)
         self.x_hist_buffer = x_with_hist[len(x_with_hist)-self.x_hist_len::]
 
-    def peaks(self,x):
-        return pmt_to_tracked_peaks(detec.peaks())
+    def peaks(self):
+        return pmt_to_tracked_peaks(self.detec.pypeaks())
 
 

@@ -86,7 +86,8 @@ def filter_valid_peaks(detected_peaks,frame_period,n_sections,valid_window):
 def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsuperframe,Nsettle):
     block_size = 100000 # we read in chunks
     thres = [0.14,0.1]
-    pdetec = preamble_utils.PreambleDetectorType2(fparams,thres1=thres[0],thres2=thres[1])
+    # pdetec = preamble_utils.PreambleDetectorType2(fparams,thres1=thres[0],thres2=thres[1])
+    pdetec = preamble_utils.PyHierPreambleDetector(preamble_utils.to_PyFrameParams(fparams),thres1=thres[0],thres2=thres[1])
     _,n_rx_samples,valid_rx_window = get_recording_params(Nsettle,Nsuperframe,fparams.frame_period)
 
     # check for peaks in chunks
@@ -104,7 +105,8 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
         logger.exception(err_msg)
         raise AssertionError(err_msg)
 
-    selected_peaks = filter_valid_peaks(pdetec.peaks,fparams.frame_period,n_sections,valid_rx_window)
+    # selected_peaks = filter_valid_peaks(pdetec.peaks,fparams.frame_period,n_sections,valid_rx_window)
+    selected_peaks = filter_valid_peaks(pdetec.peaks(),fparams.frame_period,n_sections,valid_rx_window)
     if selected_peaks is None:
         return None
 
