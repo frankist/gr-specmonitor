@@ -26,6 +26,64 @@ def generate_hier_preamble(pseq_len_list,pseq_lvl2_len,num_repeats=1):
     pseq_len_seq = [0]*(pseq_lvl2_len*num_repeats+1)+[1]
     return specmonitor.PyPreambleParams(pseq_list,pseq_len_seq,pseq_list_coef)
 
+def assert_consistency(tester,pydetec,detec,pypparams,pparams,x_with_hist):
+    # initialization asserts
+    x_hlen = pydetec.x_h.hist_len
+    xdc_mavg_hlen = pydetec.xdc_mavg_h.hist_len
+    xnodc_hlen = pydetec.xnodc_h.hist_len
+    xschmidl_nodc_hlen = pydetec.xschmidl_nodc.hist_len
+    xcorr_nodc_hlen = pydetec.xcorr_nodc.hist_len
+    xcrossautocorr_nodc_hlen = pydetec.xcrossautocorr_nodc.hist_len
+    tester.assertTrue(array_almost_equal(pypparams.pseq_list[0], pparams.subseq(0)))
+    tester.assertTrue(array_almost_equal(pypparams.pseq_list_norm[0], pparams.subseq_norm(0)))
+    tester.assertEqual(pydetec.__max_margin__,detec.N_margin)
+    tester.assertEqual(pydetec.L0,detec.L0)
+    tester.assertEqual(x_hlen,detec.d_x_hist_len)
+    tester.assertEqual(xdc_mavg_hlen,detec.DC_moving_average_buffer_hist_len())
+    tester.assertEqual(xnodc_hlen,detec.DC_cancelled_buffer_hist_len())
+    tester.assertEqual(xschmidl_nodc_hlen,detec.SCox_noDC_hist_len())
+    tester.assertEqual(xcorr_nodc_hlen,detec.crosscorrelation_noDC_hist_len())
+    tester.assertEqual(xcrossautocorr_nodc_hlen,detec.test_statistics_hist_len())
+
+    # assert buffers
+    L0 = detec.L0
+    x_h_len = len(x_with_hist)-x_hlen
+    xdc_mavg_h = detec.DC_moving_average_buffer()
+    pyxdc_mavg_h = pydetec.xdc_mavg_h[-xdc_mavg_hlen::]
+    xnodc_h = detec.DC_cancelled_buffer()
+    pyxnodc_h = pydetec.xnodc_h[-xnodc_hlen::]
+    xschmidl_nodc_h = detec.SCox_noDC_buffer()
+    pyxschmidl_nodc_h = pydetec.xschmidl_nodc[-xschmidl_nodc_hlen::]
+    xschmidl_filt_nodc = detec.SCox_filt_buffer()
+    pyxschmidl_filt_nodc = pydetec.xschmidl_filt_nodc
+    xcorr_nodc_h = detec.crosscorrelation_noDC_buffer()
+    pyxcorr_nodc_h = pydetec.xcorr_nodc[-xcorr_nodc_hlen::]
+    xcrossautocorr_nodc_h = detec.test_statistics_buffer()
+    pyxcrossautocorr_nodc_h = pydetec.xcrossautocorr_nodc[-xcrossautocorr_nodc_hlen::]
+    tester.assertEqual(len(xdc_mavg_h),x_h_len+xdc_mavg_hlen)
+    tester.assertTrue(array_almost_equal(x_with_hist,pydetec.x_h[-x_hlen::]))
+    tester.assertTrue(array_almost_equal(xdc_mavg_h,pyxdc_mavg_h))
+    tester.assertTrue(array_almost_equal(xnodc_h,pyxnodc_h))
+    tester.assertTrue(array_almost_equal(xschmidl_nodc_h,pyxschmidl_nodc_h))
+    tester.assertTrue(array_almost_equal(xschmidl_filt_nodc,pyxschmidl_filt_nodc,4))
+    tester.assertTrue(array_almost_equal(xcorr_nodc_h,pyxcorr_nodc_h,4))
+    tester.assertTrue(array_almost_equal(xcrossautocorr_nodc_h,pyxcrossautocorr_nodc_h,4))
+
+    # assert moving average
+    for i in range(x_h_len):
+        movavg = np.sum(x_with_hist[i+x_hlen-L0+1:i+x_hlen+1])/float(L0)
+        tester.assertAlmostEqual(movavg,xdc_mavg_h[i+xdc_mavg_hlen],5)
+
+    # assert peaks are consistent
+    peaks = preamble_utils.pmt_to_tracked_peaks(detec.pypeaks())
+    pypeaks = pydetec.peaks
+    tester.assertEqual(len(peaks),len(pypeaks))
+    for i,p in enumerate(pypeaks):
+        tester.assertTrue(p.is_almost_equal(peaks[i],5))
+    # plt.plot(xcorr_nodc_h)
+    # plt.plot(pyxcorr_nodc_h,'r:')
+    # plt.show()
+
 class TestArrays(unittest.TestCase):
     def test_array_values(self):
         guard_len = 5
@@ -56,16 +114,6 @@ class TestArrays(unittest.TestCase):
         xschmidl_nodc_hlen = pydetec.xschmidl_nodc.hist_len
         xcorr_nodc_hlen = pydetec.xcorr_nodc.hist_len
         xcrossautocorr_nodc_hlen = pydetec.xcrossautocorr_nodc.hist_len
-        self.assertTrue(array_almost_equal(pypparams.pseq_list[0], pparams.subseq(0)))
-        self.assertTrue(array_almost_equal(pypparams.pseq_list_norm[0], pparams.subseq_norm(0)))
-        self.assertEqual(pydetec.__max_margin__,detec.N_margin)
-        self.assertEqual(pydetec.L0,detec.L0)
-        self.assertEqual(x_hlen,detec.d_x_hist_len)
-        self.assertEqual(xdc_mavg_hlen,detec.DC_moving_average_buffer_hist_len())
-        self.assertEqual(xnodc_hlen,detec.DC_cancelled_buffer_hist_len())
-        self.assertEqual(xschmidl_nodc_hlen,detec.SCox_noDC_hist_len())
-        self.assertEqual(xcorr_nodc_hlen,detec.crosscorrelation_noDC_hist_len())
-        self.assertEqual(xcrossautocorr_nodc_hlen,detec.test_statistics_hist_len())
 
         xlen = pyfparams.section_duration()+guard_len*2
         x = np.zeros(xlen,np.complex64)
@@ -76,56 +124,8 @@ class TestArrays(unittest.TestCase):
         detec.work(x_with_hist)
         pydetec.work(np.array(x))
 
-        L0 = detec.L0
-        x_h_len = len(x_with_hist)-x_hlen
-        xdc_mavg_h = detec.DC_moving_average_buffer()
-        pyxdc_mavg_h = pydetec.xdc_mavg_h[-xdc_mavg_hlen::]
-        xnodc_h = detec.DC_cancelled_buffer()
-        pyxnodc_h = pydetec.xnodc_h[-xnodc_hlen::]
-        xschmidl_nodc_h = detec.SCox_noDC_buffer()
-        pyxschmidl_nodc_h = pydetec.xschmidl_nodc[-xschmidl_nodc_hlen::]
-        xschmidl_filt_nodc = detec.SCox_filt_buffer()
-        pyxschmidl_filt_nodc = pydetec.xschmidl_filt_nodc
-        xcorr_nodc_h = detec.crosscorrelation_noDC_buffer()
-        pyxcorr_nodc_h = pydetec.xcorr_nodc[-xcorr_nodc_hlen::]
-        xcrossautocorr_nodc_h = detec.test_statistics_buffer()
-        pyxcrossautocorr_nodc_h = pydetec.xcrossautocorr_nodc[-xcrossautocorr_nodc_hlen::]
+        assert_consistency(self,pydetec,detec,pypparams,pparams,x_with_hist)
 
-        # assert x input
-        self.assertEqual(len(xdc_mavg_h),x_h_len+xdc_mavg_hlen)
-        self.assertTrue(array_almost_equal(x_with_hist,pydetec.x_h[-x_hlen::]))
-        self.assertTrue(array_almost_equal(xdc_mavg_h,pyxdc_mavg_h))
-        self.assertTrue(array_almost_equal(xnodc_h,pyxnodc_h))
-        self.assertTrue(array_almost_equal(xschmidl_nodc_h,pyxschmidl_nodc_h))
-        self.assertTrue(array_almost_equal(xschmidl_filt_nodc,pyxschmidl_filt_nodc,4))
-        self.assertTrue(array_almost_equal(xcorr_nodc_h,pyxcorr_nodc_h,4))
-        self.assertTrue(array_almost_equal(xcrossautocorr_nodc_h,pyxcrossautocorr_nodc_h,4))
-        # plt.plot(xcorr_nodc_h)
-        # plt.plot(pyxcorr_nodc_h,'r:')
-        # plt.show()
-        # assert moving average
-        for i in range(x_h_len):
-            movavg = np.sum(x_with_hist[i+x_hlen-L0+1:i+x_hlen+1])/float(L0)
-            self.assertAlmostEqual(movavg,xdc_mavg_h[i+xdc_mavg_hlen],5)
-        # print 'peaks:',detec.peaks(),pydetec.peaks
-        # peaks = detec.peaks()
-        pypeaks = pydetec.peaks
-        # self.assertEqual(len(peaks),len(pypeaks))
-        # for i,p in enumerate(pypeaks):
-        #     p2 = peaks[i]
-        #     self.assertEqual(p2.tidx, p.tidx)
-        #     self.assertEqual(p2.xcorr, p.xcorr)
-        #     self.assertEqual(p2.xautocorr, p.xautocorr)
-        #     self.assertEqual(p2.cfo, p.cfo)
-        #     self.assertEqual(p2.preamble_mag2, p.preamble_mag2)
-        #     self.assertEqual(p2.awgn_mag2_nodc, p.awgn_mag2_nodc)
-        #     self.assertEqual(p2.dc_offset, p.dc_offset)
-
-        # plt.plot(x[x_hlen::])
-        # plt.plot(xdc_mavg_h[xdc_mavg_hlen::],'r:')
-        # plt.plot(pyxdc_mavg_h[xdc_mavg_hlen::],'x')
-        # # plt.plot(ba.moving_average_with_hist(pydetec.x_h,L0),'x')
-        # plt.show()
 
 
 if __name__ == '__main__':

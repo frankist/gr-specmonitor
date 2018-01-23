@@ -24,6 +24,7 @@
 
 #include <specmonitor/api.h>
 #include <complex>
+#include <pmt/pmt.h>
 #include "../../lib/utils/digital/volk_utils.h"
 #include "../../lib/utils/digital/range_utils.h"
 #include "../../lib/utils/digital/hist_algorithm.h"
@@ -194,7 +195,10 @@ public:
   inline int test_statistics_hist_len() const {
     return xcrossautocorr_nodc_h.hist_len();
   }
-  inline std::vector<PyTrackedPeak> peaks() const {return d_peaks;}
+  pmt::pmt_t pypeaks() const;
+  inline void clear_peaks() {
+    d_peaks.clear();
+  }
 };
 
   // This is to call it from python

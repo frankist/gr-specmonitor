@@ -86,54 +86,54 @@ namespace specmonitor {
     d_thres2(thres2),
     d_pparams(d_fparams.preamble_params()),
     d_nread(0)
-{
-  const std::vector<cplx > &v = d_pparams.argcoef_subseq();
-  d_lvl2_seq.reset(&v[0], &v[v.size()-1]);
-  const std::vector<cplx > &v2 = d_pparams.subseq_norm(0);
-  P0.reset(&v2[0],&v2[v2.size()]);
-  L = d_pparams.length();
-  l0 = P0.size();
-  l1 = d_pparams.subseq_norm(1).size();
-  L0 = l0*d_lvl2_seq.size();
-  d_lvl2_seq_diff = get_schmidl_sequence(d_lvl2_seq);
-  N_awgn = fparams.awgn_gap_size();
-  N_margin = (autocorr_margin<0) ? L0 : autocorr_margin;
+  {
+    const std::vector<cplx > &v = d_pparams.argcoef_subseq();
+    d_lvl2_seq.reset(&v[0], &v[v.size()-1]);
+    const std::vector<cplx > &v2 = d_pparams.subseq_norm(0);
+    P0.reset(&v2[0],&v2[v2.size()]);
+    L = d_pparams.length();
+    l0 = P0.size();
+    l1 = d_pparams.subseq_norm(1).size();
+    L0 = l0*d_lvl2_seq.size();
+    d_lvl2_seq_diff = get_schmidl_sequence(d_lvl2_seq);
+    N_awgn = fparams.awgn_gap_size();
+    N_margin = (autocorr_margin<0) ? L0 : autocorr_margin;
 
-  d_nread = 0;
-  d_margin = 4;
-  d_hist_len = N_awgn + L;
-  d_delay.push_back(L0-1);
-  d_delay.push_back(l0*2-1);
-  d_delay.push_back(d_lvl2_seq_diff.size()*l0-1);
-  d_delay2.push_back(d_delay[0]);
-  d_delay2.push_back(l0-1);
-  d_delay2.push_back(L0-1);
-  d_delay_cum = utils::cumsum(d_delay);
-  d_delay2_cum = utils::cumsum(d_delay2);
-  d_hist_len2 = d_delay2_cum[2]+L+N_awgn+2*N_margin;
-  d_Ldiff = std::max(l1-N_margin,0);
+    d_nread = 0;
+    d_margin = 4;
+    d_hist_len = N_awgn + L;
+    d_delay.push_back(L0-1);
+    d_delay.push_back(l0*2-1);
+    d_delay.push_back(d_lvl2_seq_diff.size()*l0-1);
+    d_delay2.push_back(d_delay[0]);
+    d_delay2.push_back(l0-1);
+    d_delay2.push_back(L0-1);
+    d_delay_cum = utils::cumsum(d_delay);
+    d_delay2_cum = utils::cumsum(d_delay2);
+    d_hist_len2 = d_delay2_cum[2]+L+N_awgn+2*N_margin;
+    d_Ldiff = std::max(l1-N_margin,0);
 
-  // NOTE: we look back in time by self.delay_cum[2] to find peaks
-  d_x_hist_len = std::max(d_delay_cum[2],L0);
-  int prealloc_size = 5000;
-//   // // x_h.resize(std::max(d_delay_cum[0],L0));
-  xdc_mavg_h.reserve(d_delay_cum[2]-L0, prealloc_size);
-  xdc_mavg_h.fill_history(cplx(0,0));
-  xnodc_h.reserve(L0+d_delay_cum[0]+d_margin+l1, prealloc_size);
-  xnodc_h.fill_history(cplx(0,0));
-  xschmidl_nodc_h.reserve(L0, prealloc_size);
-  xschmidl_nodc_h.fill_history(cplx(0,0));
-  xcorr_nodc_h.reserve(L0, prealloc_size);
-  xcorr_nodc_h.fill_history(0);
-  xcrossautocorr_nodc_h.reserve(N_margin+d_Ldiff, prealloc_size);
-  xcrossautocorr_nodc_h.fill_history(0);
-  local_max_finder_h = new utils::SlidingWindowMaxHist(N_margin);
-}
+    // NOTE: we look back in time by self.delay_cum[2] to find peaks
+    d_x_hist_len = std::max(d_delay_cum[2],L0);
+    int prealloc_size = 5000;
+    //   // // x_h.resize(std::max(d_delay_cum[0],L0));
+    xdc_mavg_h.reserve(d_delay_cum[2]-L0, prealloc_size);
+    xdc_mavg_h.fill_history(cplx(0,0));
+    xnodc_h.reserve(L0+d_delay_cum[0]+d_margin+l1, prealloc_size);
+    xnodc_h.fill_history(cplx(0,0));
+    xschmidl_nodc_h.reserve(L0, prealloc_size);
+    xschmidl_nodc_h.fill_history(cplx(0,0));
+    xcorr_nodc_h.reserve(L0, prealloc_size);
+    xcorr_nodc_h.fill_history(0);
+    xcrossautocorr_nodc_h.reserve(N_margin+d_Ldiff, prealloc_size);
+    xcrossautocorr_nodc_h.fill_history(0);
+    local_max_finder_h = new utils::SlidingWindowMaxHist(N_margin);
+  }
 
-hier_preamble_detector::~hier_preamble_detector()
-{
-  delete local_max_finder_h;
-}
+  hier_preamble_detector::~hier_preamble_detector()
+  {
+    delete local_max_finder_h;
+  }
 
 
   void hier_preamble_detector::work(const std::vector<std::complex<float> > x_h) {
@@ -225,34 +225,50 @@ hier_preamble_detector::~hier_preamble_detector()
     d_nread += x_h.size();
   }
 
-std::vector<float> hier_preamble_detector::find_crosscorr_peak(int tpeak) {
-  float cfo = utils::compute_schmidl_cox_cfo(xschmidl_filt_nodc[tpeak+d_delay_cum[2]], l0);
-  int toffset = L0+d_delay_cum[0];
-  const std::vector<cplx>& pseq1 = d_pparams.subseq_norm(1);
-  int twin0 = tpeak-d_margin+toffset;
-  int twin1 = tpeak+pseq1.size()+d_margin+toffset;
+  std::vector<float> hier_preamble_detector::find_crosscorr_peak(int tpeak) {
+    float cfo = utils::compute_schmidl_cox_cfo(xschmidl_filt_nodc[tpeak+d_delay_cum[2]], l0);
+    int toffset = L0+d_delay_cum[0];
+    const std::vector<cplx>& pseq1 = d_pparams.subseq_norm(1);
+    int twin0 = tpeak-d_margin+toffset;
+    int twin1 = tpeak+pseq1.size()+d_margin+toffset;
 
-  // compensate CFO
-  d_tmp.resize(twin1-twin0);
-  for(int i = 0; i < d_tmp.size(); ++i) {
-    d_tmp[i] = xnodc_h[twin0+i] * std::exp(cplx(0,-2*M_PI*cfo*i));
+    // compensate CFO
+    d_tmp.resize(twin1-twin0);
+    for(int i = 0; i < d_tmp.size(); ++i) {
+      d_tmp[i] = xnodc_h[twin0+i] * std::exp(cplx(0,-2*M_PI*cfo*i));
+    }
+
+    // the CFO-compensated is multiplied by the P1
+    d_tmp2.resize(d_tmp.size()-pseq1.size()+1);
+    utils::correlate(&d_tmp2[0],&d_tmp[0],&d_tmp[d_tmp.size()],&pseq1[0],pseq1.size());
+
+    // get the peak
+    int maxi = utils::argmax(&d_tmp2[0],d_tmp2.size());
+    float ymag2 = utils::mean_mag2(&xnodc_h[twin0+maxi],l1);
+    float xcorr = std::norm(d_tmp2[maxi]/(float)pseq1.size());
+
+    std::vector<float> ret;
+    ret.push_back(xcorr);
+    ret.push_back(cfo);
+    ret.push_back(ymag2);
+    return ret;//std::vector<float>({xcorr,cfo,ymag2});
   }
 
-  // the CFO-compensated is multiplied by the P1
-  d_tmp2.resize(d_tmp.size()-pseq1.size()+1);
-  utils::correlate(&d_tmp2[0],&d_tmp[0],&d_tmp[d_tmp.size()],&pseq1[0],pseq1.size());
-
-  // get the peak
-  int maxi = utils::argmax(&d_tmp2[0],d_tmp2.size());
-  float ymag2 = utils::mean_mag2(&xnodc_h[twin0+maxi],l1);
-  float xcorr = std::norm(d_tmp2[maxi]/(float)pseq1.size());
-
-  std::vector<float> ret;
-  ret.push_back(xcorr);
-  ret.push_back(cfo);
-  ret.push_back(ymag2);
-  return ret;//std::vector<float>({xcorr,cfo,ymag2});
-}
+  pmt::pmt_t hier_preamble_detector::pypeaks() const {
+    pmt::pmt_t ret = pmt::make_vector(d_peaks.size(),pmt::make_dict());
+    for(int i = 0; i < d_peaks.size(); ++i) {
+      pmt::pmt_t elem = pmt::make_dict();
+      elem = dict_add(elem,pmt::intern("tidx"),pmt::from_long(d_peaks[i].tidx));
+      elem = dict_add(elem,pmt::intern("xcorr"),pmt::from_double(d_peaks[i].xcorr));
+      elem = dict_add(elem,pmt::intern("xautocorr"),pmt::from_double(d_peaks[i].xautocorr));
+      elem = dict_add(elem,pmt::intern("cfo"),pmt::from_double(d_peaks[i].cfo));
+      elem = dict_add(elem,pmt::intern("preamble_mag2"),pmt::from_double(d_peaks[i].preamble_mag2));
+      elem = dict_add(elem,pmt::intern("awgn_mag2_nodc"),pmt::from_double(d_peaks[i].awgn_mag2_nodc));
+      elem = dict_add(elem,pmt::intern("dc_offset"),pmt::from_complex(d_peaks[i].dc_offset));
+      pmt::vector_set(ret,i,elem);
+    }
+    return ret;
+  }
 
 } /* namespace specmonitor */
 } /* namespace gr */
