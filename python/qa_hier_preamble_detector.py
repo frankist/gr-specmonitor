@@ -6,6 +6,7 @@ from gnuradio import gr, gr_unittest
 import specmonitor
 import numpy as np
 import matplotlib.pyplot as plt
+import timeit
 
 from labeling_framework.labeling_tools import preamble_utils
 from labeling_framework.labeling_tools import random_sequence
@@ -126,7 +127,54 @@ class TestArrays(unittest.TestCase):
 
         assert_consistency(self,pydetec,detec,pypparams,pparams,x_with_hist)
 
+    def test_speed(self):
+        guard_len=5
+        awgn_len=200
+        frame_period = 3000*2
+        pseq_lvl2_len = len(random_sequence.maximum_length_sequence(13*8))#13*4
+        pseq_len = [13,199]
+        nrepeats0 = 1
 
+        dc_offset = 2.0
+        cfo = -0.45/pseq_len[0]
+
+        pypparams = preamble_utils.generate_preamble_type2(pseq_len,
+                                                           pseq_lvl2_len,
+                                                           nrepeats0)
+        pyfparams = preamble_utils.frame_params(pypparams,
+                                                guard_len,awgn_len,
+                                                frame_period)
+        pparams = generate_hier_preamble(pseq_len,
+                                         pseq_lvl2_len,nrepeats0)
+        fparams = specmonitor.PyFrameParams(pparams,guard_len,
+                                            awgn_len,
+                                            frame_period)
+        sframer = preamble_utils.SignalFramer(pyfparams)
+        pydetec = preamble_utils.PreambleDetectorType2(pyfparams, pseq_len[0]*8,0.045,0.045)
+        detec = preamble_utils.PyHierPreambleDetector(fparams,pseq_len[0]*8,0.045,0.045)
+
+        x=np.zeros(int(pyfparams.frame_period*1.5),np.complex64)
+        Nruns = 5
+        for i in range(Nruns):
+            y,section_ranges = sframer.frame_signal(x,1)
+            x_with_hist = detec.x_hist_buffer + y.tolist()
+            detec.work(y)
+            pydetec.work(y)
+            assert_consistency(self,pydetec,detec.detec,
+                               pypparams,pparams,x_with_hist)
+
+        # measure_speed(detec,pydetec,y)
+
+def measure_speed(detec,pydetec,y):
+    nruns = 100
+    def call1():
+        detec.work(y)
+    def call2():
+        pydetec.work(y)
+    t1 = timeit.timeit(call1,number=nruns)
+    t2 = timeit.timeit(call2,number=nruns)
+    print 'total times:',t1,t2
+    print 'C++ version is',t2/t1,'times faster than python'
 
 if __name__ == '__main__':
     unittest.main()

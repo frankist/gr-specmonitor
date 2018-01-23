@@ -207,9 +207,6 @@ class tracked_peak:
         dc_offset = pmt.to_complex(pmt.dict_ref(pmt_elem,pmt.intern('dc_offset'),pmt.PMT_NIL))
         return cls(tidx,xcorr,xautocorr,cfo,preamble_mag2,awgn_mag2_nodc,dc_offset)
 
-def pmt_to_tracked_peaks(pmt_vector):
-    return [tracked_peak.from_pmt(pmt.vector_ref(pmt_vector,i)) for i in range(pmt.length(pmt_vector))]
-
 class PreambleDetectorType2:
     def __init__(self, fparams, autocorr_margin=None, thres1=0.08, thres2=0.04):#params, awgn_len):
         self.frame_params = fparams
@@ -292,7 +289,7 @@ class PreambleDetectorType2:
         # NOTE: I need to create a view that a starts further in the past, bc if __max_margin__ is very small, peak1 may not be inside the window. I have to create the view here, bc self.xcrossautocorr may change its address when it grows in size
         # local_peaks2 = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
         xfinaltest = offset_array_view(self.xcrossautocorr_nodc.array_h,self.xcrossautocorr_nodc.hist_len-self.Ldiff,len(x))
-        assert np.array_equal(xfinaltest[0::],self.xcrossautocorr_nodc[-self.Ldiff::])
+        assert np.array_equal(xfinaltest[0::],self.xcrossautocorr_nodc[-self.Ldiff:len(x)-self.Ldiff])
         local_peaks = self.local_max_finder_h.work(xfinaltest,len(x))#self.xfinal_view,len(x))
         local_peaks = [l-self.Ldiff for l in local_peaks]
         # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
@@ -332,11 +329,22 @@ def compensate_cfo(x,cfo):
     assert x.size==cfo.size
     return x * np.exp(-1j*2*np.pi*cfo,dtype=np.complex64)
 
-# class PyHierPreambleDetector:
-#     def __init__(fparams, autocorr_margin=None, thres1=0.08, thres2=0.04):
-#         self.detec = specmonitor.hier_preamble_detector(fparams,autocorr_margin, thres1, thres2)
-#         pass
+def pmt_to_tracked_peaks(pmt_vector):
+    return [tracked_peak.from_pmt(pmt.vector_ref(pmt_vector,i)) for i in range(pmt.length(pmt_vector))]
 
-#     def work():
-#         pass
+class PyHierPreambleDetector:
+    def __init__(self, fparams, autocorr_margin=None, thres1=0.08, thres2=0.04):
+        self.detec = specmonitor.hier_preamble_detector(fparams,autocorr_margin, thres1, thres2)
+        self.x_hist_len = self.detec.d_x_hist_len
+        self.x_hist_buffer = [complex(0,0)]*self.x_hist_len
+
+    def work(self,x):
+        x_with_hist = self.x_hist_buffer + x.tolist()
+        # print '!!!! type of x:',type(x_with_hist),type(x_with_hist[0])
+        self.detec.work(x_with_hist)
+        self.x_hist_buffer = x_with_hist[len(x_with_hist)-self.x_hist_len::]
+
+    def peaks(self,x):
+        return pmt_to_tracked_peaks(detec.peaks())
+
 
