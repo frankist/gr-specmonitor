@@ -7,8 +7,8 @@ FRAMEWORK_PATH=$(readlink -f ./python)
 # build module
 mkdir -p build
 cd build
-# cmake ../
-# make -j4
+cmake ../
+make -j4
 sudo make install
 sudo ldconfig
 cd ../
@@ -18,6 +18,7 @@ mkdir -p tmp
 
 # pass framework to python path
 echo export PYTHONPATH="${PYTHONPATH}:"${FRAMEWORK_PATH} >>~/.bashrc
+source ~/.bashrc
 
 # install required dependencies
 sudo apt-get update
@@ -49,3 +50,8 @@ cd ~
 git clone https://github.com/frankist/darkflow.git
 cd darkflow
 sudo pip install .
+
+# check if installation is correct
+python -c "import tensorflow"
+python3 -c "import tensorflow"
+python -c "import darkflow"
