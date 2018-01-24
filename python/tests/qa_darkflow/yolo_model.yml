@@ -1,0 +1,18 @@
+dataset:
+  dataset_folder: ../deep_learning/dataset
+  tmp_folder: ~/tmp/generated_files/tmp
+  darkflow_folder: &flow ~/Dropbox/Programming/deep_learning/darkflow
+
+model:
+  model_path: ./yolo_model.cfg
+  train:
+    epoch: 10000000
+    gpu: !!bool false
+  num_anchors: 7
+  height: 104
+  width: 104
+  find_anchors: !!bool false
+  classes:
+    - wifi
+    - generic_mod
+    - square

@@ -23,9 +23,10 @@
 
 namespace utils {
   template<typename complex_type>
-  void frequency_shift(complex_type* y, complex_type* x, float frac_freq, int N) {
+  float frequency_shift(complex_type* y, const complex_type* x, float frac_freq, int N, float phase_init) {
     for(int n = 0; n < N; ++n) {
-      y[n] = x[n] * std::exp(complex_type(0,2*M_PI*frac_freq*n));
+      y[n] = x[n] * std::exp(complex_type(0,phase_init + 2*M_PI*frac_freq*n));
     }
+    return 2*M_PI*frac_freq*N; // next phase
   }
 };

@@ -101,7 +101,7 @@ def store_section_samples(data_dict,x,peaks):
     y = x[tstart:tstart+num_samples] # this starts at the start of the preamble
 
 def is_framed(data_dict):
-    bounds = get_stage_derived_parameter(data_dict,'section_bounds')
+    bounds = get_stage_derived_parameter(data_dict,'section_spectrogram_img_metadata')
     if bounds is None:
         return False
     return True

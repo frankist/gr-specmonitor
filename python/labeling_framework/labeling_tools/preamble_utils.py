@@ -27,6 +27,10 @@ import matplotlib.pyplot as plt
 from ..utils.basic_algorithms import *
 from ..utils.array_view import *
 import random_sequence
+import pmt
+import specmonitor
+from ..utils import logging_utils
+logger = logging_utils.DynamicLogger(__name__)
 
 class preamble_params:
     def __init__(self, pseq_list, pseq_list_seq, pseq_list_coef = None):
@@ -178,6 +182,10 @@ class tracked_peak:
     def is_equal(self,t):
         return self.tidx==t.tidx and self.xcorr==t.xcorr and self.xautocorr==t.xautocorr and self.cfo==t.cfo and self.preamble_mag2==t.preamble_mag2 and self.awgn_mag2_nodc==t.awgn_mag2_nodc and self.dc_offset==t.dc_offset
 
+    def is_almost_equal(self,t,precision):
+        thres = 10**(-precision)
+        return np.all(np.array([abs(self.tidx-t.tidx), abs(self.xcorr-t.xcorr), abs(self.xautocorr-t.xautocorr), abs(self.cfo-t.cfo), abs(self.preamble_mag2-t.preamble_mag2), abs(self.awgn_mag2_nodc-t.awgn_mag2_nodc), abs(self.dc_offset-t.dc_offset)])<thres)
+
     def snr(self):
         return (self.preamble_mag2-self.awgn_mag2_nodc)/self.awgn_mag2_nodc if self.preamble_mag2>=self.awgn_mag2_nodc else 0
 
@@ -187,13 +195,23 @@ class tracked_peak:
             return 10*np.log10(snr_val)
         return -np.inf
 
+    @classmethod
+    def from_pmt(cls,pmt_elem):
+        # assert pmt.dict_has_key(pmt_elem,pmt.intern('tidx'))
+        tidx = pmt.to_long(pmt.dict_ref(pmt_elem,pmt.intern('tidx'),pmt.PMT_NIL))
+        xcorr = pmt.to_double(pmt.dict_ref(pmt_elem,pmt.intern('xcorr'),pmt.PMT_NIL))
+        xautocorr = pmt.to_double(pmt.dict_ref(pmt_elem,pmt.intern('xautocorr'),pmt.PMT_NIL))
+        cfo = pmt.to_double(pmt.dict_ref(pmt_elem,pmt.intern('cfo'),pmt.PMT_NIL))
+        preamble_mag2 = pmt.to_double(pmt.dict_ref(pmt_elem,pmt.intern('preamble_mag2'),pmt.PMT_NIL))
+        awgn_mag2_nodc = pmt.to_double(pmt.dict_ref(pmt_elem,pmt.intern('awgn_mag2_nodc'),pmt.PMT_NIL))
+        dc_offset = pmt.to_complex(pmt.dict_ref(pmt_elem,pmt.intern('dc_offset'),pmt.PMT_NIL))
+        return cls(tidx,xcorr,xautocorr,cfo,preamble_mag2,awgn_mag2_nodc,dc_offset)
+
 class PreambleDetectorType2:
     def __init__(self, fparams, autocorr_margin=None, thres1=0.08, thres2=0.04):#params, awgn_len):
         self.frame_params = fparams
         self.thres1 = thres1
         self.thres2 = thres2
-        self.__max_margin__ = autocorr_margin if autocorr_margin is not None else self.pseq0_tot_len
-        assert isinstance(self.__max_margin__,int)
 
         # derived
         self.params = self.frame_params.preamble_params
@@ -207,6 +225,8 @@ class PreambleDetectorType2:
         self.pseq0_tot_len = self.l0*self.lvl2_len
         self.L0 = self.pseq0_tot_len
         self.awgn_len = self.frame_params.awgn_len
+        self.__max_margin__ = autocorr_margin if autocorr_margin is not None else self.pseq0_tot_len
+        assert isinstance(self.__max_margin__,int)
 
         # object state variables
         self.nread = 0
@@ -268,14 +288,13 @@ class PreambleDetectorType2:
 
         # NOTE: I need to create a view that a starts further in the past, bc if __max_margin__ is very small, peak1 may not be inside the window. I have to create the view here, bc self.xcrossautocorr may change its address when it grows in size
         # local_peaks2 = self.local_max_finder_h.work(self.xcrossautocorr_nodc)#self.xschmidl_filt_mag_nodc)
-        xfinaltest = offset_array_view(self.xcrossautocorr_nodc.array_h,self.xcrossautocorr_nodc.hist_len-self.Ldiff)
-        assert np.array_equal(xfinaltest[0::],self.xcrossautocorr_nodc[-self.Ldiff::])
+        xfinaltest = offset_array_view(self.xcrossautocorr_nodc.array_h,self.xcrossautocorr_nodc.hist_len-self.Ldiff,len(x))
+        assert np.array_equal(xfinaltest[0::],self.xcrossautocorr_nodc[-self.Ldiff:len(x)-self.Ldiff])
         local_peaks = self.local_max_finder_h.work(xfinaltest,len(x))#self.xfinal_view,len(x))
         local_peaks = [l-self.Ldiff for l in local_peaks]
         # print 'peaks:',[p+self.nread-self.delay_cum[2] for p in local_peaks]
 
         for i in local_peaks:
-            assert i>=0 # I make this assumption for the history len of the arrays
             t = i-self.delay_cum[2]
             dc0 = self.xdc_mavg_h[t+L0] #np.mean(self.x_h[t:t+L0])
             peak0_mag2_nodc = np.mean(np.abs(self.x_h[t:t+L0]-dc0)**2)
@@ -288,7 +307,7 @@ class PreambleDetectorType2:
                 dc_offset = np.mean(self.x_h[tpeak-self.awgn_len:tpeak])
                 xmag2_mavg_nodc = np.mean(np.abs(self.x_h[tpeak:tpeak+L]-dc_offset)**2) # for the whole preamble
                 # xmag2_mavg = np.mean(self.xmag2_h[tpeak:tpeak+L]) # for the whole preamble
-                if xcorr <= self.thres2*l1mag2:#xmag2_mavg_nodc:
+                if l1mag2>0 and xcorr <= self.thres2*l1mag2:#xmag2_mavg_nodc:
                     continue
                 # recompute values for the new peak
                 # if tpeak!=t:
@@ -309,4 +328,30 @@ def compensate_cfo(x,cfo):
         return x * np.exp(-1j*2*np.pi*cfo*np.arange(x.size),dtype=np.complex64)
     assert x.size==cfo.size
     return x * np.exp(-1j*2*np.pi*cfo,dtype=np.complex64)
+
+def pmt_to_tracked_peaks(pmt_vector):
+    return [tracked_peak.from_pmt(pmt.vector_ref(pmt_vector,i)) for i in range(pmt.length(pmt_vector))]
+
+def to_PyPreambleParams(pparams):
+    return specmonitor.PyPreambleParams(pparams.pseq_list,pparams.pseq_list_seq,pparams.pseq_list_coef)
+
+def to_PyFrameParams(fparams):
+    pypparams = to_PyPreambleParams(fparams.preamble_params)
+    return specmonitor.PyFrameParams(pypparams,fparams.guard_len,fparams.awgn_len,fparams.frame_period)
+
+class PyHierPreambleDetector:
+    def __init__(self, fparams, autocorr_margin=-1, thres1=0.08, thres2=0.04):
+        self.detec = specmonitor.hier_preamble_detector(fparams,autocorr_margin, thres1, thres2)
+        self.x_hist_len = self.detec.d_x_hist_len
+        self.x_hist_buffer = [complex(0,0)]*self.x_hist_len
+
+    def work(self,x):
+        x_with_hist = self.x_hist_buffer + x.tolist()
+        # print '!!!! type of x:',type(x_with_hist),type(x_with_hist[0])
+        self.detec.work(x_with_hist)
+        self.x_hist_buffer = x_with_hist[len(x_with_hist)-self.x_hist_len::]
+
+    def peaks(self):
+        return pmt_to_tracked_peaks(self.detec.pypeaks())
+
 

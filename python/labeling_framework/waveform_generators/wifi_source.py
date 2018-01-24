@@ -36,11 +36,12 @@ from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
 import foo
 import ieee802_11
 import pmt
+import specmonitor
 # import gr_qtgui_utils
 
 # labeling_framework package
 from waveform_generator_utils import *
-from utils import logging_utils
+from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
@@ -51,6 +52,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
     def __init__(self,
                  n_written_samples,
+                 n_offset_samples,
                  encoding=0,
                  pdu_length=500,
                  pad_interval=1000,
@@ -59,11 +61,17 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
         # params
         self.n_written_samples = int(n_written_samples)
+        self.n_offset_samples = int(n_offset_samples) if n_offset_samples is not None else np.random.randint(0,self.n_written_samples)
         self.linear_gain = float(linear_gain)
         self.pdu_length = pdu_length  # size of the message passed to the WiFi [1,1500]
         assert isinstance(encoding, (int, str))
         self.encoding = encoding if isinstance(encoding,int) else GrWifiFlowgraph.encoding_labels.index(encoding)
-        self.pad_interval = pad_interval
+        if isinstance(pad_interval,tuple):
+            self.distname = pad_interval[0]
+            self.pad_interval = pad_interval[1]
+        else:
+            self.distname = 'constant'
+            self.pad_interval = tuple(pad_interval)
 
         # phy
         self.wifi_phy_hier = wifi_phy_hier(
@@ -73,15 +81,26 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
             frequency=5.89e9,  # NOTE: Rx only
             sensitivity= 0.56,  # NOTE: Rx only
         )
-        self.foo_packet_pad2 = foo.packet_pad2(
-            False, False, 0.01,
-            100, # Before padding
-            self.pad_interval)  # After padding
-        self.foo_packet_pad2.set_min_output_buffer(
-            96000)  # CHECK: What does this do?
-        # self.time_plot = gr_qtgui_utils.make_time_sink_c(1024, 20.0e6, "", 1)
+        self.packet_pad = specmonitor.foo_random_burst_shaper_cc(
+            False,
+            False,
+            0,
+            self.distname,
+            self.pad_interval,
+            100, [0])
+        self.packet_pad.set_min_output_buffer(
+            300000)
+        # self.foo_packet_pad2 = foo.packet_pad2(
+        #     False, # Debug
+        #     False, 0.01,
+        #     100, # Before padding
+        #     self.pad_interval)  # After padding
+        # self.foo_packet_pad2.set_min_output_buffer(
+        #     96000)  # CHECK: What does this do?
+        # # self.time_plot = gr_qtgui_utils.make_time_sink_c(1024, 20.0e6, "", 1)
 
         self.blocks_null_source = blocks.null_source(gr.sizeof_gr_complex * 1)
+        self.skiphead = blocks.skiphead(gr.sizeof_gr_complex, self.n_offset_samples)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
         self.dst = blocks.vector_sink_c()
         # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
@@ -115,9 +134,10 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.connect((self.blocks_null_source, 0),
                      (self.wifi_phy_hier, 0))  # no reception
 
-        self.connect((self.wifi_phy_hier, 0), self.foo_packet_pad2)
+        self.connect((self.wifi_phy_hier, 0), self.packet_pad)
         # self.connect((self.wifi_phy_hier, 0), self.time_plot)
-        self.connect(self.foo_packet_pad2, self.head)
+        self.connect(self.packet_pad, self.skiphead)
+        self.connect(self.skiphead, self.head)
         self.connect(self.head, self.dst)
 
     def run(self): #NOTE: The message probe does not stop the block, so I had to find a work around
@@ -136,6 +156,7 @@ def run(args):
     # create Wifi block
     tb = GrWifiFlowgraph(
         d['number_samples'],
+        d.get('number_offset_samples',None),
         encoding=d['encoding'],
         pdu_length=d['pdu_length'],
         pad_interval=d['pad_interval'])
@@ -160,6 +181,7 @@ if __name__ == '__main__':
     args = {
         'parameters': {
             'number_samples': 100000,
+            'number_offset_samples': 0,
             'encoding': 0,
             'pdu_length': 500,
             'pad_interval': 5000,

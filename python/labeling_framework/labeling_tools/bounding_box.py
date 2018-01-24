@@ -29,126 +29,151 @@ from ..utils.basic_utils import *
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
-fftsize = 64 # I have to define this somewhere later
+class ImgBoundingBox(object):
+    def __init__(self,rowmin,rowmax,colmin,colmax,img_size,label=None):
+        self.rowmin=rowmin
+        self.rowmax=rowmax
+        self.colmin=colmin
+        self.colmax=colmax
+        self.img_size = img_size
+        self.params = {}
+        self.params['label'] = label
+        self.assert_validity()
 
-class BoundingBox:
-    def __init__(self,time_bounds,freq_bounds):
-        BoundingBox.assert_validity(time_bounds,freq_bounds)
-        self.time_bounds = time_bounds
-        self.freq_bounds = tuple([float(f) for f in freq_bounds])
-
-    @staticmethod
-    def assert_validity(time_bounds,freq_bounds):
-        err_test = True
-        err_test &= len(time_bounds)==2
-        err_test &= isinstance(time_bounds,tuple)
-        err_test &= isinstance(time_bounds[0],int)
-        err_test &= time_bounds[1]>time_bounds[0]
-        err_test &= len(freq_bounds)==2
-        err_test &= isinstance(freq_bounds,tuple)
-        err_test &= isinstance(freq_bounds[0],float)
-        err_test &= np.max(freq_bounds)<=0.5
-        err_test &= np.min(freq_bounds)>=-0.5
-        err_test &= freq_bounds[1]>freq_bounds[0]
-        if err_test==False:
-            err_msg = 'The time/freq bounds [{},{}] are not valid.'.format(time_bounds,freq_bounds)
-            logger.error(err_msg)
-            logger.error('Reconsider changing the waveform params (freq offset range/signal duration)')
-            raise AssertionError(err_msg)
+    def is_labeled(self):
+        return self.params['label'] is not None
 
     def is_equal(self,box):
-        return box.time_bounds==self.time_bounds and box.freq_bounds==self.freq_bounds
+        assert type(box)==type(self)
+        test = self.rowmin==box.rowmin and self.rowmax==box.rowmax
+        test &= self.colmin==box.colmin and self.colmax==box.colmax
+        test &= self.img_size==box.img_size
+        test &= self.label==box.label
 
-    def time_intersection(self,tinterv):
-        tstart = max(tinterv[0],self.time_bounds[0])
-        tend = min(tinterv[1],self.time_bounds[1])
-        if tend<=tstart:
-            return None
-        return (tstart,tend)
+    def assert_validity(self):
+        test = self.rowmin>=0 and self.rowmin<=self.img_size[0]
+        test &= self.rowmax>=0 and self.rowmax<=self.img_size[0]
+        test &= self.colmin>=0 and self.colmin<=self.img_size[1]
+        test &= self.colmax>=0 and self.colmax<=self.img_size[1]
+        test &= self.rowmax>self.rowmin
+        test &= self.colmax>self.colmin
+        if test == False:
+            logger.error('The provided bounding box dimensions are not valid. \
+            box upper left: {}, box lower right: {}, \
+            img size: {}'.format((self.rowmin,self.self.colmin),(self.rowmax,self.colmax),
+                                 self.img_shape))
+            raise AssertionError()
 
-    def freq_intersection(self,finterv):
-        fstart = max(finterv[0],self.freq_bounds[0])
-        fend = min(finterv[1],self.freq_bounds[1])
-        if fend<=fstart:
-            return None
-        return (fstart,fend)
+# fftsize = 64 # I have to define this somewhere later
 
-    def box_intersection(self,box):
-        tintersect = self.time_intersection(box.time_bounds)
-        if tintersect is None:
-            return None
-        fintersect = self.freq_intersection(box.freq_bounds)
-        if fintersect is None:
-            return None
-        return BoundingBox(tintersect,fintersect)
+# class BoundingBox:
+#     def __init__(self,time_bounds,freq_bounds,label):
+#         BoundingBox.assert_validity(time_bounds,freq_bounds)
+#         self.time_bounds = time_bounds
+#         self.freq_bounds = tuple([float(f) for f in freq_bounds])
 
-    def add(self,time=0,freq=0):
-        tvec = (self.time_bounds[0]+time,self.time_bounds[1]+time)
-        fvec = (self.freq_bounds[0]+freq,self.freq_bounds[1]+freq)
-        return BoundingBox(tvec,fvec)
+#     @staticmethod
+#     def assert_validity(time_bounds,freq_bounds):
+#         err_test = True
+#         err_test &= len(time_bounds)==2
+#         err_test &= isinstance(time_bounds,tuple)
+#         err_test &= isinstance(time_bounds[0],int)
+#         err_test &= time_bounds[1]>time_bounds[0]
+#         err_test &= len(freq_bounds)==2
+#         err_test &= isinstance(freq_bounds,tuple)
+#         err_test &= isinstance(freq_bounds[0],float)
+#         err_test &= np.max(freq_bounds)<=0.5
+#         err_test &= np.min(freq_bounds)>=-0.5
+#         err_test &= freq_bounds[1]>freq_bounds[0]
+#         if err_test==False:
+#             err_msg = 'The time/freq bounds [{},{}] are not valid.'.format(time_bounds,freq_bounds)
+#             logger.error(err_msg)
+#             logger.error('Reconsider changing the waveform params (freq offset range/signal duration)')
+#             raise AssertionError(err_msg)
 
-    def __str__(self):
-        return '[({},{}),({},{})]'.format(self.time_bounds[0],self.time_bounds[1],self.freq_bounds[0],self.freq_bounds[1])
+#     def is_equal(self,box):
+#         return box.time_bounds==self.time_bounds and box.freq_bounds==self.freq_bounds
 
-######## Conversion Normalized to Integer Frequency #############
+#     def time_intersection(self,tinterv):
+#         tstart = max(tinterv[0],self.time_bounds[0])
+#         tend = min(tinterv[1],self.time_bounds[1])
+#         if tend<=tstart:
+#             return None
+#         return (tstart,tend)
 
-# freqnorm: [-0.5,0.5] and it is totally symmetric (0 means DC)
-# freqint: [0,fftsize] and the DC is at fftsize/2
-def freqnorm_to_int(freqnorm,dft_size):
-    return int(np.round((freqnorm+0.5)*dft_size+0.5))
+#     def freq_intersection(self,finterv):
+#         fstart = max(finterv[0],self.freq_bounds[0])
+#         fend = min(finterv[1],self.freq_bounds[1])
+#         if fend<=fstart:
+#             return None
+#         return (fstart,fend)
 
-def freqnorm_to_int_bounds(freqnorm_range, dft_size):
-    fmin = freqnorm_to_int(freqnorm_range[0],dft_size)
-    fmax = freqnorm_to_int(freqnorm_range[1],dft_size)
-    return (fmin,fmax)
+#     def box_intersection(self,box):
+#         tintersect = self.time_intersection(box.time_bounds)
+#         if tintersect is None:
+#             return None
+#         fintersect = self.freq_intersection(box.freq_bounds)
+#         if fintersect is None:
+#             return None
+#         return BoundingBox(tintersect,fintersect)
 
-def freqint_to_norm(freqint,dft_size):
-    return max((freqint-0.5)/float(dft_size)-0.5,-0.5)
+#     def add(self,time=0,freq=0):
+#         tvec = (self.time_bounds[0]+time,self.time_bounds[1]+time)
+#         fvec = (self.freq_bounds[0]+freq,self.freq_bounds[1]+freq)
+#         return BoundingBox(tvec,fvec)
 
-def freqint_to_norm_bounds(freqint_bounds,dft_size):
-    fmin = freqint_to_norm(freqint_bounds[0],dft_size)
-    fmax = freqint_to_norm(freqint_bounds[1],dft_size)
-    return (fmin,fmax)
+#     def __str__(self):
+#         return '[({},{}),({},{})]'.format(self.time_bounds[0],self.time_bounds[1],self.freq_bounds[0],self.freq_bounds[1])
 
-def scale_time(sample_idx,new_section_size,old_section_size):
-    return int(np.round(sample_idx)*new_section_size/float(old_section_size))
+# ######## Conversion Normalized to Integer Frequency #############
 
-def scale_time_bounds(old_sample_bounds,new_section_size,old_section_size):
-    tmin = scale_time(old_sample_bounds[0],new_section_size,old_section_size)
-    tmax = scale_time(old_sample_bounds[1]-1,new_section_size,old_section_size)+1
-    assert tmax>=tmin+1 and tmin>=0
-    tmax = min(tmax,new_section_size)
-    if max(tmin,tmax)>new_section_size:
-        logger.error('Tiem window mismatch with the image dimensions. tlims: {},window size:{}'.format((tmin,tmax),new_section_size))
-        raise AssertionError()
-    return (tmin,tmax)
+# # freqnorm: [-0.5,0.5] and it is totally symmetric (0 means DC)
+# # freqint: [0,fftsize] and the DC is at fftsize/2
+# def freqnorm_to_int(freqnorm,dft_size):
+#     return int(np.round((freqnorm+0.5)*dft_size+0.5))
 
-# Utils to convert bounding box to image bounding box
-def scale_time_range_to_image_rows(trange,nrows,section_size):
-    assert np.max(trange)<=section_size
-    rowmin = int(np.floor(trange[0]*nrows/float(section_size)))
-    rowmax = max(int(np.ceil(trange[1]*nrows/float(section_size))),rowmin+1)
-    rowmax = min(rowmax,nrows)
-    if min(rowmin,rowmax)<0 and max(rowmin,rowmax)>nrows:
-        print 'ERROR: Time window mismatch with the image dimensions'
-        print 'rowlims:',(rowmin,rowmax),',nrows:',nrows
-        exit(-1)
-    return (rowmin,rowmax)
+# def freqnorm_to_int_bounds(freqnorm_range, dft_size):
+#     fmin = freqnorm_to_int(freqnorm_range[0],dft_size)
+#     fmax = freqnorm_to_int(freqnorm_range[1],dft_size)
+#     return (fmin,fmax)
 
-def compute_boxes_pwr(x, box_list):
-    # NOTE: I convert to float bc I want the json of the labels to look nice
-    return [float(np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2)) for b in box_list]
+# def freqint_to_norm(freqint,dft_size):
+#     return max((freqint-0.5)/float(dft_size)-0.5,-0.5)
 
-# to be finished
-class ImageBoundingBox:
-    def __init__(self,img_shape,row_bounds,col_bounds):
-        self.img_shape = img_shape
-        self.row_bounds = row_bounds
-        self.col_bounds = col_bounds
+# def freqint_to_norm_bounds(freqint_bounds,dft_size):
+#     fmin = freqint_to_norm(freqint_bounds[0],dft_size)
+#     fmax = freqint_to_norm(freqint_bounds[1],dft_size)
+#     return (fmin,fmax)
 
-    @classmethod
-    def convert_from_BoundingBox(cls,bbox,img_shape,section_size):
-        rowlims = scale_time_range_to_image_rows(bbox.time_bounds,img_shape[0],section_size)
+# def scale_time(sample_idx,new_section_size,old_section_size):
+#     return int(np.round(sample_idx)*new_section_size/float(old_section_size))
+
+# def scale_time_bounds(old_sample_bounds,new_section_size,old_section_size):
+#     tmin = scale_time(old_sample_bounds[0],new_section_size,old_section_size)
+#     tmax = scale_time(old_sample_bounds[1]-1,new_section_size,old_section_size)+1
+#     assert tmax>=tmin+1 and tmin>=0
+#     tmax = min(tmax,new_section_size)
+#     if max(tmin,tmax)>new_section_size:
+#         logger.error('Tiem window mismatch with the image dimensions. tlims: {},window size:{}'.format((tmin,tmax),new_section_size))
+#         raise AssertionError()
+#     return (tmin,tmax)
+
+# # Utils to convert bounding box to image bounding box
+# def scale_time_range_to_image_rows(trange,nrows,section_size):
+#     assert np.max(trange)<=section_size
+#     rowmin = int(np.floor(trange[0]*nrows/float(section_size)))
+#     rowmax = max(int(np.ceil(trange[1]*nrows/float(section_size))),rowmin+1)
+#     rowmax = min(rowmax,nrows)
+#     if min(rowmin,rowmax)<0 and max(rowmin,rowmax)>nrows:
+#         print 'ERROR: Time window mismatch with the image dimensions'
+#         print 'rowlims:',(rowmin,rowmax),',nrows:',nrows
+#         exit(-1)
+#     return (rowmin,rowmax)
+
+# def compute_boxes_pwr(x, box_list):
+#     # NOTE: I convert to float bc I want the json of the labels to look nice
+#     return [float(np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2)) for b in box_list]
+
 
 class Spectrogram:
     def __init__(self,Sxx,section_size):
@@ -195,7 +220,7 @@ class Spectrogram:
         # convert argument to list
         if twin_list is None:
             twin_list = [(0,self.Sxx.shape[0])] # beginning to end
-        if type(twin_list) is tuple:
+        if isinstance(twin_list,tuple):
             assert len(twin_list)==2
             twin_list = [twin_list]
 
@@ -252,49 +277,50 @@ class Spectrogram:
             Sxx[0,:] = pwr_min # the spectrogram is still not transposed
         return cls(Sxx,x.size)
 
-def find_tx_intervals(xorig,fftsize):
-    def merge_close_intervals(l,margin=5):
-        l2 = []
-        i = 0
-        while i < len(l):
-            j=i+1
-            while j<len(l) and l[j][0]-l[j-1][1] <= margin:
-                j+=1
-            l2.append((l[i][0],l[j-1][1]))
-            i=j
-        return l2
-    thres = 1e-12
-    x = np.abs(xorig)**2
-    stepups=[i+1 for i in range(len(x)-1) if x[i]<thres and x[i+1]>=thres]
-    stepdowns=[i+1 for i in range(len(x)-1) if x[i]>=thres and x[i+1]<thres]
-    n_intervs = max(len(stepups),len(stepdowns))
-    if x[0]>=thres and x[-1]>=thres:
-        n_intervs += 1
-    prev = 0
-    l = [None]*n_intervs
-    for j in range(len(l)):
-        i2 = stepdowns[j] if j<len(stepdowns) else len(x)
-        i = stepups[j] if j<len(stepups) and stepups[j]<i2 else prev
-        l[j] = (i,i2)
-        if i2==len(x):
-            break
-        prev = stepups[j]
-        # i = stepups[j+jinc]
-    l2 = merge_close_intervals(l,fftsize/2)
-    return l2
+# def compute_time_bounds(xorig,dist_margin=0,thres=1e-12):
+#     def merge_close_intervals(l,margin):
+#         l2 = []
+#         i = 0
+#         while i < len(l):
+#             j=i+1
+#             while j<len(l) and l[j][0]-l[j-1][1] <= margin:
+#                 j+=1
+#             l2.append((l[i][0],l[j-1][1]))
+#             i=j
+#         return l2
+
+#     x = np.abs(xorig)**2
+
+#     stepups=[i+1 for i in range(len(x)-1) if x[i]<thres and x[i+1]>=thres]
+#     stepdowns=[i+1 for i in range(len(x)-1) if x[i]>=thres and x[i+1]<thres]
+#     n_intervs = max(len(stepups),len(stepdowns))
+#     if x[0]>=thres and x[-1]>=thres:
+#         n_intervs += 1
+#     prev = 0
+#     l = [None]*n_intervs
+#     for j in range(len(l)):
+#         i2 = stepdowns[j] if j<len(stepdowns) else len(x)
+#         i = stepups[j] if j<len(stepups) and stepups[j]<i2 else prev
+#         l[j] = (i,i2)
+#         if i2==len(x):
+#             break
+#         prev = stepups[j]
+#         # i = stepups[j+jinc]
+#     l2 = merge_close_intervals(l,dist_margin)
+#     return l2
 
 # Helpers for computing bounding boxes
 
-def compute_bounding_boxes(x):
-    fftsize = 64 # NOTE: I have to define this in the sim_awgn_params config file
-    time_intervals = find_tx_intervals(x,fftsize)
-    Spec = Spectrogram.make_spectrogram(x,fftsize)
-    finterv_list = Spec.find_freq_bounds(time_intervals)
-    n_boxes = len(time_intervals)
-    assert n_boxes == len(finterv_list)
-    boxes = [BoundingBox(time_intervals[i],finterv_list[i]) for i in range(n_boxes)]
-    # print 'New boxes:',[b.__str__() for b in boxes]
-    return boxes
+# def compute_bounding_boxes(x):
+#     fftsize = 64 # NOTE: I have to define this in the sim_awgn_params config file
+#     time_intervals = compute_tx_intervals(x,5)
+#     Spec = Spectrogram.make_spectrogram(x,fftsize)
+#     finterv_list = Spec.find_freq_bounds(time_intervals)
+#     n_boxes = len(time_intervals)
+#     assert n_boxes == len(finterv_list)
+#     boxes = [BoundingBox(time_intervals[i],finterv_list[i]) for i in range(n_boxes)]
+#     # print 'New boxes:',[b.__str__() for b in boxes]
+#     return boxes
 
 def debug_freq_bound_finder(X,Xcentre,left_bound,right_bound):
     XdB = 10*np.log10([max(xx,1.0e-6) for xx in X])
@@ -304,150 +330,21 @@ def debug_freq_bound_finder(X,Xcentre,left_bound,right_bound):
     plt.plot(int(np.round(Xcentre)),XdB[int(np.round(Xcentre))],'x')
     plt.show()
 
-import time
+# # This function simply selects the boxes that touch the time section
+# def select_boxes_that_intersect_section(box_list,section_interv):
+#     return (b for b in box_list if b.time_intersection(section_interv)!=None)
 
-# This function simply selects the boxes that touch the time section
-def select_boxes_that_intersect_section(box_list,section_interv):
-    return (b for b in box_list if b.time_intersection(section_interv)!=None)
+# # This function adds a time and freq offset
+# def add_offset(box_list,toffset=0,foffset=0):
+#     return (b.add(toffset,foffset) for b in box_list)
 
-# This function adds a time and freq offset
-def add_offset(box_list,toffset=0,foffset=0):
-    return (b.add(toffset,foffset) for b in box_list)
+# # This function intersects the boxes with the boundaries of the time section, so nothing leaks
+# def intersect_boxes_with_section(box_list,section_interv):
+#     w = BoundingBox(section_interv,(-0.5,0.5))
+#     return (w.box_intersection(b) for b in box_list if w.box_intersection(b)!=None)
 
-# This function intersects the boxes with the boundaries of the time section, so nothing leaks
-def intersect_boxes_with_section(box_list,section_interv):
-    w = BoundingBox(section_interv,(-0.5,0.5))
-    return (w.box_intersection(b) for b in box_list if w.box_intersection(b)!=None)
+# # This function intersects with the boundaries and makes the time offset relative to the beginning of the section
+# def intersect_and_offset_box(box_list,section_interv):
+#     blist = intersect_boxes_with_section(box_list,section_interv)
+#     return add_offset(blist,toffset=-section_interv[0])
 
-# This function intersects with the boundaries and makes the time offset relative to the beginning of the section
-def intersect_and_offset_box(box_list,section_interv):
-    blist = intersect_boxes_with_section(box_list,section_interv)
-    return add_offset(blist,toffset=-section_interv[0])
-
-#### deprecated
-
-# def find_freq_bounds(x,thresdB=-25):
-#     # preprocess X in freq domain
-#     f,X = signal.welch(x,1.0,return_onesided=False,detrend=False)#nperseg=64,noverlap=0
-#     X = np.fft.fftshift(X)
-#     Xamp_range = (np.min(X),np.max(X))
-#     X = (X-Xamp_range[0])/(Xamp_range[1]-Xamp_range[0])
-
-#     # compute the centre of mass
-#     Xcentre = np.argmax(X)#np.sum(np.arange(X.size)*X)/np.sum(X)
-#     thres = 10**(thresdB/10.0)
-
-#     # find left bound
-#     Xstart = int(np.round(Xcentre-X.size/2))
-#     Xleftrange = np.mod(range(Xstart,int(np.round(Xcentre))+1),X.size)
-#     left_bound = next(j for j in Xleftrange if X[j]>thres*X[Xcentre])
-
-#     # find right bound
-#     Xend = int(np.round(Xcentre+X.size/2))
-#     Xrightrange = np.mod(range(Xend,int(np.round(Xcentre))-1,-1),X.size) # descending order
-#     right_bound = next(j for j in Xrightrange if X[j]>thres*X[Xcentre])
-
-#     interv = ((left_bound-0.5)/float(X.size)-0.5,(right_bound+0.5)/float(X.size)-0.5)
-#     # debug_freq_bound_finder(X,Xcentre,left_bound,right_bound)
-#     return interv
-
-# def create_spectrogram(x,nfft=64):
-#     _,_,Sxx=signal.spectrogram(x,1.0,noverlap=0,nperseg=nfft,return_onesided=False,detrend=False)
-#     Sxx = np.fft.fftshift(np.transpose(Sxx),axes=(1,))
-#     return Sxx
-
-# def find_frequency_bounds(x,fftsize=64,thres=0.001):
-
-#     # preprocess X in freq domain
-#     f,X = signal.welch(x,1.0,return_onesided=False,detrend=False)
-#     # f,X = signal.periodogram(x,window='blackmanharris',nfft=fftsize,detrend=False,return_onesided=False)
-#     X = np.fft.fftshift(X)
-#     # X=np.fft.fftshift(np.abs(np.fft.fft(x,fftsize))**2)
-#     Xamp_range = (np.min(X),np.max(X))
-#     X = (X-Xamp_range[0])/(Xamp_range[1]-Xamp_range[0])
-
-#     # compute the centre of mass
-#     Xcentre = np.sum(np.arange(X.size)*X)/np.sum(X)
-
-#     # find left bound
-#     Xstart = int(np.round(Xcentre-X.size/2))
-#     Xleftrange = np.mod(range(Xstart,int(np.round(Xcentre))+1),X.size)
-#     # left_bound = next(i for i in Xleftrange if X[i] > X[Xcentre]*thres)
-#     csum_left = np.cumsum(X[Xleftrange])
-#     left_bound = next(j+Xstart for j in range(csum_left.size) if csum_left[j]>thres*csum_left[-1])
-
-#     # find right bound
-#     Xend = int(np.round(Xcentre+X.size/2))
-#     Xrightrange = np.mod(range(int(np.round(Xcentre)),Xend),X.size)
-#     # right_bound = next(i for i in Xrightrange if XdB[i] < XdB[Xcentre]*thres)
-#     csum_right = np.cumsum(X[Xrightrange])
-#     right_bound = next(j+Xcentre for j in range(csum_right.size) if csum_right[j]>=(1-thres)*csum_right[-1])
-
-#     interv = ((left_bound-0.5)/float(X.size)-0.5,(right_bound+0.5)/float(X.size)-0.5)
-
-#     debug_freq_bound_finder(X,Xcentre,left_bound,right_bound,csum_left,csum_right)
-
-#     return interv
-
-# def compute_bounding_box(x):
-#     tinterv_list = find_tx_intervals(x)
-#     finterv = find_freq_bounds(x) # FIXME: Make a smarter frequency estimator that partitions the signal
-#     # print 'elapsed time(freq intervals):',time.time()-start_time
-#     boxes = [BoundingBox(i,finterv) for i in tinterv_list]
-#     return boxes
-
-# def partition_boxes_into_sections(box_list,section_bounds):
-#     l = [find_boxes_in_section(box_list,s) for s in section_bounds] # NOTE: Optimization can be done
-#     return l
-
-# def time_to_specgram_row(twin,dims,section_size):
-#     rowmin = int(np.floor(twin[0]*dims[0]/float(section_size)))
-#     rowmax = max(int(np.ceil(twin[1]*dims[0]/float(section_size))),rowmin+1)
-#     rowmax = min(rowmin,dims[0])
-#     return (rowmin,rowmax)
-
-# def get_box_limits_in_image(box,section_size,dims):
-#     # NOTE: section_size is needed for overlapping windows
-#     xmin = int(np.floor(box.time_bounds[0]*dims[0]/float(section_size)))
-#     xmax = min(max(int(np.ceil(box.time_bounds[1]*dims[0]/float(section_size))),xmin+1),dims[0])
-#     ymin = int(np.round((box.freq_bounds[0]+0.5)*dims[1]))
-#     ymax = max(int(np.round((box.freq_bounds[1]+0.5)*dims[1])+1),ymin+1)
-#     # assert xmin>=0 and xmax<=dims[0] and ymin>=0 and ymax<=dims[1]
-#     if xmin<0 or xmax>dims[0] or ymin<0 or ymax>dims[1]:
-#         print 'this should not have happened'
-#         print box
-#         print xmin,xmax,ymin,ymax
-#         print dims, section_size
-#         assert 0
-#     if xmin>=dims[0] or ymin>=dims[1]: # the rounding makes the bounding box go outside
-#         return -1,-1,-1,-1
-#     return xmin,xmax,ymin,ymax
-
-# def compute_freq_bounds(x,box_time_bounds,section_size,fftsize=64):
-#     thres = 0.1
-#     l = []
-#     Sxx = create_spectrogram(x,fftsize,normalized=True)
-#     for twin in box_time_bounds:
-#         row_limits = time_to_spectrogram_row(twin,section_size)
-#         box_spectrogram = Sxx[row_limits[0]:row_limits[1],:]
-#         for col in Sxx.shape[1]:
-#             occupied_idxs = np.where(np.max(box_spectrogram,axis=(0,))>thres)
-#             l.append((np.min(occupied_idxs,np.max(occupied_idxs))))
-#     return l
-
-# def find_tx_intervals_old(x): # NOTE: For some reason this version although simpler is super slow
-#     thres = 1e-5
-#     i=0
-#     l=[]
-#     while i < len(x):
-#         try:
-#             i = next(j for j in range(i,len(x)) if x[j]>=thres)
-#         except StopIteration:
-#             break
-#         try:
-#             i2 = next(j for j in range(i+1,len(x)) if x[j]<thres)
-#         except StopIteration:
-#             i2=len(x)
-#         l.append((i,i2))
-#         i = i2+1
-#     return l

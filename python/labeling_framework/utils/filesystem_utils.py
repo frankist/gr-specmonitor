@@ -37,3 +37,9 @@ def check_dependency_met(dep_filename,this_filename=None):
         else:
             return True
     return False
+
+def try_mkdir(path):
+    if not os.path.exists(path):
+        if os.path.isfile(path):
+            raise RuntimeError('The path {} is an existing file'.format(path))
+        os.mkdir(path)

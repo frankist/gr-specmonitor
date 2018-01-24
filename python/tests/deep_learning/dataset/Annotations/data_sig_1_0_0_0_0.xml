@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<annotation>
+	<folder>RFVOCFormat</folder>
+	<filename>data_sig_1_0_0_0_0.png</filename>
+	<source>
+		<database>An RF signal database</database>
+		<annotation>PASCAL VOC2017</annotation>
+	</source>
+	<owner>
+		<name>Faceless man</name>
+	</owner>
+	<size>
+		<width>104</width>
+		<height>104</height>
+		<depth>1</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>square</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>49</xmin>
+			<xmax>54</xmax>
+			<ymin>0</ymin>
+			<ymax>104</ymax>
+		</bndbox>
+	</object>
+</annotation>

@@ -31,8 +31,16 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    DESTINATION ${GR_PYTHON_DIR}/specmonitor
+    darkflow_ckpt_classifier_c.py
+    darkflow_ckpt_classifier_msg.py
+    darkflow_statistics_collector.py DESTINATION ${GR_PYTHON_DIR}/specmonitor
 )
+
+########################################################################
+# Handle subdirectories
+########################################################################
+add_subdirectory(darkflow_tools)
+add_subdirectory(labeling_framework)
 
 ########################################################################
 # Handle the unit tests
@@ -41,7 +49,16 @@ include(GrTest)
 
 set(GR_TEST_TARGET_DEPS gnuradio-specmonitor)
 set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
-GR_ADD_TEST(qa_framer_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.py)
-#GR_ADD_TEST(qa_corr_est_norm_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.py)
-GR_ADD_TEST(qa_framer_snr_est_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_snr_est_cc.py)
-GR_ADD_TEST(qa_frame_sync_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.py)
+#GR_ADD_TEST(qa_framer_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.py)
+##GR_ADD_TEST(qa_corr_est_norm_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.py)
+#GR_ADD_TEST(qa_framer_snr_est_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_snr_est_cc.py)
+#GR_ADD_TEST(qa_frame_sync_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.py)
+GR_ADD_TEST(qa_darkflow_ckpt_classifier_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_ckpt_classifier_c.py)
+add_subdirectory(tests)
+
+GR_ADD_TEST(qa_spectrogram_img_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_spectrogram_img_c.py)
+GR_ADD_TEST(qa_darkflow_ckpt_classifier_msg ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_ckpt_classifier_msg.py)
+GR_ADD_TEST(qa_random_burst_shaper_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_random_burst_shaper_cc.py)
+GR_ADD_TEST(qa_darkflow_statistics_collector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_statistics_collector.py)
+add_test(qa_hier_preamble_detector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_hier_preamble_detector.py)
+GR_ADD_TEST(qa_foo_random_burst_shaper_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_foo_random_burst_shaper_cc.py)

@@ -72,19 +72,19 @@ class sliding_window_max: # this works with any array but keeps a buffer
         i_end = xtot.size-self.margin+1
         l = []
         while i < i_end:
-            maxi = np.argmax(xtot[i+1:i+margin])
+            maxi = np.argmax(xtot[i+1:i+self.margin])
             maxi += (i+1)
             if x[maxi]>=x[i]:
                 i = maxi
                 continue
             l.append((i-self.margin+1,x[i]))
-            i+=margin
+            i+=self.margin
         self.xhist = xtot[i::]
         return l
 
 #tested
 class SlidingWindowMax_hist: # this only works with an array with history
-    def __init__(self,margin,dtype=np.float32):
+    def __init__(self,margin):
         self.margin = margin
         self.xidx = 0
 

@@ -29,8 +29,11 @@ list(APPEND specmonitor_sources
     framer_c_impl.cc
     #corr_est_norm_cc_impl.cc
     framer_snr_est_cc_impl.cc
-    frame_sync_cc_impl.cc
-)
+    #frame_sync_cc_impl.cc
+    spectrogram_img_c_impl.cc
+    random_burst_shaper_cc_impl.cc
+    hier_preamble_detector.cc
+    foo_random_burst_shaper_cc_impl.cc )
 
 set(specmonitor_sources "${specmonitor_sources}" PARENT_SCOPE)
 if(NOT specmonitor_sources)
@@ -39,7 +42,7 @@ if(NOT specmonitor_sources)
 endif(NOT specmonitor_sources)
 
 add_library(gnuradio-specmonitor SHARED ${specmonitor_sources})
-target_link_libraries(gnuradio-specmonitor ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES} gnuradio-filter)
+target_link_libraries(gnuradio-specmonitor ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES} gnuradio-filter gnuradio-blocks)
 set_target_properties(gnuradio-specmonitor PROPERTIES DEFINE_SYMBOL "gnuradio_specmonitor_EXPORTS")
 
 if(APPLE)
@@ -64,7 +67,8 @@ include_directories(${CPPUNIT_INCLUDE_DIRS})
 list(APPEND test_specmonitor_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/test_specmonitor.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/qa_specmonitor.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/qa_hier_preamble_detector.cc
+#    ${CMAKE_CURRENT_SOURCE_DIR}/qa_frame_sync_cc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/qa_framer_c.cc
     #${CMAKE_CURRENT_SOURCE_DIR}/qa_corr_est_norm_cc.cc
 )

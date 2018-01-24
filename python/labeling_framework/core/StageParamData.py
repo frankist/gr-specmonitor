@@ -229,6 +229,6 @@ def generate_session_run_idxs(sessiondata,final_stage):
         stage_len_list = sessiondata.slice_stage_lengths(stages=path2root,tags=t)
         assert stage_len_list.shape[0]==1 # should only have one tag
         stage_range_list = [range(si) for si in reversed(stage_len_list[0,:])] # [root,...,this stage]
-        range_idx_tuple = tuple([[t]]+stage_range_list)
+        range_idx_tuple = [[t]]+stage_range_list
         l.append(itertools.product(*range_idx_tuple))
     return itertools.chain(*l)

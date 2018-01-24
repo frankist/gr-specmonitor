@@ -18,63 +18,62 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 #
+
 import numpy as np
 
 from ..sig_format import sig_data_access as sda
-from ..labeling_tools import bounding_box as bb
+from ..data_representation import image_representation as imgrep
+from ..data_representation import timefreq_box as tfbox
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
-
 
 def print_params(params,name):
     logger.debug('%s waveform generator starting',name)
     for k, v in params.iteritems():
         logger.debug('%s: %s (type=%s)', k, v, type(v))
 
-def create_waveform_sig_data(IQsamples,args,box_list,box_pwr_list):
-    """
-    This function should return a dictionary/obj with: IQsamples,
-    stage parameters that were passed, and the derived bounding_boxes
-    """
+def create_new_sigdata(args):
     logger.debug('Going to fill the stage data structure')
     # generate a sig object/dict
     v = sda.init_metadata()
 
-    # fill with samples
-    v['IQsamples'] = IQsamples
-
     # add the stage parameters that were passed to the waveform generator
     sda.set_stage_parameters(v, args['stage_name'], args['parameters'])
 
-    # add the parameters that were derived
-    sda.set_stage_derived_parameter(v, args['stage_name'], 'bounding_boxes',
-                                    box_list)
-    sda.set_stage_derived_parameter(v, args['stage_name'], 'bounding_boxes_power',
-                                    box_pwr_list)
-
     return v
 
-def derive_bounding_boxes(x):
-    logger.debug('Going to compute Bounding Boxes')
-    box_list = bb.compute_bounding_boxes(x)
-    logger.debug('Finished computing the Bounding Boxes')
+def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
+    sig2img_params = args['parameters']['signal_representation']
+    signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
+    box_label = args['parameters'][sig2img_params['boxlabel']]
 
-    # normalize the power of the signal
-    box_pwr_list = bb.compute_boxes_pwr(x, box_list)
-    max_pwr_box = np.max(box_pwr_list)
-    y = x/np.sqrt(max_pwr_box)
-    box_pwr_list_norm = [b/max_pwr_box for b in box_pwr_list]
+    section_bounds = [0,x.size]
+    sigmetadata = signalimgmetadata.generate_metadata(x,section_bounds,sig2img_params,box_label)
+    
+    # normalize boxes power
+    tfreq_boxes = sigmetadata.tfreq_boxes
+    if len(tfreq_boxes)==0 and fail_at_noTx:
+        raise RuntimeError('There were no Transmissions')
+    tfreq_boxes,max_pwr = tfbox.normalize_boxes_pwr(tfreq_boxes,x)
+    sigmetadata.tfreq_boxes = tfreq_boxes
+    y = x/np.sqrt(max_pwr)
 
-    #debug
-    # plt.plot(np.abs(gen_data))
-    # plt.plot(np.abs(gen_data0),'r')
-    # plt.show()
-    return (y,box_pwr_list,box_pwr_list_norm)
+    # fill sigdata
+    stage_data['IQsamples'] = y
+    sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
 
-def transform_IQ_to_sig_data(x,args):
-    y,box_pwr_list,box_list = derive_bounding_boxes(x)
-    v = create_waveform_sig_data(y,args,box_list,box_pwr_list)
+def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
+    """
+    This function should return a dictionary/obj with: IQsamples,
+    stage parameters that were passed, and the derived bounding_boxes
+    """
+    try:
+        v = create_new_sigdata(args)
+        set_derived_sigdata(v,x,args,fail_at_noTx)
+    except KeyError, e:
+        logger.error('The input arguments do not seem valid. I received: {}'.format(args))
+        raise
+    except RuntimeError, e:
+        logger.warning('There were no transmissions during the specified window')
+        raise e
     return v
-
-if __name__ == '__main__':
-    pass

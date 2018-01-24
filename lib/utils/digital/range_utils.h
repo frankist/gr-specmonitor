@@ -22,49 +22,87 @@
 #include <algorithm>
 #include <limits>
 #include <vector>
+#include <iostream>
 
 #ifndef RANGE_UTILS_H_
 #define RANGE_UTILS_H_
 
 namespace utils {
   template<typename T>
-  struct hist_array_view {
-    T* vec;
-    int hist_len;
-    int d_size;
+  struct array_view {
+    T* d_begin;
+    T* d_end;
+    typedef T* iterator;
+    typedef const T* const_iterator;
 
-    hist_array_view() : vec(NULL), hist_len(0) {}
-
-    hist_array_view(T* vec_x, int h_len) :
-      vec(vec_x),
-      hist_len(h_len),
-      d_size(std::numeric_limits<int>::max()) {
+    array_view() : d_begin(NULL), d_end(NULL) {}
+    array_view(const T* b, const T* e) : d_begin(b), d_end(e) {}
+    template<typename It>
+    array_view(const It b, const It e) : d_begin(&(*b)), d_end(&(*e)) {}
+    void reset(const_iterator b, const_iterator e) {d_begin = b; d_end = e;}
+    // void reset(const T* b, const T* e) {d_begin = b; d_end = e;}
+    inline array_view<T>::iterator begin() {return d_begin;}
+    inline array_view<T>::iterator end() {return d_end;}
+    inline array_view<T>::const_iterator begin() const {return d_begin;}
+    inline array_view<T>::const_iterator end() const {return d_end;}
+    inline T& endref() {return *d_end;}
+    inline const T& endref() const {return *d_end;}
+    inline T& operator[](size_t i) {
+      assert(i<=size());
+      return *(d_begin+i);}
+    inline const T& operator[](size_t i) const {
+      assert(i<=size());
+      return *(d_begin+i);
     }
+    inline size_t size() const {return d_end-d_begin;}
+    inline std::vector<T> vector_clone() const {
+      return std::vector<T>(d_begin,d_end);
+    }
+  };
+
+  template<typename T>
+  struct hist_array_view {
+    array_view<T> vec;
+    int d_hist_len;
+
+    hist_array_view() : d_hist_len(0) {}
+
+    // hist_array_view(T* vec_x, int h_len) :
+    //   vec(vec_x,vec_x+),
+    //   hist_len(h_len),
+    //   d_size(std::numeric_limits<int>::max()) {
+    // }
 
     hist_array_view(T* vec_x, int h_len, int siz) :
-      vec(vec_x),
-      hist_len(h_len),
-      d_size(siz) {
+      vec(vec_x,vec_x+siz+h_len),
+      d_hist_len(h_len) {
     }
 
-    void set(T* vec_x, int h_len, int siz = std::numeric_limits<int>::max()) {
-      vec = vec_x;
-      hist_len = h_len;
-      d_size = siz;
+    int size() const {return vec.size()-d_hist_len;}
+
+    void reset(T* vec_x, int h_len, int siz = std::numeric_limits<int>::max()) {
+      vec.reset(vec_x,vec_x+h_len+siz);
+      d_hist_len = h_len;
     }
 
     inline T& operator[](int i) {
-      assert(i>=-hist_len && i <= d_size);
-      return vec[i+hist_len];
+      assert(i>=-d_hist_len && i <= size());
+      return vec[i+hist_len()];
     }
 
     inline const T& operator[](int i) const {
-      assert(i>=-hist_len && i <= d_size);
-      return vec[i+hist_len];
+      assert(i>=-d_hist_len && i <= size());
+      return vec[i+hist_len()];
     }
 
+    inline int hist_len() const {
+      return d_hist_len;
+    }
     inline void advance(int siz) {
-      std::copy(&vec[siz], &vec[siz+hist_len], &vec[0]);
+      std::copy(&vec[siz], &vec[siz+d_hist_len], &vec[0]);
+    }
+    inline std::vector<T> vector_clone() const {
+      return vec.vector_clone();
     }
   };
 

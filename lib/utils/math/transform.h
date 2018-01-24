@@ -44,15 +44,16 @@ namespace utils {
       vec[i] *= val;
   }
 
+  // this computes: y = x/sqrt(mean(abs(x)^2))
   template<typename T>
   inline void normalize(T* vec, size_t N) {
-    float pwr = std::accumulate(&vec[0], &vec[N], 0.0, utils::OpAccNorm);
+    float pwr = std::accumulate(&vec[0], &vec[N], 0.0f, utils::OpAccNorm)/N;
     utils::scale(&vec[0], 1/sqrt(pwr), N);
   }
 
   template<typename T>
   inline void set_mean_amplitude(T* vec, size_t N) {
-    float amp = sqrt(std::accumulate(&vec[0], &vec[N], 0.0, utils::OpAccNorm)) / N;
+    float amp = sqrt(std::accumulate(&vec[0], &vec[N], 0.0f, utils::OpAccNorm)) / N;
     utils::scale(&vec[0], 1/amp, N);
   }
 };

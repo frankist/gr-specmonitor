@@ -23,8 +23,9 @@ import sys
 import os
 import pickle
 import json
+import numpy as np
 
-from ..labeling_tools.bounding_box import *
+# from ..labeling_tools.bounding_box import *
 from ..labeling_tools import preamble_utils
 from ..sig_format import pkl_sig_format
 from ..sig_format import sig_data_access as filedata
@@ -85,7 +86,8 @@ def filter_valid_peaks(detected_peaks,frame_period,n_sections,valid_window):
 def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsuperframe,Nsettle):
     block_size = 100000 # we read in chunks
     thres = [0.14,0.1]
-    pdetec = preamble_utils.PreambleDetectorType2(fparams,thres1=thres[0],thres2=thres[1])
+    # pdetec = preamble_utils.PreambleDetectorType2(fparams,thres1=thres[0],thres2=thres[1])
+    pdetec = preamble_utils.PyHierPreambleDetector(preamble_utils.to_PyFrameParams(fparams),thres1=thres[0],thres2=thres[1])
     _,n_rx_samples,valid_rx_window = get_recording_params(Nsettle,Nsuperframe,fparams.frame_period)
 
     # check for peaks in chunks
@@ -103,7 +105,8 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
         logger.exception(err_msg)
         raise AssertionError(err_msg)
 
-    selected_peaks = filter_valid_peaks(pdetec.peaks,fparams.frame_period,n_sections,valid_rx_window)
+    # selected_peaks = filter_valid_peaks(pdetec.peaks,fparams.frame_period,n_sections,valid_rx_window)
+    selected_peaks = filter_valid_peaks(pdetec.peaks(),fparams.frame_period,n_sections,valid_rx_window)
     if selected_peaks is None:
         return None
 
@@ -134,7 +137,9 @@ def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsu
         y = ret[2]
 
         # assert section_bounds do not go over superframe size
-        section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
+        spec_metadata = filedata.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
+        section_bounds = [s.section_bounds for s in spec_metadata]
+        # section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
         assert Nsuperframe>=np.max([s[1] for s in section_bounds])
 
         # write the selected samples and preamble peaks to the target file
@@ -160,7 +165,7 @@ def setup_remote_rx(sessiondata,hostnames,params_to_send):
         json.dump(params_to_send,f)
     assert os.path.isfile(tmp_params_file)
 
-    # send the stored params to the remote user 
+    # send the stored params to the remote user
     if isinstance(hostnames,str):
         hostnames = [hostnames]
     for h in hostnames:

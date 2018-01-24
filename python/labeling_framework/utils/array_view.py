@@ -43,10 +43,11 @@ class offset_array_view(object):
                 the array limits {}'.format(stop-self.offset,self.size))
             return slice(start,stop,idx.step)
         elif isinstance(idx,int):
-            if idx<0 or idx>=self.size+self.offset:
+            start = idx+self.offset
+            if start<0 or start>=self.size+self.offset:
                 raise IndexError('The index {} does not fit in the \
-                array bounds [{},{}].'.format(idx,0,self.size+self.offset))
-            return idx+self.offset
+                array bounds [{},{}].'.format(start,0,self.size+self.offset))
+            return start
         else:
             raise TypeError('The type {} is not supported while indexing array.'.format(type(idx)))
 

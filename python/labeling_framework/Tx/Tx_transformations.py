@@ -20,13 +20,16 @@
 #
 import sys
 import pickle
+import numpy as np
 
 from gnuradio import gr
 from gnuradio import blocks
 from gnuradio import analog
 from gnuradio import channels
 
-from ..labeling_tools.bounding_box import *
+# from ..labeling_tools.bounding_box import *
+from ..data_representation import image_representation as imgrep
+from ..data_representation import timefreq_box as tfbox
 from ..sig_format import pkl_sig_format
 from ..labeling_tools import preamble_utils
 from ..sig_format import sig_data_access as filedata
@@ -39,15 +42,15 @@ def generate_section_partitions(section_size,guard_band,num_sections):
 # this function returns the boxes intersected with the section of interest. It also
 # offsets the boxes time stamp to be relative with the section start.
 def compute_new_bounding_boxes(time_offset,section_size,freq_offset,box_list):
-    boi = intersect_boxes_with_section(box_list,(time_offset,time_offset+section_size))
-    boi_offset = add_offset(boi,-time_offset,freq_offset)
+    boi = tfbox.intersect_boxes_with_section(box_list,(time_offset,time_offset+section_size))
+    boi_offset = tfbox.add_offset(boi,-time_offset,freq_offset)
     return list(boi_offset)
 
 # this function picks the boxes within the window (toffset:toffset+num_samples) that were offset by -toffset
 # and breaks them into sections. It also offsets the box start to coincide with the section
 def partition_boxes_into_sections(box_list,section_size,guard_band,num_sections):
     section_ranges = generate_section_partitions(section_size,guard_band,num_sections)
-    return [list(intersect_and_offset_box(box_list,s)) for s in section_ranges]
+    return [list(tfbox.intersect_and_offset_box(box_list,s)) for s in section_ranges]
 
 def apply_framing_and_offsets(args):
     params = args['parameters']
@@ -67,10 +70,7 @@ def apply_framing_and_offsets(args):
     noise_voltage = 0#params.get('noise_voltage',0)
     freq_offset = params.get('frequency_offset',0)
     soft_gain = params.get('soft_gain',1)
-    epsilon = params.get('epsilon',1)
-    taps = None
-    seed = 0
-    num_samples = num_sections*section_size
+    num_samples = int(num_sections*section_size)
     hist_len = 3 # compensate for block history# channel is hier block with taps in it
 
     ### Create preamble and frame structure
@@ -79,6 +79,7 @@ def apply_framing_and_offsets(args):
 
     ### Read IQsamples
     twin = (time_offset-fparams.guard_len-hist_len,time_offset+num_samples+fparams.guard_len)
+    assert twin[0]>=0
     xsections_with_hist = freader.read_section(twin[0],twin[1])
 
     ### Create GR flowgraph that picks read samples, applies freq_offset, scaling, and stores in a vector_sink
@@ -112,8 +113,10 @@ def apply_framing_and_offsets(args):
     assert y.size==num_samples_with_framing
 
     # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
-    prev_boxes = filedata.get_stage_derived_parameter(stage_data,'bounding_boxes')
+    specimgmetadata = filedata.get_stage_derived_parameter(stage_data,'spectrogram_img_metadata')
+    prev_boxes = specimgmetadata.tfreq_boxes
 
+    # intersect the boxes with the section boundaries
     try:
         box_list = compute_new_bounding_boxes(time_offset,num_samples,freq_offset,prev_boxes)
     except AssertionError:
@@ -122,9 +125,17 @@ def apply_framing_and_offsets(args):
         raise
     section_boxes = partition_boxes_into_sections(box_list,section_size,fparams.guard_len,num_sections)
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
+
+    # fill new file
     stage_data['IQsamples'] = y # overwrites the generated samples
-    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounds',section_bounds)
-    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_bounding_boxes',section_boxes)
+    l = []
+    sig2img_params = filedata.get_stage_parameter(stage_data,'signal_representation')
+    signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
+    for i in range(len(section_bounds)):
+        assert section_bounds[i][1]-section_bounds[i][0] == section_size
+        assert all(s.label() is not None for s in section_boxes[i])
+        l.append(signalimgmetadata(section_boxes[i],section_bounds[i],specimgmetadata.input_params))
+    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_spectrogram_img_metadata',l)
 
     assert y.size >= np.max([s[1] for s in section_bounds])
     for i in range(num_sections):

@@ -24,20 +24,60 @@
 #define OPERATION_UTILS_H_
 
 namespace utils {
-  template<typename complex_type>
-  inline float mean_mag2(complex_type* vec, int N) {
-    float sum = 0;
-    for(int i = 0; i < N; ++i)
-      sum += std::norm(vec[i]);
-    return sum;
+  float OpNorm(cplx val) {return std::norm(val);}
+  float OpAccNorm (float x, std::complex<float> y) {return x+std::norm(y);}
+  float OpNormComp(cplx x, cplx y) { return std::norm(x) < std::norm(y); }
+  struct OpAccNormDist {
+    cplx val;
+    OpAccNormDist(cplx a) : val(a) {}
+    inline float operator()(float x, cplx y) const {return x+std::norm(y-val);}
+  };
+
+  inline cplx mean(const cplx* x, int N) {
+    return std::accumulate(x,x+N,cplx(0,0))/(float)N;
+  }
+  inline float mean_mag2(const cplx* x, int N) {
+    return std::accumulate(x,x+N,0.0f,OpAccNorm)/(float)N;
+  }
+  inline float mean_mag2_bias(const cplx* x, int N, cplx bias) {
+    OpAccNormDist op(bias);
+    return std::accumulate(x,x+N,0.0f,op)/(float)N;
   }
 
-  class OpNorm {
-    inline float operator()(std::complex<float> val) {
-      return std::norm(val);
-    }
-  };
-  float OpAccNorm (float x, std::complex<float> y) {return x+std::norm(y);}
+  // template<typename complex_type>
+  // inline float mean_mag2(const complex_type* vec, int N) {
+  //   float sum = 0;
+  //   for(int i = 0; i < N; ++i)
+  //     sum += std::norm(vec[i]);
+  //   return sum;
+  // }
+
+  // template<typename complex_type>
+  // inline float mean_mag2_bias(const complex_type* vec, int N, complex_type bias) {
+  //   float sum = 0;
+  //   for(int i = 0; i < N; ++i)
+  //     sum += std::norm(vec[i]-bias);
+  //   return sum;
+  // }
+
+
+  template<typename T>
+  inline void cumsum(T* y, const T* x, int N) {
+    assert(N>0);
+    y[0] = x[0];
+    for(int i = 1; i < N; ++i)
+      y[i] = y[i-1]+x[i];
+  }
+  template<typename T>
+  inline std::vector<T> cumsum(const std::vector<T>& x) {
+    std::vector<T> y(x.size());
+    cumsum(&y[0],&x[0],x.size());
+    return y;
+  }
+
+  inline int argmax(const cplx* x, int N) {
+    return std::distance(x,std::max_element(x,x+N,OpNormComp));
+  }
 };
 
 #endif

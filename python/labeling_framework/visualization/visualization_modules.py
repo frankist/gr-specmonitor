@@ -34,37 +34,23 @@ from ..core.LuigiSimulatorHandler import StageLuigiTask
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
-class SpectrogramImageUtils:
-    @staticmethod
-    def generate_img(Sxx):
-        Srange = (np.min(Sxx),np.max(Sxx))
-        Snorm = (Sxx-Srange[0])/(Srange[1]-Srange[0])
-        assert np.max(Snorm)<=1.0 and np.min(Snorm)>=0
-        im = Image.fromarray(np.uint8(cm.gist_earth(Snorm)*255))
-        return im
+def get_pixel_coordinates(imgbox):
+    ud_l = [(e,imgbox.colmin) for e in range(imgbox.rowmin,imgbox.rowmax)]
+    ud_r = [(e,imgbox.colmax-1) for e in range(imgbox.rowmin,imgbox.rowmax)]
+    lr_u = [(imgbox.rowmin,e) for e in range(imgbox.colmin,imgbox.colmax)]
+    lr_d = [(imgbox.rowmax-1,e) for e in range(imgbox.colmin,imgbox.colmax)]
+    pixels = set(ud_l) | set(ud_r) | set(lr_u) | set(lr_d)
 
-    # based on the box limits, computes the pixel coordinates
-    @staticmethod
-    def box_pixel_coordinates(row_lims,col_lims):
-        assert row_lims[0]>=0 and col_lims[0]>=0
-        assert row_lims[0]<row_lims[1] and col_lims[0]<col_lims[1]
-        ud_l = [(e,col_lims[0]) for e in range(row_lims[0],row_lims[1])]
-        ud_r = [(e,col_lims[1]-1) for e in range(row_lims[0],row_lims[1])]
-        lr_u = [(row_lims[0],e) for e in range(col_lims[0],col_lims[1])]
-        lr_d = [(row_lims[1]-1,e) for e in range(col_lims[0],col_lims[1])]
-        return set(ud_l) | set(ud_r) | set(lr_u) | set(lr_d)
+    # need to transpose
+    pixels = [(p[1],p[0]) for p in pixels]
+    return pixels
 
-    @staticmethod
-    def transpose_pixel_coordinates(pixel_list):
-        return [(p[1],p[0]) for p in pixel_list]
-
-# convert a spectrogram matrix to a normalized image
-def generate_img(S):
-    Srange = (np.min(S),np.max(S))
-    Snorm = (S-Srange[0])/(Srange[1]-Srange[0])
-    assert np.max(Snorm)<=1.0 and np.min(Snorm)>=0
-    im = Image.fromarray(np.uint8(cm.gist_earth(Snorm)*255))
-    return im
+def paint_box(im,bbox):
+    if bbox.rowmin < 0:
+        return False # bounding box was too close to the border. Not gonna draw it
+    pixel_list = get_pixel_coordinates(bbox)
+    paint_box_pixels(im,pixel_list)
+    return True
 
 def concatenate_images(img_list):
     div = 4
@@ -80,20 +66,6 @@ def concatenate_images(img_list):
         x_offset += im.size[0]+div
 
     return new_im
-
-# returns the pixels of a box
-def box_pixels(rowlims,collims,dims):
-    assert rowlims[0]>=0 and collims[0]>=0
-    assert rowlims[0]<rowlims[1] and collims[0]<collims[1]
-    assert rowlims[1]<=dims[0] and collims[1]<=dims[1]
-    ud_l = [(e,collims[0]) for e in range(rowlims[0],rowlims[1])]
-    ud_r = [(e,collims[1]-1) for e in range(rowlims[0],rowlims[1])]
-    lr_u = [(rowlims[0],e) for e in range(collims[0],collims[1])]
-    lr_d = [(rowlims[1]-1,e) for e in range(collims[0],collims[1])]
-    return set(ud_l) | set(ud_r) | set(lr_u) | set(lr_d)
-
-def pixel_transpose(pixel_list):
-    return [(p[1],p[0]) for p in pixel_list]
 
 def paint_box_pixels(im,pixel_list):
     def get_val(im,pix):
@@ -140,86 +112,40 @@ def debug_plot_data(section,section_boxes,Sxx,im1):
         ax3.plot(b_range,section_fft[b_range],'ro:')
     plt.show()
 
-def paint_box(im,Spec,box):
-    rowmin,rowmax,colmin,colmax = Spec.convert_box_to_coordinates(box)
-    if rowmin < 0:
-        return False # bounding box was too close to the border. Not gonna draw it
-    pixel_list = SpectrogramImageUtils.box_pixel_coordinates((rowmin,rowmax),(colmin,colmax))
-    pixel_list = SpectrogramImageUtils.transpose_pixel_coordinates(pixel_list) # to be consistent with the image
-    paint_box_pixels(im,pixel_list)
-    return True
 
 def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     targetfile = this_run_params['targetfilename']
     sourcefile = this_run_params['sourcefilename']
     freader = psf.WaveformPklReader(sourcefile)
     sig_data = freader.data()
+    x = freader.read_section()
     is_framed = fdh.is_framed(sig_data)
     if insync is False or is_framed is False:
         logger.error('I have to implement this functionality')
         print sig_data
-        exit(-1)
+        raise NotImplementedError('data has to be framed and in sync to be stored as an img with bounding boxes')
 
-    section_bounds = fdh.get_stage_derived_parameter(sig_data,'section_bounds')
-    box_list = fdh.get_stage_derived_parameter(sig_data,'section_bounding_boxes')
-    num_sections = len(section_bounds)
-    x = freader.read_section()
-
+    spec_metadata = fdh.get_stage_derived_parameter(sig_data,'section_spectrogram_img_metadata')
+    num_sections = len(spec_metadata)
     assert num_sections==1 # TODO: Implement this for several subsections
-    for i in range(num_sections):
-        # print 'section:',section_bounds[i]
-        section = x[section_bounds[i][0]:section_bounds[i][1]]
-        # print 'section:',section.size,section_bounds[i][1]-section_bounds[i][0]
-        assert section.size == section_bounds[i][1]-section_bounds[i][0]
-        Spec = bounding_box.Spectrogram.make_spectrogram(section,cancel_DC_offset=True)
-        im = SpectrogramImageUtils.generate_img(Spec.matrix())
-        im_no_boxes = im.copy()
-
-        # print 'Going to write image',targetfilename_format.format(i)
-        if mark_boxes is True:
-            for box in box_list[i]:
-                # print 'box:',box.__str__(),Spec.Sxx.shape
-                paint_box(im,Spec,box)
-        # debug_plot_data(section,box_list[i],Sxx,im)
-        im = concatenate_images([im_no_boxes,im])
-        im.save(targetfile,'PNG')#targetfilename_format.format(i),'PNG')
-
-def save_spectrograms(sourcefname,insync,mark_boxes):
-    dirname = os.path.dirname(sourcefname)
-    fbase = os.path.splitext(os.path.basename(sourcefname))[0]
-    targetfilename_format = dirname + '/img/' + fbase + '_{}.png'
-    freader = psf.WaveformPklReader(sourcefname)
-    sig_data = freader.data()
-    is_framed = fdh.is_framed(sig_data)
-
-    if insync is False or is_framed is False:
-        print 'ERROR: I have to implement this functionality'
-        print sig_data
-        exit(-1)
-
-    section_bounds = fdh.get_stage_derived_parameter(sig_data,'section_bounds')
-    box_list = fdh.get_stage_derived_parameter(sig_data,'section_bounding_boxes')
-    num_sections = len(section_bounds)
-    x = freader.read_section()
+    section_size = fdh.get_stage_derived_parameter(sig_data,'section_size')
 
     for i in range(num_sections):
-        # print 'section:',section_bounds[i]
-        section = x[section_bounds[i][0]:section_bounds[i][1]]
-        # print 'section:',section.size,section_bounds[i][1]-section_bounds[i][0]
-        assert section.size == section_bounds[i][1]-section_bounds[i][0]
-        Spec = bounding_box.Spectrogram.make_spectrogram(section,cancel_DC_offset=True)
-        im = SpectrogramImageUtils.generate_img(Spec.matrix())
+        # get the image bounding boxes
+        imgboxes = spec_metadata[i].generate_img_bounding_boxes() if mark_boxes==True else []
+        Sxx = spec_metadata[i].image_data(x)
+
+        # convert image data to img format
+        im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))
         im_no_boxes = im.copy()
 
-        # print 'Going to write image',targetfilename_format.format(i)
-        if mark_boxes is True:
-            for box in box_list[i]:
-                # print 'box:',box.__str__(),Spec.Sxx.shape
-                paint_box(im,Spec,box)
-        # debug_plot_data(section,box_list[i],Sxx,im)
+        # paint the bounding boxes in the image
+        for b in imgboxes:
+            paint_box(im,b)
+
+        # put images side by side
         im = concatenate_images([im_no_boxes,im])
-        im.save(targetfilename_format.format(i),'PNG')
-        # misc.imsave(targetfilename_format.format(i),Sxx)
+        im.save(targetfile,'PNG')
 
 class ImgSpectrogramBoundingBoxTask(StageLuigiTask):
     def __init__(self,*args,**kwargs):
