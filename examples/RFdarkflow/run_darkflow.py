@@ -72,6 +72,7 @@ def predict_darkflow_model(cfg_obj,args):
     # save in json format too
     options['json'] = True
     tfnet = TFNet(options)
+    assert tfnet.FLAGS.threshold>=0
     tfnet.predict()
 
 def savepb_darkflow_model(cfg_obj,args):
