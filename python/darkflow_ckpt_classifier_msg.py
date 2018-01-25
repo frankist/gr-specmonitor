@@ -54,6 +54,7 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
 
         # tmp FIXME
         self.stats = darkflow_statistics_collector()
+        self.write_flag = False
 
 
     def run_darkflow(self, msg):
@@ -67,6 +68,9 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.last_result = detected_boxes
         # print 'new classification'
         # self.imgnp[:] = 0
+        if write_flag==False and np.any([box['label']=='wifi' for box in detected_boxes]):
+            cv2.imwrite('../tmp/recorded_files/tmp.png', self.imgcv)
+            write_flag = True
 
         for box in detected_boxes:
             d = pmt.make_dict()
