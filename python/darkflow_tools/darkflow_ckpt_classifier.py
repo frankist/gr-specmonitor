@@ -34,7 +34,7 @@ class DarkflowCkptClassifier:
         newim = None
         if generate_img:
             outcopy = out.copy()
-            newim = self.tfnet.framework.postprocess(outcopy,imgcv,save=False)
+            newim = self.tfnet.framework.postprocess(outcopy,imgcv,save=False,put_text=False)
 
         boxesInfo = list()
         if generate_boxes:
