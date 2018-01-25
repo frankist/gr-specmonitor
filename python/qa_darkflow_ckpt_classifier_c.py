@@ -80,7 +80,7 @@ class qa_darkflow_ckpt_classifier_c (gr_unittest.TestCase):
 
     def test_002_t(self):
         yaml_file = '../../python/tests/qa_darkflow/yolo_model.yml'
-        pkl_file = '~/Dropbox/Programming/deep_learning/test_data/qa_darkflow/data_wifi_0_0_0_0_0.pkl' # FIXME
+        pkl_file = '../../python/tests/deep_learning/dataset/Images/data_wifi_0_0_0_0_0.pkl' # FIXME
 
         freader = pkl_sig_format.WaveformPklReader(os.path.expanduser(pkl_file))
         x = freader.read_section()
