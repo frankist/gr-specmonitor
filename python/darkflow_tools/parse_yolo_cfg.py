@@ -5,15 +5,17 @@ from labeling_framework.utils.filesystem_utils import *
 import yaml
 import os
 import configparser
+import shutil
 
 class YOLOCfgPaths(object):
     img_foldername = 'Images'#'JPEGImages'
     annotations_foldername = 'Annotations'
     darknet_annotations_foldername = 'darknet_annotations'
 
-    def __init__(self,cfg_params, yml_path):
+    def __init__(self,cfg_params, yml_file):
+        self.yml_filepath = os.path.abspath(yml_file)
         self.cfg_params = dict(cfg_params)
-        self.yml_path = yml_path
+        self.yml_path = os.path.dirname(self.yml_filepath)
         self.setup_paths()
         self.assert_validity()
 
@@ -28,6 +30,13 @@ class YOLOCfgPaths(object):
         try_mkdir(self.tmp_path())
         # setup ckpt folder
         try_mkdir(os.path.join(self.tmp_path(),'ckpt'))
+        # make out dir inside images
+        try_mkdir(os.path.join(self.images_path(),'out'))
+        # # copy yaml file to tmp
+        # shutil.copy2(self.yml_filepath,self.tmp_path())
+        # # copy model file to tmp
+        # shutil.copy2(self.model_path(),self.tmp_path())
+        # print('Copies of the YAML and model files were placed in {}'.self.tmp_path())
 
     def dataset_path(self):
         return self.abspath(os.path.expanduser(self.cfg_params['dataset']['dataset_folder']))
@@ -56,8 +65,8 @@ class YOLOCfgPaths(object):
     def model_path(self):
         return self.abspath(os.path.expanduser(self.cfg_params['model']['model_path']))
 
-    def darkflow_bin_path(self):
-        return self.abspath(os.path.expanduser(self.cfg_params['dataset']['darkflow_folder']))
+    # def darkflow_bin_path(self):
+    #     return self.abspath(os.path.expanduser(self.cfg_params['dataset']['darkflow_folder']))
 
     def summary_path(self):
         return '{}/{}'.format(self.tmp_path(),'summary')
@@ -69,10 +78,9 @@ class YOLOCfgPaths(object):
         return '{}/{}'.format(self.tmp_path(),'ckpt')
 
 def read_yaml_main_config(filename):
-    this_cwd = os.path.dirname(os.path.abspath(filename))
     with open(filename,'r') as f:
         cfg_params = yaml.load(f)
-    return YOLOCfgPaths(cfg_params,this_cwd)
+    return YOLOCfgPaths(cfg_params,filename)
 
 def assert_yaml_cfg_correctness(yolo_cfg):
     cfg_params = yolo_cfg.cfg_params
@@ -86,10 +94,10 @@ def assert_yaml_cfg_correctness(yolo_cfg):
     dataset = cfg_params['dataset']
     assert 'tmp_folder' in dataset
     assert 'dataset_folder' in dataset
-    assert 'darkflow_folder' in dataset
+    # assert 'darkflow_folder' in dataset
     assert_path_exists(yolo_cfg.dataset_path())
     assert_path_exists(yolo_cfg.tmp_path())
-    assert_path_exists(yolo_cfg.darkflow_bin_path())
+    # assert_path_exists(yolo_cfg.darkflow_bin_path())
     assert 'model_path' in cfg_params['model']
     assert_path_exists(yolo_cfg.model_path(),True)
     # TODO: check if img and annotations folders exist

@@ -6,6 +6,7 @@ import subprocess
 import cv2
 
 import parse_yolo_cfg as yolocfg
+from darkflow.net.build import TFNet
 import voc_tools
 import darknet_scripts
 
@@ -32,7 +33,6 @@ def darkflow_parse_config(cfg_obj):
     def add_optional(options,obj,name):
         if name in obj:
             options[name] = obj[name]
-    darkflow_bin_folder = cfg_obj.darkflow_bin_path()
     yaml_options = {
         'model': cfg_obj.model_path(),
         'dataset': cfg_obj.images_path(),
@@ -46,10 +46,10 @@ def darkflow_parse_config(cfg_obj):
     }
     cfg_train = cfg_obj.model_params()['train']
     add_optional(yaml_options,cfg_train,'epoch')
-    if 'gpu' in cfg_train and (cfg_train['gpu']==True or cfg_train['gpu']=="true"):
-        yaml_options['gpu'] = 1.0
+    if 'gpu' in cfg_train:
+        yaml_options['gpu'] = float(cfg_train['gpu'])
     return yaml_options
-    
+
 def train_darkflow_model(cfg_obj,load_ckpt):
     options = darkflow_parse_config(cfg_obj)
     options['train'] = True
@@ -109,9 +109,9 @@ if __name__=='__main__':
         exit('Finished setup.')
 
     # Import darkflow based on folder provided in yaml
-    darkflow_folder = cfg_obj.darkflow_bin_path()
-    sys.path.append(darkflow_folder)
-    from darkflow.net.build import TFNet
+    # darkflow_folder = cfg_obj.darkflow_bin_path()
+    # sys.path.append(darkflow_folder)
+    # from darkflow.net.build import TFNet
 
     if args.mode=='train':
         train_darkflow_model(cfg_obj,args.load)
