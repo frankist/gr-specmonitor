@@ -23,6 +23,7 @@ import numpy as np
 from gnuradio import gr
 import pmt
 import cv2
+import time
 
 from darkflow_tools.darkflow_ckpt_classifier import *
 from darkflow_statistics_collector import *
@@ -31,11 +32,12 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
     """
     docstring for block darkflow_ckpt_classifier_msg
     """
-    def __init__(self, yaml_config, fftsize):
+    def __init__(self, yaml_config, fftsize, threshold = 0.6):
         self.yaml_file = yaml_config
         self.fftsize = fftsize
+        self.threshold = threshold
 
-        self.classifier = DarkflowCkptClassifier(self.yaml_file)
+        self.classifier = DarkflowCkptClassifier(self.yaml_file,self.threshold)
 
         model_params = self.classifier.cfg_obj.model_params()
         self.ncols = model_params['width']
@@ -54,7 +56,10 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
 
         # tmp FIXME
         self.stats = darkflow_statistics_collector()
-        self.write_flag = False
+        self.tstamp = time.time()
+        self.num_img_writes = 0
+        self.save_period = 5
+        self.write_im_results = False
 
 
     def run_darkflow(self, msg):
@@ -68,9 +73,14 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.last_result = detected_boxes
         # print 'new classification'
         # self.imgnp[:] = 0
-        if write_flag==False and np.any([box['label']=='wifi' for box in detected_boxes]):
-            cv2.imwrite('../tmp/recorded_files/tmp.png', self.imgcv)
-            write_flag = True
+        if self.write_im_results and (time.time()-self.tstamp)>self.save_period and np.any([box['label']=='wifi' for box in detected_boxes]):
+            fname = '/home/francisco/gr-specmonitor/tmp/recorded_files/tmp{}.png'.format(self.num_img_writes)
+            newim,boxes=self.classifier.classify2(self.imgcv,True,True)
+            print 'boxes:',boxes
+            print('Gonna save image to file {}'.format(fname))
+            cv2.imwrite(fname, newim)
+            self.num_img_writes += 1
+            self.tstamp = time.time()
 
         for box in detected_boxes:
             d = pmt.make_dict()
