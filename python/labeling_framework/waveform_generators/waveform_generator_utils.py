@@ -44,7 +44,7 @@ def create_new_sigdata(args):
 
 def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sig2img_params = args['parameters']['signal_representation']
-    signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
+    signalimgmetadata = imgrep.signal_to_img_converter_factory(sig2img_params)
     box_label = args['parameters'][sig2img_params['boxlabel']]
 
     section_bounds = [0,x.size]

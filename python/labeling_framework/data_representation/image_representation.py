@@ -75,3 +75,25 @@ def get_signal_to_img_converter(params):
 
     # delegate
     return __format_types__[format_name]
+
+def signal_to_img_converter_factory(params): # NOTE: consider deleting the get_signal_to_img_converter
+    return get_signal_to_img_converter(params)
+
+# class SignalRepresentation(object):
+#     def __init__(self,sig2imgparams,IQsamples):
+#         pass
+
+#     def generate_metadata(self):
+#         raise NotImplementedError('This method needs to be implemented')
+
+#     def generate_representation(self):
+#         raise NotImplementedError('This method needs to be implemented')
+
+#     def representation_dims(self):
+#         raise NotImplementedError('This method needs to be implemented')
+
+#     def apply_transformation(self,**kwargs):
+#         """
+#         This method creates a new representation with both
+#         IQsamples and metadata altered """
+#         raise NotImplementedError('This method needs to be implemented')

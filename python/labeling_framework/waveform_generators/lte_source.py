@@ -162,7 +162,7 @@ class GrLTETracesFlowgraph(gr.top_block):
             self.frequency_offset = [frequency_offset]
         self.fft_size = GrLTETracesFlowgraph.prb_mapping[self.n_prbs]
         self.samp_rate = float(self.fft_size*self.subcarrier_spacing)
-        frames_path = os.path.expanduser('~/Dropbox/tmp/lte_frames')
+        frames_path = os.path.expanduser('~/tmp/lte_frames')
         n_prbs_str = "%02d" % (self.n_prbs,)
         mcs_str = "%02d" % (self.mcs)
         fname = '{}/lte_dump_prb_{}_mcs_{}.32fc'.format(frames_path,n_prbs_str,mcs_str)
