@@ -27,8 +27,9 @@ import numpy as np
 
 # from ..labeling_tools.bounding_box import *
 from ..labeling_tools import preamble_utils
+from ..sig_format import stage_signal_data as ssa
 from ..sig_format import pkl_sig_format
-from ..sig_format import sig_data_access as filedata
+# from ..sig_format import sig_data_access as filedata
 from ..utils import ssh_utils
 from ..core import SessionParams
 from ..utils import logging_utils
@@ -123,7 +124,7 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
     return (tstart, selected_peaks, y)
 
 # post-processing the tmp file and update the metadata file
-def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsuperframe,Nsettle):
+def post_process_rx_file_and_save(multi_stage_data,rawfile,args,fparams,n_sections,Nsuperframe,Nsettle):
     targetfilename = args['targetfilename']
     stage_name = args['stage_name']
 
@@ -137,16 +138,20 @@ def post_process_rx_file_and_save(stage_data,rawfile,args,fparams,n_sections,Nsu
         y = ret[2]
 
         # assert section_bounds do not go over superframe size
-        spec_metadata = filedata.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
+        spec_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
+        # spec_metadata = filedata.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
         section_bounds = [s.section_bounds for s in spec_metadata]
         # section_bounds = filedata.get_stage_derived_parameter(stage_data,'section_bounds')
         assert Nsuperframe>=np.max([s[1] for s in section_bounds])
 
         # write the selected samples and preamble peaks to the target file
-        stage_data['IQsamples'] = y
-        filedata.set_stage_derived_parameter(stage_data,stage_name,'detected_preambles',peak_list)
-        with open(targetfilename,'w') as f:
-            pickle.dump(stage_data,f)
+        new_stage_data = ssa.StageSignalData(args,{'spectrogram_img':spec_metadata,'detected_preambles':peak_list},y)
+        multi_stage_data.set_stage_data(new_stage_data)
+        multi_stage_data.save_pkl()
+        # stage_data['IQsamples'] = y
+        # filedata.set_stage_derived_parameter(stage_data,stage_name,'detected_preambles',peak_list)
+        # with open(targetfilename,'w') as f:
+        #     pickle.dump(stage_data,f)
         return True
     return False
 

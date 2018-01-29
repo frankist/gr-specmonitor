@@ -24,6 +24,7 @@ import numpy as np
 from ..sig_format import sig_data_access as sda
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
+from ..sig_format import stage_signal_data as ssa
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -49,7 +50,7 @@ def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
 
     section_bounds = [0,x.size]
     sigmetadata = signalimgmetadata.generate_metadata(x,section_bounds,sig2img_params,box_label)
-    
+
     # normalize boxes power
     tfreq_boxes = sigmetadata.tfreq_boxes
     if len(tfreq_boxes)==0 and fail_at_noTx:
@@ -62,6 +63,8 @@ def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     stage_data['IQsamples'] = y
     sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
 
+    return ssa.StageSignalData(args,{'spectrogram_img':sigmetadata},y)
+
 def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
     """
     This function should return a dictionary/obj with: IQsamples,
@@ -69,11 +72,13 @@ def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
     """
     try:
         v = create_new_sigdata(args)
-        set_derived_sigdata(v,x,args,fail_at_noTx)
+        this_stage_data = set_derived_sigdata(v,x,args,fail_at_noTx)
+        v2 = ssa.MultiStageSignalData()
+        v2.set_stage_data(this_stage_data)
     except KeyError, e:
         logger.error('The input arguments do not seem valid. I received: {}'.format(args))
         raise
     except RuntimeError, e:
         logger.warning('There were no transmissions during the specified window')
         raise e
-    return v
+    return v2

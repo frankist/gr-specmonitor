@@ -27,8 +27,7 @@ import luigi
 from ..core import session_settings
 from ..core import LuigiSimulatorHandler as lsh
 from ..core import SessionParams as sp
-from ..sig_format import sig_data_access as sda
-from ..sig_format import pkl_sig_format
+from ..sig_format import stage_signal_data as ssa
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -113,14 +112,6 @@ def clean_IQ(args):
     sourcefilename = args['sourcefilename']
 
     ### get dependency file, and create a new stage_data object
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    if 'IQsamples' in freader.wavdata:
-        del freader.wavdata['IQsamples']
-
-    # clean original file
-    with open(sourcefilename,'w') as f:
-        pickle.dump(stage_data,f)
-    # with open(targetfilename,'w') as f:
-    #     f.write('success')
-    logger.info('Finished cleaning up IQsamples in file %s',sourcefilename)
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
+    multi_stage_data.clean_previous_samples()
+    multi_stage_data.save_pkl()

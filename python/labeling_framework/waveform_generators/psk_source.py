@@ -166,8 +166,10 @@ def run(args):
             continue
         break
 
-    # save file
-    fname = os.path.expanduser(args['targetfilename'])
-    with open(fname, 'w') as f:
-        pickle.dump(v, f)
-    logger.debug('Finished writing to file %s', fname)
+    v.save_pkl()
+
+    # # save file
+    # fname = os.path.expanduser(args['targetfilename'])
+    # with open(fname, 'w') as f:
+    #     pickle.dump(v, f)
+    # logger.debug('Finished writing to file %s', fname)

@@ -354,4 +354,33 @@ class PyHierPreambleDetector:
     def peaks(self):
         return pmt_to_tracked_peaks(self.detec.pypeaks())
 
+############ Labeling Framework Preamble Generation ##############
+
+def get_session_preamble_params(multi_stage_data):
+    lvl2_diff_len = len(random_sequence.maximum_length_sequence(13*2))
+    pseq_len = [13,61]
+    pparams = generate_preamble_type2(pseq_len,lvl2_diff_len)
+    return pparams
+
+def get_session_frame_params(multi_stage_data):
+    guard_len = 5
+    awgn_guard_len = 100
+    pparams = get_session_preamble_params(multi_stage_data)
+    if 'frame_params' in multi_stage_data.session_data:
+        section_size = multi_stage_data.session_data['frame_params']['section_size']
+    else:
+        section_size = multi_stage_data.get_stage_args('section_size')
+    frame_dur = frame_params.compute_frame_period(section_size,
+                                                    pparams.length(),
+                                                    guard_len,awgn_guard_len)
+    fparams = frame_params(pparams,guard_len,awgn_guard_len,frame_dur)
+    return fparams
+
+def get_num_samples_with_framing(data,num_sections=None):
+    if num_sections is None:
+        num_sections = multi_stage_data.get_stage_parameter('num_sections')
+        fparams = get_session_frame_params(multi_stage_data)
+    else:
+        fparams = data
+    return int(num_sections*fparams.frame_period)
 

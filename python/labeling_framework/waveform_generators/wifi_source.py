@@ -169,10 +169,11 @@ def run(args):
 
     v = transform_IQ_to_sig_data(gen_data,args)
 
-    fname = os.path.expanduser(args['targetfilename'])
-    with open(fname, 'w') as f:
-        pickle.dump(v, f)
-    logger.debug('Finished writing to file %s', fname)
+    v.save_pkl()
+    # fname = os.path.expanduser(args['targetfilename'])
+    # with open(fname, 'w') as f:
+    #     pickle.dump(v, f)
+    # logger.debug('Finished writing to file %s', fname)
 
 
 if __name__ == '__main__':

@@ -23,8 +23,7 @@ import numpy as np
 import pickle
 import copy
 
-from ..sig_format import sig_data_access as sda
-from ..sig_format import pkl_sig_format
+from ..sig_format import stage_signal_data as ssa
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -39,8 +38,6 @@ def time_average_Sxx_and_boxes(Sxx,tfreq_boxes,num_averages,step):
     return Syy
 
 def run(args):
-    targetfilename = args['targetfilename']
-    sourcefilename = args['sourcefilename']
     params = args['parameters']
     num_averages = params['n_fft_averages']
     spec_avg_step = params.get('n_fft_step',num_averages)
@@ -48,23 +45,23 @@ def run(args):
     img_window = (img_row_offset,img_row_offset+params['img_n_rows'])
 
     ### get dependency file, and create a new stage_data object
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    section = freader.read_section()
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
+    section = multi_stage_data.read_stage_samples()
 
-    spec_metadata = sda.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
+    spec_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
 
     if len(spec_metadata)!=1:
         raise NotImplementedError('I assume that this file has one section. To be extended in the future') #TODO
 
+    # create a new spectrogram that is a slice of the previous
     l = []
     for i in range(len(spec_metadata)):
         new_specdata = copy.deepcopy(spec_metadata[i])
         new_specdata.set_num_fft_averages(num_averages,spec_avg_step)
         new_specdata.slice_by_img_dims(img_window[0],img_window[1])
         l.append(new_specdata)
-    sda.set_stage_derived_parameter(stage_data,args['stage_name'],'subsection_spectrogram_img_metadata',l)
 
-    with open(targetfilename,'w') as f:
-        pickle.dump(stage_data,f)
-    logger.info('Finished writing resulting signal to file %s',targetfilename)
+    # create a new StageSignalData and save it
+    new_stage_data = ssa.StageSignalData(args,{'spectrogram_img':l},section)
+    multi_stage_data.set_stage_data(new_stage_data)
+    multi_stage_data.save_pkl()

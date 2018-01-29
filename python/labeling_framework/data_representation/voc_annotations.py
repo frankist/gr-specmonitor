@@ -27,8 +27,7 @@ from PIL import Image
 import pickle
 import cv2
 
-from ..sig_format import sig_data_access as sda
-from ..sig_format import pkl_sig_format
+from ..sig_format import stage_signal_data as ssa
 import image_representation as imrep
 import timefreq_box as tfbox
 from ..labeling_tools import bounding_box as bbox
@@ -136,10 +135,11 @@ def create_image_and_annotation(args):
 
     # get parameters
     img_size = args['parameters']['img_size']
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    section = freader.read_section()
-    spec_metadata = sda.get_stage_derived_parameter(stage_data,'subsection_spectrogram_img_metadata')
+
+    ### get dependency file, and create a new stage_data object
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
+    section = multi_stage_data.read_stage_samples()
+    spec_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
     assert len(spec_metadata)==1 # for now other options are not supported
 
     write_VOC_annotations(annotation_filename,img_filename,spec_metadata,img_size)
@@ -148,7 +148,9 @@ def create_image_and_annotation(args):
     # NOTE: spectrogram may be smaller than image just to fit in CNN input. In such case, it is a good idea
     # to keep the original spectrogram dimensions stored somewhere
     d = {'spectrogram_dims':Sxxdims,'image_dims':img_size}
-    sda.set_stage_derived_parameter(stage_data,args['stage_name'],'voc_representation',d)
-    with open(targetfilename,'w') as f:
-        pickle.dump(stage_data,f)
+    new_stage_data = ssa.StageSignalData(args,
+                        {'voc_representation':d,'spectrogram_img':spec_metadata},
+                        section)
+    multi_stage_data.set_stage_data(new_stage_data)
+    multi_stage_data.save_pkl()
 

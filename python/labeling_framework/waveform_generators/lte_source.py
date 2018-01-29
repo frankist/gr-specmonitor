@@ -232,40 +232,22 @@ def run(args):
             v = transform_IQ_to_sig_data(gen_data,args)
 
             # merge boxes if broadcast channel is empty
-            metadata = sda.get_stage_derived_parameter(v, 'spectrogram_img_metadata', args['stage_name'])
+            metadata = v.get_stage_derived_params('spectrogram_img')
+            # metadata = sda.get_stage_derived_parameter(v, 'spectrogram_img_metadata', args['stage_name'])
             tfreq_boxes = copy.deepcopy(metadata.tfreq_boxes)
             new_tfreq_boxes = merge_boxes_within_same_lte_frame(gen_data,
                 tfreq_boxes,tb.fft_size)
-            # frame_win_list = find_lte_frame_windows(gen_data,tb.fft_size,tb.samp_rate)
-            # if len(frame_win_list)==0:
-            #     raise RuntimeError('Couldnt find any ZC peak')
-            # new_tfreq_boxes = []
-            # # NOTE: This avoids eliminating boxes for which frames were not found.
-            # # They are considered last, so there are no common boxes between them and other frames
-            # frame_win_list.append((0,frame_win_list[0][0]))
-            # frame_win_list.append((frame_win_list[-1][1]+1,len(gen_data))) # this includes boxes for which frame was not found
-            # for tframe in frame_win_list:
-            #     frame_boxes = list(tfbox.select_boxes_that_intersect_section(tfreq_boxes,tframe))
-            #     if len(frame_boxes)==0:
-            #         continue
-            #     maxpwr = np.max([b.params['power'] for b in frame_boxes])
-            #     mintstamp = np.min([b.time_bounds[0] for b in frame_boxes])
-            #     maxtstamp = np.max([b.time_bounds[1] for b in frame_boxes])
-            #     minfreq = np.min([b.freq_bounds[0] for b in frame_boxes])
-            #     maxfreq = np.max([b.freq_bounds[1] for b in frame_boxes])
-            #     new_box = tfbox.TimeFreqBox((mintstamp,maxtstamp),(minfreq,maxfreq),'lte')
-            #     new_box.params['power'] = maxpwr
-            #     new_tfreq_boxes.append(new_box)
-            #     tfreq_boxes = [b for b in tfreq_boxes if b.time_intersection(tframe)==None]
             metadata.tfreq_boxes = new_tfreq_boxes
-            sda.set_stage_derived_parameter(v, args['stage_name'], 'spectrogram_img_metadata', metadata)
+            # NOTE: being a Ptr, it should be stored in the multi_stage_data
+            # sda.set_stage_derived_parameter(v, args['stage_name'], 'spectrogram_img_metadata', metadata)
         except RuntimeError, e:
             logger.warning('Going to re-run radio')
             continue
         break
 
     # save file
-    fname = os.path.expanduser(args['targetfilename'])
-    with open(fname, 'w') as f:
-        pickle.dump(v, f)
-    logger.debug('Finished writing to file %s', fname)
+    v.save_pkl()
+    # fname = os.path.expanduser(args['targetfilename'])
+    # with open(fname, 'w') as f:
+    #     pickle.dump(v, f)
+    # logger.debug('Finished writing to file %s', fname)
