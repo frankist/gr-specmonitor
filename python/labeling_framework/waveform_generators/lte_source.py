@@ -6,6 +6,8 @@ import pickle
 import time
 import sys
 import matplotlib.pyplot as plt
+import scipy
+import copy
 
 from gnuradio import gr
 from gnuradio import blocks
@@ -15,8 +17,68 @@ from gnuradio.filter import firdes
 # labeling_framework package
 import specmonitor
 from waveform_generator_utils import *
+from ..sig_format import sig_data_access as sda
+from ..labeling_tools import random_sequence
+from ..data_representation import timefreq_box as tfbox
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
+
+prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
+fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
+ZC_cached = {
+}
+
+def compute_LTE_ZC(fft_size):
+    if fft_size in ZC_cached:
+        return ZC_cached[fft_size]
+    subcarrier_spacing=15000
+    LTE_samp_rate = float(fft_size*subcarrier_spacing)
+    resamp_ratio = 20.0e6/LTE_samp_rate
+    zc = random_sequence.zadoffchu_freq_noDC_sequence(63,25,0,fft_size)
+    zc_resampled = scipy.signal.resample(zc,int(len(zc)*resamp_ratio))
+    ZC_cached[fft_size] = zc_resampled
+    return zc_resampled
+
+def find_zc_peaks(x,fft_size):
+    zc = compute_LTE_ZC(fft_size)
+    xcorr = np.correlate(x,zc)
+    xcorrabs = np.abs(xcorr)/np.max(np.abs(xcorr))
+    peaks = np.where(xcorrabs>0.8)[0]
+    peaks_sorted = peaks[np.argsort(xcorrabs[peaks])]
+    max_peaks = []
+    while len(peaks_sorted)>0:
+        max_peaks.append(peaks_sorted[-1])
+        peaks_sorted = [p for p in peaks_sorted if np.abs(peaks_sorted[-1]-p)>fft_size]
+    max_peaks = np.sort(max_peaks)
+    return max_peaks
+
+def lte_frame_window(peak,samp_rate):
+    frame_dur=10.0e-3*samp_rate
+    pss_offset = int(np.round(406.9e-6*samp_rate))
+    return (peak-pss_offset,peak+frame_dur-pss_offset)
+
+def find_lte_frame_windows(x,fft_size,samp_rate):
+    l = []
+    half_frame_dur=5.0e-3*20.0e6+1
+    peaks = find_zc_peaks(x,fft_size)
+    peaks_remaining = np.copy(peaks)
+    while len(peaks_remaining)>0:
+        p = peaks_remaining[0]
+        p2_list = np.where(np.abs(p+half_frame_dur-peaks_remaining[1::])<2)[0]
+        if len(p2_list)>0: # we found the second peak
+            assert len(p2_list)==1
+            l.append(lte_frame_window(p,20.0e6))#samp_rate
+            peaks_remaining = np.delete(peaks_remaining,[0,1+p2_list[0]])
+        else:
+            if p>=len(x)-half_frame_dur: # at the right border. the frame was not complete
+                l.append(lte_frame_window(p,20.0e6))
+                peaks_remaining = np.delete(peaks_remaining,[0])
+            elif p<=half_frame_dur: # at the left border. we missed the start of the frame
+                l.append(lte_frame_window(p-int(20.0e6*5.0e-3),20.0e6))
+                peaks_remaining = np.delete(peaks_remaining,[0])
+            else:
+                raise RuntimeError('Couldnt find the second PSSS peak of the LTE frame')
+    return l
 
 class GrLTETracesFlowgraph(gr.top_block):
     # NOTE: srsLTE does not use the standard mapping
@@ -62,10 +124,11 @@ class GrLTETracesFlowgraph(gr.top_block):
             self.frequency_offset = [frequency_offset]
         self.fft_size = GrLTETracesFlowgraph.prb_mapping[self.n_prbs]
         self.samp_rate = float(self.fft_size*self.subcarrier_spacing)
-        frames_path = os.path.expanduser('~/tmp/lte_frames')
+        frames_path = os.path.expanduser('~/Dropbox/tmp/lte_frames')
         n_prbs_str = "%02d" % (self.n_prbs,)
         mcs_str = "%02d" % (self.mcs)
         fname = '{}/lte_dump_prb_{}_mcs_{}.32fc'.format(frames_path,n_prbs_str,mcs_str)
+        print 'DEBUG: this is the file ',fname
         self.expected_bw = GrLTETracesFlowgraph.fftsize_mapping[self.fft_size]
         self.resamp_ratio = 20.0e6/self.samp_rate
         self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
@@ -129,6 +192,32 @@ def run(args):
 
         try:
             v = transform_IQ_to_sig_data(gen_data,args)
+
+            # merge boxes if broadcast channel is empty
+            metadata = sda.get_stage_derived_parameter(v, 'spectrogram_img_metadata', args['stage_name'])
+            tfreq_boxes = copy.deepcopy(metadata.tfreq_boxes)
+            frame_win_list = find_lte_frame_windows(gen_data,tb.fft_size,tb.samp_rate)
+            if len(frame_win_list)==0:
+                raise RuntimeError('Couldnt find any ZC peak')
+            new_tfreq_boxes = []
+            # NOTE: This avoids eliminating boxes for which frames were not found. They are considered last, so there are no common boxes between frames
+            frame_win_list.append((0,frame_win_list[0][0]))
+            frame_win_list.append((frame_win_list[-1][1]+1,len(gen_data))) # this includes boxes for which frame was not found
+            for tframe in frame_win_list:
+                frame_boxes = list(tfbox.select_boxes_that_intersect_section(tfreq_boxes,tframe))
+                if len(frame_boxes)==0:
+                    continue
+                maxpwr = np.max([b.params['power'] for b in frame_boxes])
+                mintstamp = np.min([b.time_bounds[0] for b in frame_boxes])
+                maxtstamp = np.max([b.time_bounds[1] for b in frame_boxes])
+                minfreq = np.min([b.freq_bounds[0] for b in frame_boxes])
+                maxfreq = np.max([b.freq_bounds[1] for b in frame_boxes])
+                new_box = tfbox.TimeFreqBox((mintstamp,maxtstamp),(minfreq,maxfreq),'lte')
+                new_box.params['power'] = maxpwr
+                new_tfreq_boxes.append(new_box)
+                tfreq_boxes = [b for b in tfreq_boxes if b.time_intersection(tframe)==None]
+            metadata.tfreq_boxes = new_tfreq_boxes
+            sda.set_stage_derived_parameter(v, args['stage_name'], 'spectrogram_img_metadata', metadata)
         except RuntimeError, e:
             logger.warning('Going to re-run radio')
             continue

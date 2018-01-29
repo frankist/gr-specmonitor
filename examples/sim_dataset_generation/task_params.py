@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import numpy as np
-import sys
 
 num_sections = 1
 section_size = 550000
@@ -10,7 +9,7 @@ frequency_offset = [0]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 
-tags = ['wifi','psk']#,'lte']
+tags = ['wifi','psk','lte']
 stage_dependency_tree = {
     'Tx':'waveform',
     'TxImg':'Tx',
