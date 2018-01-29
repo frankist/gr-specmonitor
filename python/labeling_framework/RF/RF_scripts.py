@@ -31,9 +31,8 @@ from gnuradio import channels
 from gnuradio import uhd
 
 # from ..labeling_tools.bounding_box import *
-from ..sig_format import pkl_sig_format
 from ..labeling_tools import preamble_utils
-from ..sig_format import sig_data_access as filedata
+from ..sig_format import stage_signal_data as ssa
 # import filedata_handling as filedata
 from ..RF import RF_sync_utils
 from ..utils import ssh_utils

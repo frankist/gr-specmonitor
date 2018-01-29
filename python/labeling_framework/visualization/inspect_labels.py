@@ -22,9 +22,8 @@ import json
 import jsonpickle
 import matplotlib.pyplot as plt
 
-from ..sig_format import pkl_sig_format as psf
 from ..labeling_tools import bounding_box
-from ..sig_format import sig_data_access as fdh
+from ..sig_format import stage_signal_data as ssa
 from ..core.LuigiSimulatorHandler import StageLuigiTask
 from ..utils import typesystem_utils as ts
 from ..utils import logging_utils
@@ -32,13 +31,14 @@ logger = logging_utils.DynamicLogger(__name__)
 
 def write_metadata_to_json(this_run_params):
     targetfile = this_run_params['targetfilename']
-    sourcefile = this_run_params['sourcefilename']
-    freader = psf.WaveformPklReader(sourcefile)
-    sig_data = freader.data()
-    sig_params = sig_data['parameters']
-    sig_derived_params = sig_data['derived_parameters']
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(this_run_params)
+    multi_stage_data.clean_previous_samples() # need to clean IQsamples
+    d = multi_stage_data
+    # sig_data = freader.data()
+    # sig_params = sig_data['parameters']
+    # sig_derived_params = sig_data['derived_parameters']
 
-    d = {'parameters':ts.np_to_native(sig_params),'derived_parameters':ts.np_to_native(sig_derived_params)}
+    # d = {'parameters':ts.np_to_native(sig_params),'derived_parameters':ts.np_to_native(sig_derived_params)}
     with open(targetfile,'w') as f:
         js = jsonpickle.encode(d,unpicklable=False)
         jsident = json.dumps(json.loads(js), indent=2) # unfortunately i can't specify indent in jsonpickle

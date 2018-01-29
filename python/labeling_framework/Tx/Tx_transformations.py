@@ -68,7 +68,8 @@ def apply_framing_and_offsets(args):
 
     ### Create preamble and frame structure
     # TODO: Make this happen in another part of the code
-    multi_stage_data.session_data['frame_params'] = {'section_size':section_size}
+    multi_stage_data.session_data['frame_params'] = {'section_size':section_size,
+                                                     'num_sections':num_sections}
     fparams = preamble_utils.get_session_frame_params(multi_stage_data) #filedata.get_frame_params(stage_data)
     sframer = preamble_utils.SignalFramer(fparams)
 
