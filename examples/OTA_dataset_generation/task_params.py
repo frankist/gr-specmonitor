@@ -10,7 +10,7 @@ frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 
-tags = ['wifi','psk']
+tags = ['wifi','psk','lte']
 ssh_hosts = ['USRPRx']
 stage_dependency_tree = {
     'Tx':'waveform',
@@ -104,6 +104,24 @@ stage_params = {
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
             ('repeats',np.arange(10))
+        ],
+        'Tx': Tx_params,
+        'RF': RF_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
+    },
+    'lte':
+    {
+        'waveform':
+        [
+            ('waveform',['lte']),
+            ('sample_rate',20e6),
+            ('n_samples',wf_gen_samps),
+            ('n_prbs',[50,100]),
+            ('pad_interval',[('uniform',(100,200000))]),
+            ('signal_representation',[spectrogram_representation]),
+            ('n_offset_samples',[('uniform',(0,500000))]),
+            ('runs',range(5))
         ],
         'Tx': Tx_params,
         'RF': RF_params,

@@ -47,5 +47,8 @@ def launch(params):
     elif wf=='generic_mod':
         from . import psk_source
         psk_source.run(params)
+    elif wf=='lte':
+        from . import lte_source
+        lte_source.run(params)
     else:
         raise ValueError('ERROR: Do not recognize this waveform')

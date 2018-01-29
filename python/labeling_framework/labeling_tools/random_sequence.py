@@ -37,19 +37,18 @@ def zadoffchu_noDC_sequence(zc_length, u, q, n_start = 0, num_samples = -1):
     dc = np.mean(seq)
     return seq-dc
 
-def zadoffchu_freq_noDC_sequence(zc_length, u, q, guard_len = 0):
-    num_samples = zc_length+guard_len
+def zadoffchu_freq_noDC_sequence(zc_length, u, q, fft_size):
+    num_samples = fft_size
     n_end = 0 + zc_length
-    guard_len_half = int(np.floor(guard_len/2))
     zc_len_half = int(np.floor(zc_length/2))
 
     zc = [0]*num_samples#np.zeros(num_samples, dtype='complex')
-    zc_seq = np.array([np.exp(-1j*np.pi*u*float(n*(n+1+2*q))/zc_length) for n in range(n_end)])
+    zc_seq = np.array([np.exp(-1j*np.pi*u*float(n*(n+1+2*q))/zc_length) for n in range(n_end)],dtype=np.complex64)
     zc[-zc_len_half-1::] = zc_seq[0:zc_len_half+1]
     zc[0:zc_len_half] = zc_seq[zc_len_half+1::]
     zc[0] = 0
 
-    return np.fft.ifft(zc)
+    return np.fft.ifft(zc,fft_size)
 
 barker_code = {2:[1,-1],3:[1,1,-1],4:[1,1,-1,1], \
                5:[1,1,1,-1,1],7:[1,1,1,-1,-1,1,-1],11:[1,1,1,-1,-1,-1,1,-1,-1,1,-1], \

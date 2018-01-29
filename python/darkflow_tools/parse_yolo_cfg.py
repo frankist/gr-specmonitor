@@ -153,6 +153,8 @@ def generate_darkflow_args(cfg_obj):
     }
     cfg_train = cfg_obj.model_params()['train']
     add_optional(yaml_options,cfg_train,'epoch')
-    if 'gpu' in cfg_train and (cfg_train['gpu']==True or cfg_train['gpu']=="true"):
-        yaml_options['gpu'] = 1.0
+    if 'gpu' in cfg_train:
+        yaml_options['gpu'] = float(cfg_train['gpu'])
+    if 'threshold' in cfg_train:
+        yaml_options['threshold'] = float(cfg_train['threshold'])
     return yaml_options
