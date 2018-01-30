@@ -119,7 +119,7 @@ class SessionData:
             logger.error(err_str)
             raise ImportError(err_str)
         # TODO: Parse the module to see if every variable is initialized
-        deptree = sdt.StageDependencyTree(cfg_module.stage_dependency_tree)
+        deptree = sdt.StageDependencyTree(session_settings.get_task_dependency_tree())#cfg_module.stage_dependency_tree)
         sp = StageParamData.TaggedMultiStageParams(cfg_module.tags,
                                                    deptree,
                                                    cfg_module.stage_params)

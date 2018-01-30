@@ -27,6 +27,10 @@ class waveform(StageLuigiTask):
     """
     This task generates waveform files
     """
+    @staticmethod
+    def depends_on():
+        return None
+
     def requires(self):
         return SessionInit(self.session_args)
 

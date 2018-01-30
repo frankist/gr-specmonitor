@@ -10,16 +10,6 @@ skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 
 tags = ['wifi','psk','lte']
-stage_dependency_tree = {
-    'Tx':'waveform',
-    'TxImg':'Tx',
-    'Rx':'Tx',
-    'RFVOCFormat':'Rx',
-    'RxCleanIQ':'Rx',
-    'TxCleanIQ':'Tx',
-    'waveformCleanIQ':'waveform',
-    'RFVOCFormatCleanIQ':'RFVOCFormat'
-}
 
 Tx_params = [
     ('frequency_offset',frequency_offset),
