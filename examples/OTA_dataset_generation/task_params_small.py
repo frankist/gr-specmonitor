@@ -12,21 +12,6 @@ wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 
 tags = ['wifi','psk','lte']
 ssh_hosts = ['USRPRx']
-stage_dependency_tree = {
-    'Tx':'waveform',
-    'RF':'Tx',
-    'TxImg':'Tx',
-    'Rx':'RF',
-    'RFImg':'RF',
-    'RFLabels':'RF',
-    'RFVOCFormat':'Rx',
-
-    'waveformCleanIQ':'waveform',
-    'TxCleanIQ':'Tx',
-    'RFCleanIQ':'RF',
-    'RxCleanIQ':'Rx',
-    'RFVOCFormatCleanIQ':'RFVOCFormat'
-}
 
 Tx_params = [
     ('frequency_offset',frequency_offset),
