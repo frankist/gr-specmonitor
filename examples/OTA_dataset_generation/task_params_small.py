@@ -4,7 +4,7 @@ import numpy as np
 import sys
 
 num_sections = 1
-section_size = 550000 #500000#100000
+section_size = 1100000 #500000#100000
 toffset_range = [50]#[int(i) for i in np.linspace(50,10000,10)]#[50,60,70,80,90,100]
 frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
@@ -34,7 +34,7 @@ RF_params = [
 ]
 
 Rx_params = [
-    ('n_fft_averages',50),
+    ('n_fft_averages',100),
     ('img_row_offset',[0]),
     ('img_n_rows',104),
 ]
@@ -42,6 +42,9 @@ Rx_params = [
 RFVOCFormat_params = [
     ('img_size',[(104,104)])
 ]
+# RFVOCFormat_params = {
+#     'img_size': [(104,104)]
+# }
 
 spectrogram_representation = {
     'format_type':'spectrogram',
@@ -84,8 +87,8 @@ stage_params = {
             ('samples_per_symbol',10),
             ('excess_bw',0.25),
             ('pre_diff_code',False),
-            ('burst_len', 20000),#[('poisson',3000,1000)]),
-            ('zero_pad_len',[('uniform',(1000,50000))]),
+            ('burst_len', 40000),#[('poisson',3000,1000)]),
+            ('zero_pad_len',[('uniform',(1000,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
             ('repeats',np.arange(2))

@@ -91,7 +91,11 @@ class TaggedMultiStageParams:
     def __init__(self,tag_order,stage_dep_tree,stage_params):
         def add_tag(untagged_params,tag):
             for stage_key in untagged_params.keys():
-                untagged_params[stage_key].append(('session_tag',tag))
+                # FIXME: Temporary fix to work for both list<tuple> and dict
+                if isinstance(untagged_params[stage_key],list):
+                    untagged_params[stage_key].append(('session_tag',tag))
+                else:
+                    untagged_params[stage_key]['session_tag'] = tag
             return untagged_params
         self.tag_names = tag_order
         self.stage_dep_tree = stage_dep_tree
