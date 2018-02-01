@@ -31,9 +31,8 @@ from gnuradio import channels
 from gnuradio import uhd
 
 # from ..labeling_tools.bounding_box import *
-from ..sig_format import pkl_sig_format
 from ..labeling_tools import preamble_utils
-from ..sig_format import sig_data_access as filedata
+from ..sig_format import stage_signal_data as ssa
 # import filedata_handling as filedata
 from ..RF import RF_sync_utils
 from ..utils import ssh_utils
@@ -83,26 +82,32 @@ def setup_RF_Tx_on_repeat(framed_signal, params, fparams, sample_rate):
 def run_RF_channel(args):
     params = args['parameters']
     sessiondata = args['sessiondata']
-    session_folder = SessionParams.SessionPaths.session_folder(sessiondata)
+    # session_folder = SessionParams.SessionPaths.session_folder(sessiondata)
     tmp_folder = SessionParams.SessionPaths.tmp_folder(sessiondata)
     tmp_file = tmp_folder + '/tmp.bin'
     targetfilename = args['targetfilename']
-    sourcefilename = args['sourcefilename']
-    stage_name = args['stage_name']
+    # sourcefilename = args['sourcefilename']
+    # stage_name = args['stage_name']
 
     ### Read previous stage data and sets the parameters of the new stage
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    filedata.set_stage_parameters(stage_data, stage_name, params)
-    x = np.array(freader.read_section(), np.complex128)
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
+    # freader = pkl_sig_format.WaveformPklReader(sourcefilename)
+    # stage_data = freader.data()
+    # filedata.set_stage_parameters(stage_data, stage_name, params)
+    # x = np.array(freader.read_section(), np.complex128)
+    x = np.array(multi_stage_data.read_stage_samples(),np.complex128)
 
     # get parameters from other stages
-    fparams = filedata.get_frame_params(stage_data)
-    n_sections = filedata.get_stage_parameter(stage_data, 'num_sections')
-    Nsuperframe = filedata.get_num_samples_with_framing(
-        stage_data)  # it is basically frame_period*num_frames
+    fparams = preamble_utils.get_session_frame_params(multi_stage_data)
+    # fparams = filedata.get_frame_params(stage_data)
+    n_sections = multi_stage_data.session_data['frame_params']['num_sections']
+    Nsuperframe = preamble_utils.get_num_samples_with_framing(fparams,n_sections)
+    # n_sections = filedata.get_stage_parameter(stage_data, 'num_sections')
+    # Nsuperframe = filedata.get_num_samples_with_framing(
+        # stage_data)  # it is basically frame_period*num_frames
     assert x.size >= Nsuperframe
-    sample_rate = filedata.get_stage_parameter(stage_data, 'sample_rate')
+    # sample_rate = filedata.get_stage_parameter(stage_data, 'sample_rate')
+    sample_rate = multi_stage_data.get_stage_args('sample_rate')
     Nsettle = int(params['settle_time'] * sample_rate)
     n_skip_samples, n_rx_samples, _ = RF_sync_utils.get_recording_params(
         Nsettle, Nsuperframe, fparams.frame_period)
@@ -138,7 +143,7 @@ def run_RF_channel(args):
 
     # save the results
     success = RF_sync_utils.post_process_rx_file_and_save(
-        stage_data, tmp_file, args, fparams, n_sections, Nsuperframe, Nsettle)
+        multi_stage_data, tmp_file, args, fparams, n_sections, Nsuperframe, Nsettle)
     if success is True:
         logger.debug('Finished writing to file %s',targetfilename)
     else:

@@ -30,18 +30,19 @@ import sys
 from scipy import signal
 import argparse
 
-# sys.path.append('../../python/')
-from specmonitor.darkflow_ckpt_classifier_c import darkflow_ckpt_classifier_c
+from specmonitor import spectrogram_img_c
+from specmonitor import darkflow_ckpt_classifier_msg
 
 class DarkflowFlowGraph(gr.top_block):
-    def __init__(self,yaml_config):
+    def __init__(self,yaml_config=''):
         super(DarkflowFlowGraph, self).__init__()
 
         # params
         self.yaml_config = yaml_config
         sample_rate = 20.0e6
-        centre_freq = 3.5e9
-        gaindB = 30
+        centre_freq = 2.35e9#3.5e9
+        gaindB = 10#30
+        fftsize = 104
 
         # flowgraph blocks
         self.usrp_source = uhd.usrp_source(
@@ -54,21 +55,24 @@ class DarkflowFlowGraph(gr.top_block):
         self.usrp_source.set_samp_rate(sample_rate)
         self.usrp_source.set_center_freq(centre_freq,0)
         self.usrp_source.set_gain(gaindB,0)
-        self.toparallel = blocks.stream_to_vector(gr.sizeof_gr_complex, 64)
-        self.fftblock = fft.fft_vcc(64,True,signal.get_window(('tukey',0.25),64),True)
-        self.mag2 = blocks.complex_to_mag_squared(64)
-        self.classifier = darkflow_ckpt_classifier_c(self.yaml_config, 64,
-                                                     True, 10, 10000)
-        # self.tostream = blocks.vector_to_stream(gr.sizeof_float,64)
-        # self.null_sink = blocks.null_sink(gr.sizeof_float)
+        self.toparallel = blocks.stream_to_vector(gr.sizeof_gr_complex, fftsize)
+        self.fftblock = fft.fft_vcc(fftsize,True,signal.get_window(('tukey',0.25),fftsize),True)
+        self.spectroblock = spectrogram_img_c(fftsize,104,104,50,True)
+        self.classifier = darkflow_ckpt_classifier_msg(self.yaml_config, fftsize, 0.6)
 
         # make flowgraph
         self.connect(self.usrp_source,self.toparallel)
         self.connect(self.toparallel,self.fftblock)
-        self.connect(self.fftblock,self.mag2)
-        self.connect(self.mag2,self.classifier)
-        # self.connect(self.mag2,self.tostream)
-        # self.connect(self.tostream,self.null_sink)
+        self.connect(self.fftblock,self.spectroblock)
+        self.msg_connect(self.spectroblock, "imgcv", self.classifier, "gray_img")
+
+    # def run(self):
+    #     # GNURadio has some bug when using streams. It hangs
+    #     self.run()
+    #     # self.tb.start()
+    #     # self.stop()
+    #     # self.wait()
+    #     # yolo_result = classifier.last_result
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Setup the files for training/testing')

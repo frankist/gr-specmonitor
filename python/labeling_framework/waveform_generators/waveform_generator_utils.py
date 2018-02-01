@@ -20,10 +20,12 @@
 #
 
 import numpy as np
+import copy
 
 from ..sig_format import sig_data_access as sda
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
+from ..sig_format import stage_signal_data as ssa
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -44,12 +46,12 @@ def create_new_sigdata(args):
 
 def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sig2img_params = args['parameters']['signal_representation']
-    signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
+    signalimgmetadata = imgrep.signal_to_img_converter_factory(sig2img_params)
     box_label = args['parameters'][sig2img_params['boxlabel']]
 
     section_bounds = [0,x.size]
     sigmetadata = signalimgmetadata.generate_metadata(x,section_bounds,sig2img_params,box_label)
-    
+
     # normalize boxes power
     tfreq_boxes = sigmetadata.tfreq_boxes
     if len(tfreq_boxes)==0 and fail_at_noTx:
@@ -58,9 +60,11 @@ def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sigmetadata.tfreq_boxes = tfreq_boxes
     y = x/np.sqrt(max_pwr)
 
-    # fill sigdata
-    stage_data['IQsamples'] = y
-    sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
+    # # fill sigdata
+    # stage_data['IQsamples'] = y
+    # sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
+
+    return ssa.StageSignalData(args,{'spectrogram_img':sigmetadata},y)
 
 def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
     """
@@ -69,11 +73,20 @@ def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
     """
     try:
         v = create_new_sigdata(args)
-        set_derived_sigdata(v,x,args,fail_at_noTx)
+        this_stage_data = set_derived_sigdata(v,x,args,fail_at_noTx)
+        v2 = ssa.MultiStageSignalData()
+        v2.set_stage_data(this_stage_data)
     except KeyError, e:
         logger.error('The input arguments do not seem valid. I received: {}'.format(args))
         raise
     except RuntimeError, e:
         logger.warning('There were no transmissions during the specified window')
         raise e
-    return v
+    return v2
+
+def aggregate_independent_waveforms(multi_stage_data_list):
+    assert len(multi_stage_data_list)>=1
+    combined_data = copy.deepcopy(multi_stage_data_list[0])
+    for i in range(1,len(multi_stage_data_list)):
+        combined_data = ssa.combine_multi_stage_data(combined_data,multi_stage_data_list[i])
+    return combined_data

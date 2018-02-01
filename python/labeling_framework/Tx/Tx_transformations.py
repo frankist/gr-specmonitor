@@ -27,12 +27,10 @@ from gnuradio import blocks
 from gnuradio import analog
 from gnuradio import channels
 
-# from ..labeling_tools.bounding_box import *
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
-from ..sig_format import pkl_sig_format
 from ..labeling_tools import preamble_utils
-from ..sig_format import sig_data_access as filedata
+from ..sig_format import stage_signal_data as ssa
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -54,14 +52,9 @@ def partition_boxes_into_sections(box_list,section_size,guard_band,num_sections)
 
 def apply_framing_and_offsets(args):
     params = args['parameters']
-    targetfilename = args['targetfilename']
-    sourcefilename = args['sourcefilename']
 
     ### get dependency file, and create a new stage_data object
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    filedata.set_stage_parameters(stage_data,args['stage_name'],params)
-    assert args['stage_name'] in stage_data['parameters']
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
 
     ### Read parameters
     time_offset = params['time_offset']
@@ -74,13 +67,16 @@ def apply_framing_and_offsets(args):
     hist_len = 3 # compensate for block history# channel is hier block with taps in it
 
     ### Create preamble and frame structure
-    fparams = filedata.get_frame_params(stage_data)
+    # TODO: Make this happen in another part of the code
+    multi_stage_data.session_data['frame_params'] = {'section_size':section_size,
+                                                     'num_sections':num_sections}
+    fparams = preamble_utils.get_session_frame_params(multi_stage_data) #filedata.get_frame_params(stage_data)
     sframer = preamble_utils.SignalFramer(fparams)
 
     ### Read IQsamples
     twin = (time_offset-fparams.guard_len-hist_len,time_offset+num_samples+fparams.guard_len)
     assert twin[0]>=0
-    xsections_with_hist = freader.read_section(twin[0],twin[1])
+    xsections_with_hist = multi_stage_data.read_stage_samples()[twin[0]:twin[1]]
 
     ### Create GR flowgraph that picks read samples, applies freq_offset, scaling, and stores in a vector_sink
     tb = gr.top_block()
@@ -109,12 +105,11 @@ def apply_framing_and_offsets(args):
 
     ### Create preamble structure and frame the signal
     y,section_bounds = sframer.frame_signal(gen_data,num_sections)
-    num_samples_with_framing = filedata.get_num_samples_with_framing(stage_data)
+    num_samples_with_framing = preamble_utils.get_num_samples_with_framing(fparams,num_sections)
     assert y.size==num_samples_with_framing
 
-    # print 'boxes:',[b.__str__() for b in freader.data()['bounding_boxes']]
-    specimgmetadata = filedata.get_stage_derived_parameter(stage_data,'spectrogram_img_metadata')
-    prev_boxes = specimgmetadata.tfreq_boxes
+    prev_stage_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
+    prev_boxes = prev_stage_metadata.tfreq_boxes
 
     # intersect the boxes with the section boundaries
     try:
@@ -127,15 +122,14 @@ def apply_framing_and_offsets(args):
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
 
     # fill new file
-    stage_data['IQsamples'] = y # overwrites the generated samples
+    # stage_data['IQsamples'] = y # overwrites the generated samples
     l = []
-    sig2img_params = filedata.get_stage_parameter(stage_data,'signal_representation')
+    sig2img_params = multi_stage_data.get_stage_args('signal_representation')
     signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)
     for i in range(len(section_bounds)):
         assert section_bounds[i][1]-section_bounds[i][0] == section_size
         assert all(s.label() is not None for s in section_boxes[i])
-        l.append(signalimgmetadata(section_boxes[i],section_bounds[i],specimgmetadata.input_params))
-    filedata.set_stage_derived_parameter(stage_data,args['stage_name'],'section_spectrogram_img_metadata',l)
+        l.append(signalimgmetadata(section_boxes[i],section_bounds[i],prev_stage_metadata.input_params))#specimgmetadata.input_params))
 
     assert y.size >= np.max([s[1] for s in section_bounds])
     for i in range(num_sections):
@@ -144,6 +138,6 @@ def apply_framing_and_offsets(args):
         # plt.show()
         assert np.max(np.abs(y[section_bounds[i][0]:section_bounds[i][1]]-gen_data[(fparams.guard_len+i*section_size):fparams.guard_len+(i+1)*section_size]))<0.0001
 
-    with open(targetfilename,'w') as f:
-        pickle.dump(stage_data,f)
-    logger.info('Finished writing resulting signal to file %s',targetfilename)
+    new_stage_data = ssa.StageSignalData(args,{'spectrogram_img':l},y)
+    multi_stage_data.set_stage_data(new_stage_data)
+    multi_stage_data.save_pkl()

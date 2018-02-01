@@ -27,27 +27,24 @@ import luigi
 from ..core import session_settings
 from ..core import LuigiSimulatorHandler as lsh
 from ..core import SessionParams as sp
-from ..sig_format import sig_data_access as sda
-from ..sig_format import pkl_sig_format
+from ..sig_format import stage_signal_data as ssa
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class RemoveIQSamples(lsh.StageLuigiTask):
     completed = luigi.BoolParameter(significant=False,default=False)
 
-    def stage2clean(self):
-        raise NotImplementedError('This is an abstract class')
-
     @staticmethod
     def mkdir_flag():
         return False
 
     def requires(self):
+        stage2clean = self.depends_on().my_task_name()
         ret = super(RemoveIQSamples,self).requires()
         if not isinstance(ret,list):
             ret = [ret]
         sessiondata = self.load_sessiondata()
-        resulttasktuples = sessiondata.child_stage_idxs(self.stage2clean(),self.stage_idxs[0:-1])
+        resulttasktuples = sessiondata.child_stage_idxs(stage2clean,self.stage_idxs[0:-1])
         for taskhandler,child_stage_idx_list in resulttasktuples.items():
             if taskhandler.__name__ == self.my_task_name():
                 continue
@@ -57,8 +54,9 @@ class RemoveIQSamples(lsh.StageLuigiTask):
         return ret
 
     def stage2clean_output(self):
+        stage2clean = self.depends_on().my_task_name()
         outfilename = sp.SessionPaths.stage_outputfile(self.session_args['session_path'],
-                                         self.stage2clean(),
+                                         stage2clean,
                                          self.stage_idxs[0:-1],self.output_fmt)
         return outfilename
 
@@ -84,43 +82,35 @@ class RemoveIQSamples(lsh.StageLuigiTask):
         clean_IQ(this_run_params)
         self.completed = True
 
-def IQcleaner_task_factory(classname,stage2clean):
-    new_class = type(classname, # name of the new class
-                     (RemoveIQSamples,), # base class
-                     {"stage2clean": lambda self: stage2clean})
-    return new_class
+# def IQcleaner_task_factory(classname,stage2clean):
+#     new_class = type(classname, # name of the new class
+#                      (RemoveIQSamples,), # base class
+#                      {"stage2clean": lambda self: stage2clean})
+#     return new_class
 
-def register_IQcleaner_task_handler(stage2clean):
-    class_name = '{}CleanIQ'.format(stage2clean)
-    task = IQcleaner_task_factory(class_name,stage2clean)
-    session_settings.register_task_handler(class_name,task)
+# def register_IQcleaner_task_handler(stage2clean):
+#     class_name = '{}CleanIQ'.format(stage2clean)
+#     task = IQcleaner_task_factory(class_name,stage2clean)
+#     session_settings.register_task_handler(class_name,task)
 
-# def ClassFactory(name, argnames, BaseClass=BaseClass):
-#     def __init__(self, **kwargs):
-#         for key, value in kwargs.items():
-#             # here, the argnames variable is the one passed to the
-#             # ClassFactory call
-#             if key not in argnames:
-#                 raise TypeError("Argument %s not valid for %s" 
-#                     % (key, self.__class__.__name__))
-#             setattr(self, key, value)
-#         BaseClass.__init__(self, name[:-len("Class")])
-#     newclass = type(name, (BaseClass,),{"__init__": __init__})
-#     return newclass
+# # def ClassFactory(name, argnames, BaseClass=BaseClass):
+# #     def __init__(self, **kwargs):
+# #         for key, value in kwargs.items():
+# #             # here, the argnames variable is the one passed to the
+# #             # ClassFactory call
+# #             if key not in argnames:
+# #                 raise TypeError("Argument %s not valid for %s" 
+# #                     % (key, self.__class__.__name__))
+# #             setattr(self, key, value)
+# #         BaseClass.__init__(self, name[:-len("Class")])
+# #     newclass = type(name, (BaseClass,),{"__init__": __init__})
+# #     return newclass
 
 def clean_IQ(args):
     # targetfilename = args['targetfilename']
     sourcefilename = args['sourcefilename']
 
     ### get dependency file, and create a new stage_data object
-    freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    stage_data = freader.data()
-    if 'IQsamples' in freader.wavdata:
-        del freader.wavdata['IQsamples']
-
-    # clean original file
-    with open(sourcefilename,'w') as f:
-        pickle.dump(stage_data,f)
-    # with open(targetfilename,'w') as f:
-    #     f.write('success')
-    logger.info('Finished cleaning up IQsamples in file %s',sourcefilename)
+    multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
+    multi_stage_data.clean_previous_samples()
+    multi_stage_data.save_pkl()

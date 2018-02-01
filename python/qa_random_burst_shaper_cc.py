@@ -129,8 +129,8 @@ class qa_random_burst_shaper_cc (gr_unittest.TestCase):
 
         fftsize=64
         _,_,Sxx=signal.spectrogram(xout,1.0,noverlap=0,nperseg=fftsize,return_onesided=False,detrend=False)
-        plt.imshow(Sxx)
-        plt.show()
+        # plt.imshow(Sxx)
+        # plt.show()
         # plt.plot(xoutmag2)
         # plt.show()
 

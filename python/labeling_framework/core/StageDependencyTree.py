@@ -48,7 +48,8 @@ class StageDependencyTree:
             return None
 
     def get_stage_childs(self,stage_name):
-        assert stage_name in self.stage_names
+        if stage_name not in self.stage_names:
+            raise AssertionError('The stage {} is not in {}'.format(stage_name,self.stage_names))
         l = []
         for k,v in self.dep_tree.items():
             if v==stage_name:

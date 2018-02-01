@@ -27,6 +27,10 @@ class waveform(StageLuigiTask):
     """
     This task generates waveform files
     """
+    @staticmethod
+    def depends_on():
+        return None
+
     def requires(self):
         return SessionInit(self.session_args)
 
@@ -47,5 +51,8 @@ def launch(params):
     elif wf=='generic_mod':
         from . import psk_source
         psk_source.run(params)
+    elif wf=='lte':
+        from . import lte_source
+        lte_source.run(params)
     else:
         raise ValueError('ERROR: Do not recognize this waveform')

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import numpy as np
-import sys
 
 num_sections = 1
 section_size = 550000
@@ -10,17 +9,7 @@ frequency_offset = [0]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
 
-tags = ['wifi','psk']
-stage_dependency_tree = {
-    'Tx':'waveform',
-    'TxImg':'Tx',
-    'Rx':'Tx',
-    'RFVOCFormat':'Rx',
-    'RxCleanIQ':'Rx',
-    'TxCleanIQ':'Tx',
-    'waveformCleanIQ':'waveform',
-    'RFVOCFormatCleanIQ':'RFVOCFormat'
-}
+tags = ['wifi','psk','lte']
 
 Tx_params = [
     ('frequency_offset',frequency_offset),
@@ -90,6 +79,22 @@ stage_params = {
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
             ('runs',range(10))
+        ],
+        'Tx': Tx_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
+    },
+    'lte':
+    {
+        'waveform':
+        [
+            ('waveform',['lte']),
+            ('n_samples',wf_gen_samps),
+            ('n_prbs',[50,100]),
+            ('pad_interval',[('uniform',(100,200000))]),
+            ('signal_representation',[spectrogram_representation]),
+            ('n_offset_samples',[('uniform',(0,500000))]),
+            ('runs',range(5))
         ],
         'Tx': Tx_params,
         'Rx': Rx_params,

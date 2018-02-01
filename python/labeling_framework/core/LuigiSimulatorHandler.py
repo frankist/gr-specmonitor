@@ -155,11 +155,25 @@ class StageLuigiTask(luigi.Task):
     def load_sessiondata(self):
         return sp.load_session(self.session_args)
 
-    def my_task_name(self):
-        return self.__class__.__name__
+    @classmethod
+    def my_task_name(cls):
+        return cls.__name__
 
     @staticmethod
     def mkdir_flag():
+        return True
+
+    # NOTE: unfortunately, can't make abstract+static in python 2.7
+    @staticmethod
+    def depends_on():
+        raise NotImplementedError('Not implemented')
+
+    @classmethod
+    def is_concrete(cls):
+        try:
+            cls.depends_on()
+        except NotImplementedError:
+            return False
         return True
 
     def requires(self):
