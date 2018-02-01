@@ -61,7 +61,7 @@ stage_params = {
             ('sample_rate',20e6),
             ('encoding',[0]),
             ('pdu_length',[1500]),
-            ('pad_interval',[('uniform',(1000,50000))]),
+            ('pad_interval',[('uniform',(1000,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('repeats',np.arange(10))
         ],
@@ -85,7 +85,7 @@ stage_params = {
             ('excess_bw',0.25),
             ('pre_diff_code',False),
             ('burst_len', 20000),#[('poisson',3000,1000)]),
-            ('zero_pad_len',[('uniform',(1000,50000))]),
+            ('zero_pad_len',[('uniform',(1000,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
             ('repeats',np.arange(10))

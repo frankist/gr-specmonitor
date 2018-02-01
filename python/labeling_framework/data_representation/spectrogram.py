@@ -243,6 +243,21 @@ class SectionSpectrogramMetadata(object):
             if test1==False:
                 logger.error('These were the dims:{},{}'.format(b.time_bounds,self.section_duration()))
                 raise AssertionError('The boxes do not fit in the section provided.')
+    
+    def make_superposition(self,spec2):
+        assert self.input_params==spec2.input_params
+        assert self.depth==spec2.depth
+        assert self.fftsize==spec2.fftsize
+        assert self.num_fft_avgs==spec2.num_fft_avgs
+        assert self.num_fft_step==spec2.num_fft_step
+        assert self.section_bounds==spec2.section_bounds
+
+        import copy
+        new_spec = copy.deepcopy(self)
+        new_spec.tfreq_boxes += spec2.tfreq_boxes
+        new_spec.tfreq_boxes.sort(key=lambda x: x.time_bounds[0], reverse=False)
+
+        return new_spec
 
     @classmethod
     def generate_metadata(cls,x,section_bounds,input_params,label):

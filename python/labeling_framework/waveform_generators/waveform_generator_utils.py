@@ -20,6 +20,7 @@
 #
 
 import numpy as np
+import copy
 
 from ..sig_format import sig_data_access as sda
 from ..data_representation import image_representation as imgrep
@@ -59,9 +60,9 @@ def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sigmetadata.tfreq_boxes = tfreq_boxes
     y = x/np.sqrt(max_pwr)
 
-    # fill sigdata
-    stage_data['IQsamples'] = y
-    sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
+    # # fill sigdata
+    # stage_data['IQsamples'] = y
+    # sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
 
     return ssa.StageSignalData(args,{'spectrogram_img':sigmetadata},y)
 
@@ -82,3 +83,10 @@ def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
         logger.warning('There were no transmissions during the specified window')
         raise e
     return v2
+
+def aggregate_independent_waveforms(multi_stage_data_list):
+    assert len(multi_stage_data_list)>=1
+    combined_data = copy.deepcopy(multi_stage_data_list[0])
+    for i in range(1,len(multi_stage_data_list)):
+        combined_data = ssa.combine_multi_stage_data(combined_data,multi_stage_data_list[i])
+    return combined_data

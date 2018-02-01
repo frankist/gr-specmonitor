@@ -142,6 +142,15 @@ class GrLTETracesFlowgraph(gr.top_block):
         self.mcs = mcs
 
         # derived params
+        self.fft_size = GrLTETracesFlowgraph.prb_mapping[self.n_prbs]
+        self.samp_rate = float(self.fft_size*self.subcarrier_spacing)
+        frames_path = os.path.expanduser('~/tmp/lte_frames')
+        n_prbs_str = "%02d" % (self.n_prbs,)
+        mcs_str = "%02d" % (self.mcs)
+        fname = '{}/lte_dump_prb_{}_mcs_{}.32fc'.format(frames_path,n_prbs_str,mcs_str)
+        self.expected_bw = GrLTETracesFlowgraph.fftsize_mapping[self.fft_size]
+        self.resamp_ratio = 20.0e6/self.samp_rate
+        self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
         if isinstance(n_offset_samples,tuple):
             if n_offset_samples[0]=='uniform':
                 self.n_offset_samples = np.random.randint(*n_offset_samples[1])
@@ -150,29 +159,18 @@ class GrLTETracesFlowgraph(gr.top_block):
         else:
             self.n_offset_samples = int(n_offset_samples)
         if isinstance(pad_interval,tuple):
-            self.pad_interval = pad_interval[1]
+            self.pad_interval = [int(p/self.resamp_ratio) for p in pad_interval[1]]
             self.pad_dist = pad_interval[0]
         else:
-            self.pad_interval = [pad_interval]
+            self.pad_interval = [int(pad_interval/self.resamp_ratio)]
             self.pad_dist = 'constant'
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
         else: # it is just a value
             self.frequency_offset = [frequency_offset]
-        self.fft_size = GrLTETracesFlowgraph.prb_mapping[self.n_prbs]
-        self.samp_rate = float(self.fft_size*self.subcarrier_spacing)
-        frames_path = os.path.expanduser('~/tmp/lte_frames')
-        n_prbs_str = "%02d" % (self.n_prbs,)
-        mcs_str = "%02d" % (self.mcs)
-        fname = '{}/lte_dump_prb_{}_mcs_{}.32fc'.format(frames_path,n_prbs_str,mcs_str)
-        print 'DEBUG: this is the file ',fname
-        self.expected_bw = GrLTETracesFlowgraph.fftsize_mapping[self.fft_size]
-        self.resamp_ratio = 20.0e6/self.samp_rate
-        self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
 
         # blocks
-        # print 'this is the filename:',fname
         self.file_reader = blocks.file_source(gr.sizeof_gr_complex,fname,True)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.n_samples_per_frame,"packet_len")
         self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist, self.pad_interval, 0, self.frequency_offset,"packet_len")

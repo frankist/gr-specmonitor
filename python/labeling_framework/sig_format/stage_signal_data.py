@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import os
 import pickle
+import copy
+import numpy as np
 
 class StageSignalData:
     def __init__(self,stage_arguments,derived_params,samples = None):
@@ -96,3 +98,46 @@ class MultiStageSignalData:
         with open(fname,'r') as f:
             multi_stage_data = pickle.load(f)
         return multi_stage_data
+
+    def join(self,data2):
+        assert self.prior_stages==data2.prior_stages
+        assert self.session_data==data2.session_data
+        for stage_name,sdata in self.stage_data.items():
+            if stage_name!=self.prior_stages[-1]: # not the last
+                assert sdata==data2.stage_data[stage_name] # confirm they are the same
+            else:
+                sdata.join(data2.stage_data[stage_name])
+
+def combine_stage_data(stage_data1,stage_data2):
+    assert stage_data1.sourcefilename==stage_data2.sourcefilename
+    assert stage_data1.targetfilename==stage_data2.targetfilename
+    assert stage_data1.stage_name==stage_data2.stage_name
+    # assert stage_data1.args==stage_data2.args
+    assert len(stage_data1.samples)==len(stage_data2.samples)
+    assert isinstance(stage_data1.samples,np.ndarray)
+
+    new_stage_data = copy.deepcopy(stage_data1)
+    # combine samples
+    new_stage_data.samples += stage_data2.samples
+
+    # combine derived params
+    if len(stage_data1.derived_params.keys())!=1 or 'spectrogram_img' not in stage_data1.derived_params:
+        raise NotImplementedError('I have to make this more generalizable')
+    for k,v in new_stage_data.derived_params.items():
+        v2 = stage_data1.derived_params[k].make_superposition(stage_data2.derived_params[k])
+        new_stage_data.derived_params[k] = v2
+
+    return new_stage_data
+
+def combine_multi_stage_data(multi_data1,multi_data2):
+    assert multi_data1.prior_stages==multi_data2.prior_stages
+    assert multi_data1.session_data==multi_data2.session_data
+    assert len(multi_data1.stage_data)==len(multi_data2.stage_data)
+
+    new_multi_data = copy.deepcopy(multi_data1)
+    for stage_name,sdata in multi_data1.stage_data.items():
+        if stage_name!=multi_data1.prior_stages[-1]: # if not last stages
+            assert sdata==multi_data2.stage_data[stage_name]
+        else:
+            new_multi_data.stage_data[stage_name] = combine_stage_data(sdata,multi_data2.stage_data[stage_name])
+    return new_multi_data

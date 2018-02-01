@@ -144,32 +144,44 @@ class GeneralModFlowgraph(gr.top_block):
         frequency_offset = params.get('frequency_offset',0)
         return cls(n_written_samples,constellation_obj,samples_per_symbol,excess_bw,burst_len,zero_pad_len,linear_gain=1.0,frequency_offset=frequency_offset)
 
+def create_multiple_Txs(params):
+    tb_list = []
+    freq_param = params.get('frequency_offset',[0])
+    if isinstance(freq_param,tuple) and freq_param[0]=='multipleTx':
+        for freq in freq_param[1]:
+            params2 = dict(params)
+            params2['frequency_offset'] = freq
+            tb_list.append(GeneralModFlowgraph.load_flowgraph(params2))
+    else:
+        tb_list.append(GeneralModFlowgraph.load_flowgraph(d))
+    return tb_list
+
 def run(args):
     d = args['parameters']
     print_params(d,__name__)
 
-    while True:
-        # create general_mod block
-        tb = GeneralModFlowgraph.load_flowgraph(d)
+    # create general_mod block
+    # tb = GeneralModFlowgraph.load_flowgraph(d)
+    tb_list = create_multiple_Txs(d)
 
-        logger.info('Starting GR waveform generator script for PSK')
-        tb.run()
-        logger.info('GR script finished')
+    waveform_data_list = []
+    for tb in tb_list:
+        while True:
+            logger.info('Starting GR waveform generator script for PSK')
+            tb.run()
+            logger.info('GR script finished')
 
-        gen_data = np.array(tb.dst.data())
-        # gen_data0 = np.array(gen_data)
+            gen_data = np.array(tb.dst.data())
 
-        try:
-            v = transform_IQ_to_sig_data(gen_data,args)
-        except RuntimeError, e:
-            logger.warning('Going to re-run radio')
-            continue
-        break
+            try:
+                v = transform_IQ_to_sig_data(gen_data,args)
+            except RuntimeError, e:
+                logger.warning('Going to re-run radio')
+                continue
+            waveform_data_list.append(v)
+            break
+    v = aggregate_independent_waveforms(waveform_data_list)
 
+    # aggregate everything
     v.save_pkl()
-
-    # # save file
-    # fname = os.path.expanduser(args['targetfilename'])
-    # with open(fname, 'w') as f:
-    #     pickle.dump(v, f)
     # logger.debug('Finished writing to file %s', fname)

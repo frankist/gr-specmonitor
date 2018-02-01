@@ -39,12 +39,12 @@ Rx_params = [
     ('img_n_rows',104),
 ]
 
-RFVOCFormat_params = [
-    ('img_size',[(104,104)])
-]
-# RFVOCFormat_params = {
-#     'img_size': [(104,104)]
-# }
+# RFVOCFormat_params = [
+#     ('img_size',[(104,104)])
+# ]
+RFVOCFormat_params = {
+    'img_size': [(104,104)]
+}
 
 spectrogram_representation = {
     'format_type':'spectrogram',
@@ -64,7 +64,7 @@ stage_params = {
             ('sample_rate',20e6),
             ('encoding',[0]),
             ('pdu_length',[1500]),
-            ('pad_interval',[('uniform',(1000,50000))]),
+            ('pad_interval',[('uniform',(1000,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('repeats',np.arange(2))
         ],

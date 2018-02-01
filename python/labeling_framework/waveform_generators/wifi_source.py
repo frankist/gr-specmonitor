@@ -89,7 +89,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
             self.pad_interval,
             100, [0])
         self.packet_pad.set_min_output_buffer(
-            300000)
+            1000000)
         # self.foo_packet_pad2 = foo.packet_pad2(
         #     False, # Debug
         #     False, 0.01,
