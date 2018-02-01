@@ -103,7 +103,7 @@ def merge_boxes_within_same_lte_frame(x,tfreq_boxes_x,fft_size):
         maxfreq = np.max([b.freq_bounds[1] for b in frame_boxes])
         # caches the measured BW. If we capture a box that does not fit this BW
         # (CC may have smaller BW), we correct it
-        if np.abs(maxfreq+minfreq)>1e-5: # I do not expect CFO here
+        if np.abs(maxfreq+minfreq)>0.01:#1e-5: # I do not expect CFO here
             raise AssertionError('I do not expect CFO here. However, I got ({},{})'.format(minfreq,maxfreq))
         if fft_size not in bw_cached or (maxfreq-minfreq)>(bw_cached[fft_size][1]-bw_cached[fft_size][0]):
             bw_cached[fft_size] = (minfreq,maxfreq)
