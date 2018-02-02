@@ -150,6 +150,7 @@ def run_RF_channel(args):
         logger.warning('Preamble sync has failed. Going to repeat transmission')
     os.remove(tmp_file)
     # Note: The separation into multiple subsections happens later
+    return success
 
 
 class RemoteSetup(SessionLuigiTask):

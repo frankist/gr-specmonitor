@@ -33,6 +33,8 @@ def init():
     for name,task in session_settings.retrieve_task_handlers().items():
         dep = task.depends_on()
         if dep is not None:
+            if isinstance(dep,basestring):
+                dep = session_settings.retrieve_task_handler(dep)
             dtree[task.my_task_name()] = dep.my_task_name()
     session_settings.set_task_dependency_tree(dtree)
 
