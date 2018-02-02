@@ -27,9 +27,9 @@ for i,e in enumerate(Tx_params_wifi):
         Tx_params_wifi[i] = ('frequency_offset',0)
 
 RF_params = [
-    ('tx_gain_norm', [0.01,0.1,0.99]),#10.0**np.arange(-20,0,5)),#range(0, 21, 10)),  #range(0,30,15)),
+    ('tx_gain_norm', [0.1,0.99]),#10.0**np.arange(-20,0,5)),#range(0, 21, 10)),  #range(0,30,15)),
     ('settle_time', 0.25),
-    ('rx_gaindB', [5.0,10.0,15.0,20.0]),#range(0, 21, 10)),
+    ('rx_gaindB', [15.0,20.0]),#range(0, 21, 10)),
     ('rf_frequency', 2.35e9)
 ]
 
