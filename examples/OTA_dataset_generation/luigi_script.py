@@ -31,7 +31,12 @@ class RF(StageLuigiTask):
 
     def run(self):
         this_run_params = self.get_run_parameters()
-        RF_scripts.run_RF_channel(this_run_params)
+        success = False
+        counter = 0
+        while success is False:
+            success = RF_scripts.run_RF_channel(this_run_params)
+            counter += 1
+            logger.trace('This is the try no. {}'.format(counter))
 
 class TxImg(ImgSpectrogramBoundingBoxTask):#StageLuigiTask):
     @staticmethod
@@ -54,7 +59,7 @@ class RFLabels(Labels2JsonTask):
 class Rx(StageLuigiTask):
     @staticmethod
     def depends_on():
-        return Tx
+        return RF
 
     def run(self):
         this_run_params = self.get_run_parameters()
@@ -72,7 +77,7 @@ class RFVOCFormat(StageLuigiTask):
 class waveformClean(remove_IQsamples.RemoveIQSamples):
     @staticmethod
     def depends_on():
-        return waveform
+        return 'waveform'
 class TxClean(remove_IQsamples.RemoveIQSamples):
     @staticmethod
     def depends_on():

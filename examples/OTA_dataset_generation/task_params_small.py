@@ -39,12 +39,12 @@ Rx_params = [
     ('img_n_rows',104),
 ]
 
-# RFVOCFormat_params = [
-#     ('img_size',[(104,104)])
-# ]
-RFVOCFormat_params = {
-    'img_size': [(104,104)]
-}
+RFVOCFormat_params = [
+    ('img_size',[(104,104)])
+]
+# RFVOCFormat_params = {
+#     'img_size': [(104,104)]
+# }
 
 spectrogram_representation = {
     'format_type':'spectrogram',
@@ -90,7 +90,7 @@ stage_params = {
             ('burst_len', 40000),#[('poisson',3000,1000)]),
             ('zero_pad_len',[('uniform',(1000,200000))]),
             ('signal_representation',[spectrogram_representation]),
-            ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
+            ('frequency_offset',[('multipleTx',(-0.325,-0.125,0.125,0.325))]),
             ('repeats',np.arange(2))
         ],
         'Tx': Tx_params,
