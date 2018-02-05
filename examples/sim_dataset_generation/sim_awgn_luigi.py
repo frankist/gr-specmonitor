@@ -8,6 +8,10 @@ from labeling_framework.visualization.inspect_labels import Labels2JsonTask
 from labeling_framework.data_representation import voc_annotations
 from labeling_framework.general_tasks import partition_signal
 from labeling_framework.general_tasks import remove_IQsamples
+
+# register waveform generatos
+from labeling_modules.waveforms.lte_ul_source import LTEULGenerator
+
 from labeling_framework.utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 

@@ -160,6 +160,10 @@ class StageLuigiTask(luigi.Task):
         return cls.__name__
 
     @staticmethod
+    def setup():
+        pass # do nothing
+
+    @staticmethod
     def mkdir_flag():
         return True
 

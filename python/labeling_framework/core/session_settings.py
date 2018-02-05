@@ -5,6 +5,10 @@ def init():
     registered_tasks = {}
     global task_dependency_tree
     task_tree = {}
+    global global_settings
+    global_settings = {}
+    global stage_settings
+    stage_settings = {}
 
 def register_task_handler(name, ClassPtr):
     registered_tasks[name] = ClassPtr
@@ -22,3 +26,12 @@ def set_task_dependency_tree(dtree):
 
 def get_task_dependency_tree():
     return dict(task_tree)
+
+def set_stage_setting(stage_name,variable,value):
+    if stage_name in stage_settings:
+        assert stage_name in registered_tasks
+        stage_settings[stage_name] = {}
+    stage_settings[stage_name][variable] = value
+
+def get_stage_setting(stage_name,variable):
+    return stage_settings[stage_name][variable]

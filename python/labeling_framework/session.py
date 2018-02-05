@@ -38,6 +38,10 @@ def init():
             dtree[task.my_task_name()] = dep.my_task_name()
     session_settings.set_task_dependency_tree(dtree)
 
+    # call task setup for every task type
+    for name,task in session_settings.retrieve_task_handlers().items():
+        task.setup()
+
 def run(session):
     init()
     # cmdline_args = ['OTACmdSession','--local-scheduler']

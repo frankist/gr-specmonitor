@@ -90,3 +90,8 @@ def aggregate_independent_waveforms(multi_stage_data_list):
     for i in range(1,len(multi_stage_data_list)):
         combined_data = ssa.combine_multi_stage_data(combined_data,multi_stage_data_list[i])
     return combined_data
+
+class SignalGenerator(object):
+    @staticmethod
+    def run(params):
+        raise NotImplemented('This is an abstract method')

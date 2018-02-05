@@ -20,6 +20,7 @@
 #
 
 from ..core.LuigiSimulatorHandler import *
+from ..waveform_generators.waveform_generator_utils import SignalGenerator
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -30,6 +31,16 @@ class waveform(StageLuigiTask):
     @staticmethod
     def depends_on():
         return None
+
+    @staticmethod
+    def setup():
+        session_settings.global_settings['waveform_types'] = {}
+        waveform_generators = SignalGenerator.__subclasses__()
+        l = []
+        for w in waveform_generators:
+            session_settings.global_settings['waveform_types'][w.__name__] = w
+            l.append(w.__name__)
+        logger.info('These are the signal/waveform generators that were registered:{}'.format(l))
 
     def requires(self):
         return SessionInit(self.session_args)
@@ -55,4 +66,8 @@ def launch(params):
         from . import lte_source
         lte_source.run(params)
     else:
-        raise ValueError('ERROR: Do not recognize this waveform')
+        gen_name = params['parameters']['signal_generator']
+        siggen = session_settings.global_settings['waveform_types'][gen_name]
+        siggen.run(params)
+    # else:
+    #     raise ValueError('ERROR: Do not recognize this waveform')

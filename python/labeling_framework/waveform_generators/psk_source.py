@@ -153,7 +153,7 @@ def create_multiple_Txs(params):
             params2['frequency_offset'] = freq
             tb_list.append(GeneralModFlowgraph.load_flowgraph(params2))
     else:
-        tb_list.append(GeneralModFlowgraph.load_flowgraph(d))
+        tb_list.append(GeneralModFlowgraph.load_flowgraph(params))
     return tb_list
 
 def run(args):
