@@ -28,6 +28,15 @@ namespace gr {
       virtual ~DistInterface(){}
     };
 
+    void call_exception_args(int val,int expected) {
+      if(val==expected)
+        return;
+      std::stringstream ss;
+      ss << "ERROR: This distribution expects " << expected << " parameters. However it got " << val;
+      std::cerr << ss.str() << std::endl;
+      throw std::invalid_argument(ss.str());
+    }
+
     // Uniform Int Distribution
 
     class RandIntDist : public DistInterface {
@@ -44,7 +53,7 @@ namespace gr {
       int min() const {return d_dist.min();}
       int max() const {return d_dist.max();}
       static DistInterface* pymake(const std::vector<float>& params) {
-        assert(params.size()==2);
+        call_exception_args(params.size(),2);
         return new RandIntDist((int)params[0],(int)params[1]);
       }
     };
@@ -56,7 +65,7 @@ namespace gr {
       ConstantDist(float v) : d_val(v) {}
       virtual float generate() {return d_val;}
       static DistInterface* pymake(const std::vector<float>& params) {
-        assert(params.size()==1);
+        call_exception_args(params.size(),1);
         return new ConstantDist(params[0]);
       }
     };
