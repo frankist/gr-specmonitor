@@ -75,7 +75,6 @@ namespace gr {
 
       update_npostpad();
       set_tag_propagation_policy(TPP_DONT);
-      std::cout << "Exit constructor of burst shaper" << std::endl;
     }
 
     /*
@@ -83,7 +82,6 @@ namespace gr {
      */
     random_burst_shaper_cc_impl::~random_burst_shaper_cc_impl()
     {
-      std::cout << "burst destructor called!" << std::endl;
       if(d_dist!=NULL)
         delete d_dist;
       d_dist = NULL;

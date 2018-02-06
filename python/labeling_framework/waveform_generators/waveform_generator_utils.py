@@ -47,6 +47,7 @@ def create_new_sigdata(args):
 def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sig2img_params = args['parameters']['signal_representation']
     signalimgmetadata = imgrep.signal_to_img_converter_factory(sig2img_params)
+
     box_label = args['parameters'][sig2img_params['boxlabel']]
 
     section_bounds = [0,x.size]
@@ -59,10 +60,6 @@ def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     tfreq_boxes,max_pwr = tfbox.normalize_boxes_pwr(tfreq_boxes,x)
     sigmetadata.tfreq_boxes = tfreq_boxes
     y = x/np.sqrt(max_pwr)
-
-    # # fill sigdata
-    # stage_data['IQsamples'] = y
-    # sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
 
     return ssa.StageSignalData(args,{'spectrogram_img':sigmetadata},y)
 

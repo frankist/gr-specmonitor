@@ -121,11 +121,19 @@ def run(args):
 
             # merge boxes if broadcast channel is empty
             metadata = v.get_stage_derived_params('spectrogram_img')
-            # tfreq_boxes = copy.deepcopy(metadata.tfreq_boxes)
-            # new_tfreq_boxes = merge_boxes_within_same_lte_frame(gen_data,
-            #     tfreq_boxes,tb.fft_size)
-            # metadata.tfreq_boxes = new_tfreq_boxes
-            # # NOTE: being a Ptr, it should be stored in the multi_stage_data
+            tfreq_boxes = copy.deepcopy(metadata.tfreq_boxes)
+            frac_bw = tb.expected_bw/20.0e6
+            freq_tuple = (-frac_bw/2,frac_bw/2)
+            new_tfreq_boxes = []
+            for b in tfreq_boxes:
+                bnew = tfbox.TimeFreqBox(b.time_bounds,freq_tuple,'lte_ul')
+                new_tfreq_boxes.append(bnew)
+            tfreq_boxes,max_pwr = tfbox.normalize_boxes_pwr(new_tfreq_boxes,gen_data)
+            metadata.tfreq_boxes = tfreq_boxes
+            y=gen_data/np.sqrt(max_pwr)
+            this_stage_data = ssa.StageSignalData(args,{'spectrogram_img':metadata},y)
+            v = ssa.MultiStageSignalData()
+            v.set_stage_data(this_stage_data)
         except RuntimeError, e:
             logger.warning('Going to re-run radio')
             continue
