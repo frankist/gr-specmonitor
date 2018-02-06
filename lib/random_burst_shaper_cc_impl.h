@@ -24,6 +24,7 @@
 #include <specmonitor/random_burst_shaper_cc.h>
 #include <boost/random.hpp>
 #include <ctime>
+#include <specmonitor/DynRandom.h>
 
 namespace gr {
   namespace specmonitor {
@@ -40,7 +41,7 @@ namespace gr {
       const int d_nprepad;
       const std::vector<float> d_freq_offset_values;
 
-      DistAbstract* d_dist;
+      DynRandom *d_dist;
       boost::random::mt19937 d_rng;
       boost::random::uniform_int_distribution<> d_freq_dist;
       int d_npostpad;
@@ -56,6 +57,7 @@ namespace gr {
       float d_phase_init;
       int d_bufnread;
       std::vector<tag_t> d_length_tags;
+      std::vector<uint64_t> d_burst_list;
 
       void write_padding(gr_complex *dst, int &nwritten, int nspace);
       int copy_items(gr_complex *dst, const gr_complex *src, int &nwritten,
@@ -68,8 +70,7 @@ namespace gr {
       void enter_postpad();
       void update_npostpad();
      public:
-      random_burst_shaper_cc_impl(std::string dist,
-                                  const std::vector<float>& params,
+      random_burst_shaper_cc_impl(DynRandom time_dist,
                                   int pre_padding,
                                   const std::vector<float>& freq_offset_values,
                                   const std::string &length_tag_name);

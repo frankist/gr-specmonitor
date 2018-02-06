@@ -24,7 +24,8 @@ import numpy as np
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from PIL import Image
-import pickle
+# import pickle
+import cPickle as pickle
 import cv2
 
 from ..sig_format import stage_signal_data as ssa

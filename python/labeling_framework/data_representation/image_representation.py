@@ -26,20 +26,25 @@ logger = logging_utils.DynamicLogger(__name__)
 
 ############ data transformation helpers ##############
 
-def normalize_image_data(img_data,strict_bounds=False):
-    val_range = (np.min(img_data),np.max(img_data))
+def normalize_image_data(img_data,strict_bounds=False,nan_val=0):
+    val_range = (np.nanmin(img_data),np.nanmax(img_data))
     data_norm = (img_data-val_range[0])/(val_range[1]-val_range[0])
-    if not (np.max(data_norm)<=1.0 and np.min(data_norm)>=0):
+    if not (np.nanmax(data_norm)<=1.0 and np.nanmin(data_norm)>=0):
         if strict_bounds is False and val_range[0]==-np.inf:
             # if not strict, recompute normalized image
-            minval = np.min(np.isfinite(img_data))
-            idxs = np.isneginf(img_data)
-            img2 = np.array(img_data)
-            img2[idxs] = minval
-            data_norm = normalize_image_data(img2)
-            logger.warning('Normalization Failed. This was the img limits: {}. I am gonna set a minimum value of {}'.format(val_range,minval))
+            A = np.copy(img_data)
+            A[np.isneginf(A)] = np.nan
+            A[np.isinf(A)] = np.nan
+            data_norm = normalize_image_data(A)
+            # minval = np.min(np.isfinite(img_data))
+            # idxs = np.isneginf(img_data)
+            # img2 = np.array(img_data)
+            # img2[idxs] = minval
+            data_norm = normalize_image_data(A)
+            logger.warning('Normalization Failed. This was the img limits: {}.'.format(val_range))
         else:
-            raise RuntimeError('Normalization Failed. This was the img limits: {}'.format(val_range))
+            raise RuntimeError('Normalization Failed. This was the img limits: {}. However the normalized bounds obtained were {}'.format(val_range,(np.nanmin(data_norm),np.nanmax(data_norm))))
+    data_norm[np.isnan(data_norm)] = nan_val
     return data_norm
 
 # consider deleting

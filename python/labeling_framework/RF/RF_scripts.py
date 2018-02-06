@@ -22,7 +22,8 @@
 import sys
 import os
 import time
-import pickle
+# import pickle
+import cPickle as pickle
 import numpy as np
 
 from gnuradio import gr

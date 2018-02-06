@@ -20,10 +20,22 @@ namespace gr {
       d_rand_dist = RegisteredDists::instance()->make_dist(d_dist_name,d_params);
     }
 
+    DynRandom::DynRandom(const DynRandom& d) :
+      d_dist_name(d.d_dist_name),
+      d_params(d.d_params) {
+      // deep copy of rand dist
+      d_rand_dist = RegisteredDists::instance()->make_dist(d_dist_name,d_params);
+    }
+
+    DynRandom DynRandom::operator=(const DynRandom& d) {
+      return DynRandom(d);
+    }
+
     DynRandom::~DynRandom()
     {
       if(d_rand_dist!=NULL)
         delete d_rand_dist;
+      d_rand_dist = NULL;
     }
 
     float DynRandom::generate() {

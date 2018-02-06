@@ -64,6 +64,15 @@ class ImgBoundingBox(object):
                                  self.img_shape))
             raise AssertionError()
 
+    def resized_box(self,new_dims):
+        newrowmin = int(round(self.rowmin*new_dims[0]/float(self.img_size[0])))
+        newrowmax = int(round(self.rowmax*new_dims[0]/float(self.img_size[0])))
+        newcolmin = int(round(self.colmin*new_dims[1]/float(self.img_size[1])))
+        newcolmax = int(round(self.colmax*new_dims[1]/float(self.img_size[1])))
+        o = ImgBoundingBox(newrowmin,newrowmax,newcolmin,newcolmax,new_dims)
+        o.params = dict(self.params)
+        return o
+
 # fftsize = 64 # I have to define this somewhere later
 
 # class BoundingBox:

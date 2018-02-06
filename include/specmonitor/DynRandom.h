@@ -19,7 +19,9 @@ namespace gr {
     {
     public:
       DynRandom(std::string dist_name, const std::vector<float>& params);
+      DynRandom(const DynRandom& d);
       ~DynRandom();
+      DynRandom operator=(const DynRandom& d);
       float generate();
       std::vector<float> generate_N(int N);
     private:

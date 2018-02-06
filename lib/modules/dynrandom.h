@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/random.hpp>
 #include <boost/function.hpp>
 #include <iostream>
@@ -13,6 +14,10 @@
 
 namespace gr {
   namespace specmonitor {
+    unsigned int micro_local_time() {
+      return boost::posix_time::microsec_clock::local_time().time_of_day().total_microseconds();
+    }
+
     // specify types
     class DistInterface;
     typedef const std::vector<float>& param_format;
@@ -38,13 +43,13 @@ namespace gr {
     }
 
     // Uniform Int Distribution
-
     class RandIntDist : public DistInterface {
       boost::random::mt19937 d_rng;
       boost::random::uniform_int_distribution<> d_dist;
     public:
       RandIntDist(int left, int right) :
-        d_rng(static_cast<unsigned int>(std::time(0))),
+        d_rng(micro_local_time()), // NOTE: This gives more precision
+        // d_rng(static_cast<unsigned int>(std::time(0))),
         d_dist(left,right) {
       }
       virtual float generate() {
@@ -67,6 +72,24 @@ namespace gr {
       static DistInterface* pymake(const std::vector<float>& params) {
         call_exception_args(params.size(),1);
         return new ConstantDist(params[0]);
+      }
+    };
+
+    // PoissonDist
+    class PoissonDist : public DistInterface {
+      boost::random::mt19937 d_rng;
+      boost::random::poisson_distribution<> d_dist;
+    public:
+      PoissonDist(int val) :
+        d_rng(micro_local_time()), // NOTE: This gives more precision
+        d_dist(val) {
+      }
+      virtual float generate() {
+        return d_dist(d_rng);
+      }
+      static DistInterface* pymake(const std::vector<float>& params) {
+        call_exception_args(params.size(),1);
+        return new PoissonDist((int)params[0]);
       }
     };
 

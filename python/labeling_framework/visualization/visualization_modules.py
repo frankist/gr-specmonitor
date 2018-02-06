@@ -24,6 +24,7 @@ import numpy as np
 from scipy import signal
 from scipy import misc
 from PIL import Image
+import cv2
 from pylab import cm
 import matplotlib.pyplot as plt
 
@@ -49,8 +50,13 @@ def get_pixel_coordinates(imgbox):
 def paint_box(im,bbox):
     if bbox.rowmin < 0:
         return False # bounding box was too close to the border. Not gonna draw it
-    pixel_list = get_pixel_coordinates(bbox)
-    paint_box_pixels(im,pixel_list)
+    thick = int(min(im.shape[0],im.shape[1]) // 300)
+    color = (255,130,255,255)#colors[max_indx]
+    cv2.rectangle(im,(bbox.colmin,bbox.rowmin),
+                  (bbox.colmax,bbox.rowmax),
+                  color, thick)
+    # pixel_list = get_pixel_coordinates(bbox)
+    # paint_box_pixels(im,pixel_list)
     return True
 
 def concatenate_images(img_list):
@@ -142,18 +148,27 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     for i in range(num_sections):
         # get the image bounding boxes
         imgboxes = spec_metadata[i].generate_img_bounding_boxes() if mark_boxes==True else []
-        Sxx = spec_metadata[i].image_data(x)
+        Sxx = spec_metadata[i].image_data(x)#,nan_val=np.nan)
+
+        # desired dims
+        orig_dims = Sxx.shape
+        final_dims = (min(Sxx.shape),min(Sxx.shape))
 
         # convert image data to img format
-        im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))
-        im_no_boxes = im.copy()
+        # im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))
+        # im_no_boxes = im.copy()
+        imnp = np.uint8(cm.gist_earth(Sxx)*255)
+        im_no_boxes = Image.fromarray(cv2.resize(imnp,final_dims)).copy()
+        imnp = cv2.resize(imnp,final_dims)
 
         # paint the bounding boxes in the image
         for b in imgboxes:
-            paint_box(im,b)
+            bnew = b.resized_box(final_dims)
+            paint_box(imnp,bnew)
 
         # put images side by side
-        im = concatenate_images([im_no_boxes,im])
+        im = Image.fromarray(cv2.resize(imnp,final_dims))
+        im = concatenate_images([im_no_boxes,im])#[im_no_boxes,im])
         im.save(targetfile,'PNG')
 
 class ImgSpectrogramBoundingBoxTask(StageLuigiTask):

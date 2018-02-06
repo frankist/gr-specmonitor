@@ -9,9 +9,12 @@ endif()
 ########################################################################
 # Install python sources
 ########################################################################
+file(GLOB all_python_files
+  "*.py"
+)
+
 GR_PYTHON_INSTALL(
     FILES
-    __init__.py
-    basic_utils.py
-    logging_utils.py DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/utils
+    ${all_python_files}
+    DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/utils
 )

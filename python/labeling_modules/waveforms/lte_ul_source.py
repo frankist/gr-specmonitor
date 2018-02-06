@@ -2,7 +2,8 @@
 
 import numpy as np
 import os
-import pickle
+# import pickle
+import cPickle as pickle
 import time
 import sys
 import matplotlib.pyplot as plt
@@ -20,14 +21,16 @@ from labeling_framework.core import session_settings
 from labeling_framework.waveform_generators.waveform_generator_utils import *
 from labeling_framework.labeling_tools import random_sequence
 from labeling_framework.data_representation import timefreq_box as tfbox
+from labeling_framework.labeling_tools.parametrization import random_generator
 from labeling_framework.utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 class GrLTEULTracesFlowgraph(gr.top_block):
+    prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
+    fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
     lte_up_filenames = ['ul_p_50_d_1.32fc', 'ul_p_50_d_2.32fc', 'ul_p_50_d_3.32fc', 'ul_p_50_d_6.32fc']
     def __init__(self,n_samples,
                  n_offset_samples,
-                 trace_number,
                  linear_gain,
                  pad_interval,
                  frequency_offset):
@@ -35,43 +38,35 @@ class GrLTEULTracesFlowgraph(gr.top_block):
 
         # params
         self.n_samples = n_samples
+        self.n_offset_samples = int(random_generator.load_value(n_offset_samples))
         self.linear_gain = linear_gain
+        trace_number = 0
 
-        self.samp_rate = 20e6
+        #derived
+        subcarrier_spacing = 15000
+        fftsize = GrLTEULTracesFlowgraph.prb_mapping[50]
+        self.samp_rate = float(fftsize*subcarrier_spacing)
+        self.expected_bw = GrLTEULTracesFlowgraph.fftsize_mapping[fftsize]
         self.fname = GrLTEULTracesFlowgraph.lte_up_filenames[trace_number]
         self.fname = os.path.expanduser(os.path.join('~/tmp/lte_frames/ul',self.fname))
         self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
-
-        # # derived params
-        # frames_path = os.path.expanduser('~/tmp/lteshell_frames/ul')
-        # self.expected_bw = GrLTEULTracesFlowgraph.fftsize_mapping[self.fft_size]
         self.resamp_ratio = 20.0e6/self.samp_rate
-        # self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
-        if isinstance(n_offset_samples,tuple):
-            if n_offset_samples[0]=='uniform':
-                self.n_offset_samples = np.random.randint(*n_offset_samples[1])
-            else:
-                raise NotImplementedError('I don\'t recognize this.')
-        else:
-            self.n_offset_samples = int(n_offset_samples)
-        if isinstance(pad_interval,tuple):
-            self.pad_interval = [int(p/self.resamp_ratio) for p in pad_interval[1]]
-            self.pad_dist = pad_interval[0]
-        else:
-            self.pad_interval = [int(pad_interval/self.resamp_ratio)]
-            self.pad_dist = 'constant'
+        randgen = random_generator.load_generator(pad_interval)
+        # scale by sampling rate
+        new_params = [int(v/self.resamp_ratio) for v in randgen.params]
+        randgen = random_generator(randgen.dist_name,new_params)
+
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
         else: # it is just a value
             self.frequency_offset = [frequency_offset]
 
-        print 'file name is :', self.fname
         # blocks
         self.file_reader = blocks.file_source(gr.sizeof_gr_complex,self.fname,True)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.n_samples_per_frame,"packet_len")
-        self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist, self.pad_interval, 0, self.frequency_offset,"packet_len")
-        # self.resampler = filter.fractional_resampler_cc(0,1/self.resamp_ratio)
+        self.burst_shaper = specmonitor.random_burst_shaper_cc(randgen.dynrandom(), 0, self.frequency_offset,"packet_len")
+        self.resampler = filter.fractional_resampler_cc(0,1/self.resamp_ratio)
         self.skiphead = blocks.skiphead(gr.sizeof_gr_complex,
                                         self.n_offset_samples)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_samples)
@@ -85,9 +80,9 @@ class GrLTEULTracesFlowgraph(gr.top_block):
         ##################################################
         self.connect(self.file_reader, self.tagger)
         self.connect(self.tagger, self.burst_shaper)
-        # self.connect(self.burst_shaper, self.resampler)
-        # self.connect(self.resampler, self.skiphead)
-        self.connect(self.burst_shaper, self.skiphead)
+        self.connect(self.burst_shaper, self.resampler)
+        self.connect(self.resampler, self.skiphead)
+        # self.connect(self.burst_shaper, self.skiphead)
         self.connect(self.skiphead, self.head)
         self.connect(self.head, self.dst)
 
@@ -104,9 +99,8 @@ class GrLTEULTracesFlowgraph(gr.top_block):
         n_offset_samples = params.get('n_offset_samples',0)
         linear_gain = float(params.get('linear_gain',1.0))
         pad_interval = params['pad_interval']
-        trace_number = params.get('trace_number',np.random.randint(0,len(GrLTEULTracesFlowgraph.lte_up_filenames)))
         frequency_offset = params.get('frequency_offset',0.0)
-        return cls(n_samples, n_offset_samples, trace_number, linear_gain, pad_interval, frequency_offset)
+        return cls(n_samples, n_offset_samples, linear_gain, pad_interval, frequency_offset)
 
 def run(args):
     d = args['parameters']
@@ -149,7 +143,7 @@ class LTEULGenerator(SignalGenerator):
         return 'lte_ul'
 
 if __name__=='__main__':
-    d = {'n_samples':1000000,'n_offset_samples':100,'pad_interval':100000, 'trace_number':1}
+    d = {'n_samples':1000000,'n_offset_samples':100,'pad_interval':100000}
     tb = GrLTEULTracesFlowgraph.load_flowgraph(d)
     tb.run()
     xout = np.array(tb.dst.data())

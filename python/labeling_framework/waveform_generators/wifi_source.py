@@ -21,7 +21,8 @@
 
 import numpy as np
 import os
-import pickle
+# import pickle
+import cPickle as pickle
 import time
 
 import sys

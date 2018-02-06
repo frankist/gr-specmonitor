@@ -2,7 +2,8 @@
 
 import numpy as np
 import os
-import pickle
+# import pickle
+import cPickle as pickle
 import time
 import sys
 import matplotlib.pyplot as plt
@@ -20,6 +21,7 @@ from waveform_generator_utils import *
 from ..sig_format import sig_data_access as sda
 from ..labeling_tools import random_sequence
 from ..data_representation import timefreq_box as tfbox
+from labeling_framework.labeling_tools.parametrization import random_generator
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -158,12 +160,10 @@ class GrLTETracesFlowgraph(gr.top_block):
                 raise NotImplementedError('I don\'t recognize this.')
         else:
             self.n_offset_samples = int(n_offset_samples)
-        if isinstance(pad_interval,tuple):
-            self.pad_interval = [int(p/self.resamp_ratio) for p in pad_interval[1]]
-            self.pad_dist = pad_interval[0]
-        else:
-            self.pad_interval = [int(pad_interval/self.resamp_ratio)]
-            self.pad_dist = 'constant'
+        randgen = random_generator.load_param(pad_interval)
+        # scale by sampling rate
+        new_params = [int(v/self.resamp_ratio) for v in randgen.params]
+        randgen = random_generator.load_generator(pad_interval)
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
@@ -173,7 +173,7 @@ class GrLTETracesFlowgraph(gr.top_block):
         # blocks
         self.file_reader = blocks.file_source(gr.sizeof_gr_complex,fname,True)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.n_samples_per_frame,"packet_len")
-        self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist, self.pad_interval, 0, self.frequency_offset,"packet_len")
+        self.burst_shaper = specmonitor.random_burst_shaper_cc(randgen.dynrandom(), 0, self.frequency_offset,"packet_len")
         # self.resampler = filter.rational_resampler_base_ccc(interp,decim,taps)
         self.resampler = filter.fractional_resampler_cc(0,1/self.resamp_ratio)
         self.skiphead = blocks.skiphead(gr.sizeof_gr_complex,

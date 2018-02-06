@@ -19,7 +19,8 @@
 # Boston, MA 02110-1301, USA.
 #
 import sys
-import pickle
+# import pickle
+import cPickle as pickle
 import numpy as np
 
 from gnuradio import gr
