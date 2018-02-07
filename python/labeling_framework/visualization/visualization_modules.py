@@ -50,7 +50,7 @@ def get_pixel_coordinates(imgbox):
 def paint_box(im,bbox):
     if bbox.rowmin < 0:
         return False # bounding box was too close to the border. Not gonna draw it
-    thick = int(min(im.shape[0],im.shape[1]) // 300)
+    thick = int(min(im.shape[0],im.shape[1]) // 150)
     color = (255,130,255,255)#colors[max_indx]
     cv2.rectangle(im,(bbox.colmin,bbox.rowmin),
                   (bbox.colmax,bbox.rowmax),
@@ -152,7 +152,8 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
 
         # desired dims
         orig_dims = Sxx.shape
-        final_dims = (min(Sxx.shape),min(Sxx.shape))
+        img_width = 300
+        final_dims = (img_width,img_width*2)#(min(Sxx.shape)*4,min(Sxx.shape)*4)
 
         # convert image data to img format
         # im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))
@@ -163,7 +164,7 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
 
         # paint the bounding boxes in the image
         for b in imgboxes:
-            bnew = b.resized_box(final_dims)
+            bnew = b.resized_box((final_dims[1],final_dims[0]))
             paint_box(imnp,bnew)
 
         # put images side by side
