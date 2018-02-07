@@ -25,6 +25,7 @@ import luigi
 import itertools
 import importlib
 import pickle
+import logging
 
 # my package
 from . import session_settings
@@ -34,6 +35,11 @@ from ..utils.basic_utils import *
 from ..utils import luigi_utils
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
+
+# This disables the spammy luigi logging except for the execution summary
+class DisableLuigiInfoSpam(logging.Filter):
+    def filter(self, record):
+        return record.levelno>20 or record.getMessage().startswith('\n===== Luigi Execution Summary =====')
 
 # Luigi Tasks
 
@@ -85,7 +91,6 @@ class SessionInit(luigi.Task):
         # with self.output().open('wb') as f:
         #     pickle.dump(simdata,f)
 
-
 class CmdSession(luigi.WrapperTask):
     session_path = luigi.Parameter()
     cfg_file = luigi.Parameter()
@@ -102,6 +107,8 @@ class CmdSession(luigi.WrapperTask):
     def requires(self):
         if self.first_run==True:
             self.first_run=False
+            luigilogger = logging.getLogger('luigi-interface')
+            luigilogger.addFilter(DisableLuigiInfoSpam())
             if self.clean_first=='True':
                 sp.session_clean(self.session_args())
             # run the session config setup as a sub-pipeline

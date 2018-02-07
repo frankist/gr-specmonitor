@@ -1,6 +1,7 @@
 import sys
 import luigi
 import logging
+import time
 
 from labeling_framework.core import session_settings
 from labeling_framework.core.LuigiSimulatorHandler import *
@@ -18,6 +19,7 @@ def find_declared_tasks(parent_task=StageLuigiTask):
     return concrete_child_tasks
 
 def init():
+    # define globals
     session_settings.init()
 
     # set up logging
@@ -43,6 +45,9 @@ def init():
         task.setup()
 
 def run(session):
+    session_tstart = time.time()
     init()
     # cmdline_args = ['OTACmdSession','--local-scheduler']
     luigi.run(main_task_cls=session, local_scheduler=True)#cmdline_args)
+    session_duration = time.time()-session_tstart
+    print 'Session took',session_duration,'seconds.'

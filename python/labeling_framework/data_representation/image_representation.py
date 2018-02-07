@@ -21,6 +21,7 @@
 
 import numpy as np
 import importlib
+
 from ..utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -28,22 +29,22 @@ logger = logging_utils.DynamicLogger(__name__)
 
 def normalize_image_data(img_data,strict_bounds=False,nan_val=0):
     val_range = (np.nanmin(img_data),np.nanmax(img_data))
+    test = np.all([np.isfinite(v) for v in val_range])
+    if test==False and strict_bounds==False:
+        # there were np.inf or -np.inf
+        # convert the np.inf to np.nan, and try normalizing again
+        A = np.copy(img_data)
+        A[np.isneginf(A)] = np.nan
+        A[np.isinf(A)] = np.nan
+        img_data = A
+        val_range = (np.nanmin(img_data),np.nanmax(img_data))
+        assert np.all([np.isfinite(v) for v in val_range])
+
+    # compute normalized image
     data_norm = (img_data-val_range[0])/(val_range[1]-val_range[0])
-    if not (np.nanmax(data_norm)<=1.0 and np.nanmin(data_norm)>=0):
-        if strict_bounds is False and val_range[0]==-np.inf:
-            # if not strict, recompute normalized image
-            A = np.copy(img_data)
-            A[np.isneginf(A)] = np.nan
-            A[np.isinf(A)] = np.nan
-            data_norm = normalize_image_data(A)
-            # minval = np.min(np.isfinite(img_data))
-            # idxs = np.isneginf(img_data)
-            # img2 = np.array(img_data)
-            # img2[idxs] = minval
-            data_norm = normalize_image_data(A)
-            logger.warning('Normalization Failed. This was the img limits: {}.'.format(val_range))
-        else:
-            raise RuntimeError('Normalization Failed. This was the img limits: {}. However the normalized bounds obtained were {}'.format(val_range,(np.nanmin(data_norm),np.nanmax(data_norm))))
+    if np.nanmax(data_norm)>1.0 or np.nanmin(data_norm)<0:
+        raise RuntimeError('Normalization Failed. This was the img limits: {}. However the normalized bounds obtained were {}'.format(val_range,(np.nanmin(data_norm),np.nanmax(data_norm))))
+
     data_norm[np.isnan(data_norm)] = nan_val
     return data_norm
 

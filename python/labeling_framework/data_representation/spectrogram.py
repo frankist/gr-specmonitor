@@ -21,6 +21,7 @@
 
 import numpy as np
 from scipy import signal
+import warnings
 
 from ..utils import basic_utils
 import image_representation as imgfmt
@@ -193,7 +194,9 @@ class SectionSpectrogramMetadata(object):
         if self.input_params.get('cancel_DC_offset',False)==True:
             Sxx = cancel_spectrogram_DCoffset(Sxx)
         if self.input_params.get('dB',True)==True:
-            Sxx = 10*np.log10(Sxx)
+            with warnings.catch_warnings(): # ignore log10(zero) warning
+                warnings.simplefilter("ignore")
+                Sxx = 10*np.log10(Sxx)
         Sxx = normalize_spectrogram(Sxx,nan_val)
         if Sxx.shape!=self.img_size():
             logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
