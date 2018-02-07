@@ -79,16 +79,19 @@ def setup_RF_Tx_on_repeat(framed_signal, params, fparams, sample_rate):
 
     return tb
 
-
 def run_RF_channel(args):
-    params = args['parameters']
-    sessiondata = args['sessiondata']
-    # session_folder = SessionParams.SessionPaths.session_folder(sessiondata)
-    tmp_folder = SessionParams.SessionPaths.tmp_folder(sessiondata)
-    tmp_file = tmp_folder + '/tmp.bin'
-    targetfilename = args['targetfilename']
-    # sourcefilename = args['sourcefilename']
-    # stage_name = args['stage_name']
+    try:
+        params = args['parameters']
+        sessiondata = args['sessiondata']
+        tmp_folder = SessionParams.SessionPaths.tmp_folder(sessiondata)
+        tmp_file = tmp_folder + '/tmp.bin'
+        targetfilename = args['targetfilename']
+        # sourcefilename = args['sourcefilename']
+        # stage_name = args['stage_name']
+        settle_time = params['settle_time']
+    except KeyError:
+        logger.error('ERROR at parsing arguments. I received this {}'.format(args))
+        raise
 
     ### Read previous stage data and sets the parameters of the new stage
     multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
@@ -109,7 +112,7 @@ def run_RF_channel(args):
     assert x.size >= Nsuperframe
     # sample_rate = filedata.get_stage_parameter(stage_data, 'sample_rate')
     sample_rate = multi_stage_data.get_stage_args('sample_rate')
-    Nsettle = int(params['settle_time'] * sample_rate)
+    Nsettle = int(settle_time * sample_rate)
     n_skip_samples, n_rx_samples, _ = RF_sync_utils.get_recording_params(
         Nsettle, Nsuperframe, fparams.frame_period)
 

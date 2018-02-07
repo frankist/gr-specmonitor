@@ -1,16 +1,18 @@
-import sys
-
 from labeling_framework import session
 from labeling_framework.waveform_generators.waveform_launcher import *
 from labeling_framework.core.LuigiSimulatorHandler import StageLuigiTask
 from labeling_framework.visualization.visualization_modules import ImgSpectrogramBoundingBoxTask
 from labeling_framework.visualization.inspect_labels import Labels2JsonTask
 from labeling_framework.RF import RF_scripts
+from labeling_framework.Tx import Tx_transformations
 from labeling_framework.data_representation import voc_annotations
 from labeling_framework.general_tasks import partition_signal
 from labeling_framework.general_tasks import remove_IQsamples
 from labeling_framework.utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
+
+# register waveform generatos
+from labeling_modules.waveforms.lte_ul_source import LTEULGenerator
 
 class Tx(StageLuigiTask):
     @staticmethod
@@ -18,7 +20,6 @@ class Tx(StageLuigiTask):
         return waveform
     def run(self):
         this_run_params = self.get_run_parameters()
-        from labeling_framework.Tx import Tx_transformations
         Tx_transformations.apply_framing_and_offsets(this_run_params)
 
 class RF(StageLuigiTask):

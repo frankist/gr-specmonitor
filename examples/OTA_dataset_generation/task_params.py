@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
 import numpy as np
-import sys
+from labeling_framework.labeling_tools.parametrization import random_generator
 
 num_sections = 1
 section_size = 550000 #500000#100000
-toffset_range = [50]#[int(i) for i in np.linspace(50,10000,10)]#[50,60,70,80,90,100]
+toffset_range = [50]#[int(i) for i in np.linspace(50,10000,10)]
 frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
+n_repeats = 1
 
-tags = ['wifi','psk','lte']
+tags = ['wifi','psk','lte','lte_ul']
 ssh_hosts = ['USRPRx']
 
 Tx_params = [
@@ -18,7 +19,7 @@ Tx_params = [
     ('time_offset',toffset_range),
     ('section_size',section_size),
     ('num_sections',num_sections),
-    ('soft_gain',[0.1,1.0]),
+    ('soft_gain',[0.1,0.5,1.0]),
     ('noise_voltage',[0])
 ]
 Tx_params_wifi = list(Tx_params)
@@ -27,9 +28,9 @@ for i,e in enumerate(Tx_params_wifi):
         Tx_params_wifi[i] = ('frequency_offset',0)
 
 RF_params = [
-    ('tx_gain_norm', [0.1,0.99]),#10.0**np.arange(-20,0,5)),#range(0, 21, 10)),  #range(0,30,15)),
+    ('tx_gain_norm', [0.1,0.99]),#10.0**np.arange(-20,0,5))
     ('settle_time', 0.25),
-    ('rx_gaindB', [15.0,20.0]),#range(0, 21, 10)),
+    ('rx_gaindB', [17.0,21.0]),#range(0, 21, 10)),
     ('rf_frequency', 2.35e9)
 ]
 
@@ -63,7 +64,7 @@ stage_params = {
             ('pdu_length',[1500]),
             ('pad_interval',[('uniform',(1000,200000))]),
             ('signal_representation',[spectrogram_representation]),
-            ('repeats',np.arange(10))
+            ('repeats',range(n_repeats))
         ],
         'Tx': Tx_params_wifi,
         'RF': RF_params,
@@ -85,10 +86,10 @@ stage_params = {
             ('excess_bw',0.25),
             ('pre_diff_code',False),
             ('burst_len', 20000),#[('poisson',3000,1000)]),
-            ('zero_pad_len',[('uniform',(1000,200000))]),
+            ('zero_pad_len',random_generator('randint',(1000,200000))),
             ('signal_representation',[spectrogram_representation]),
-            ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
-            ('repeats',np.arange(10))
+            ('frequency_offset',[('multipleTx',(-0.325,-0.125,0.125,0.325))]),
+            ('repeats',range(n_repeats))
         ],
         'Tx': Tx_params,
         'RF': RF_params,
@@ -103,10 +104,28 @@ stage_params = {
             ('sample_rate',20e6),
             ('n_samples',wf_gen_samps),
             ('n_prbs',[50,100]),
-            ('pad_interval',[('uniform',(100,200000))]),
+            ('pad_interval',random_generator('randint',(100,200000))),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
-            ('runs',range(5))
+            ('runs',range(max(int(n_repeats/2),1)))
+        ],
+        'Tx': Tx_params,
+        'RF': RF_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
+    },
+    'lte_ul':
+    {
+        'waveform':
+        [
+            ('waveform',['lte_ul']),
+            ('signal_generator',['LTEULGenerator']),
+            ('sample_rate',20e6),
+            ('n_samples',wf_gen_samps),
+            ('pad_interval',random_generator('randint',(100,200000))),
+            ('signal_representation',[spectrogram_representation]),
+            ('n_offset_samples',[('uniform',(0,500000))]),
+            ('runs',range(n_repeats))
         ],
         'Tx': Tx_params,
         'RF': RF_params,
