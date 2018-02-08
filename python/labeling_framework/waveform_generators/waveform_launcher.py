@@ -19,12 +19,16 @@
 # Boston, MA 02110-1301, USA.
 #
 
-from ..core.LuigiSimulatorHandler import *
-from ..waveform_generators.waveform_generator_utils import SignalGenerator
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+import labeling_framework as lf
+from labeling_framework.core import LuigiSimulatorHandler as lsh
+logger = lf.DynamicLogger(__name__)
 
-class waveform(StageLuigiTask):
+class SignalGenerator(object):
+    @staticmethod
+    def run(params):
+        raise NotImplemented('This is an abstract method')
+
+class waveform(lf.StageLuigiTask):
     """
     This task generates waveform files
     """
@@ -34,40 +38,27 @@ class waveform(StageLuigiTask):
 
     @staticmethod
     def setup():
-        session_settings.global_settings['waveform_types'] = {}
+        lf.session_settings.global_settings['waveform_types'] = {}
         waveform_generators = SignalGenerator.__subclasses__()
         l = []
         for w in waveform_generators:
-            session_settings.global_settings['waveform_types'][w.__name__] = w
-            l.append(w.__name__)
+            if w.name() in lf.session_settings.global_settings['waveform_types']:
+                raise AssertionError('The waveform with name {} is a duplicate.'.format(w.name()))
+            lf.session_settings.global_settings['waveform_types'][w.name()] = w
+            l.append(w.name())
         logger.info('These are the signal/waveform generators that were registered:{}'.format(l))
 
     def requires(self):
-        return SessionInit(self.session_args)
+        return lsh.SessionInit(self.session_args)
 
     def run(self):
         logger.trace('Running Waveform Generator for %s',self.output().path)
         this_run_params = self.get_run_parameters()
-        launch(this_run_params)
 
-def launch(params):
-    # TODO: use virtual function and map rather than elif
-    wf = params['parameters']['waveform']
-    if wf in ['square','saw']: #FIXME: It should not read the tag but the waveform parameter
-        from . import signal_source as sc
-        sc.run(params)
-    elif wf=='wifi':
-        from . import wifi_source as ws
-        ws.run(params)
-    elif wf=='generic_mod':
-        from . import psk_source
-        psk_source.run(params)
-    elif wf=='lte':
-        from . import lte_source
-        lte_source.run(params)
-    else:
-        gen_name = params['parameters']['signal_generator']
-        siggen = session_settings.global_settings['waveform_types'][gen_name]
-        siggen.run(params)
-    # else:
-    #     raise ValueError('ERROR: Do not recognize this waveform')
+        # delegate to the correct waveform generator
+        waveform_name = this_run_params['parameters']['waveform']
+        wav_generator = lf.session_settings.global_settings['waveform_types'].get(waveform_name,None)
+        if wav_generator is not None:
+            wav_generator.run(this_run_params)
+        else:
+            raise ValueError('ERROR: Do not recognize this waveform')

@@ -16,13 +16,14 @@ from gnuradio import filter
 from gnuradio.filter import firdes
 
 # labeling_framework package
+import labeling_framework as lf
 import specmonitor
-from waveform_generator_utils import *
-from ..sig_format import sig_data_access as sda
-from ..labeling_tools import random_sequence
-from ..data_representation import timefreq_box as tfbox
+from labeling_framework import SignalGenerator
+from labeling_framework.waveform_generators.waveform_generator_utils import *
+from labeling_framework.labeling_tools import random_sequence
+from labeling_framework.data_representation import timefreq_box as tfbox
 from labeling_framework.labeling_tools.parametrization import random_generator
-from ..utils import logging_utils
+from labeling_framework.utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
@@ -245,7 +246,11 @@ def run(args):
 
     # save file
     v.save_pkl()
-    # fname = os.path.expanduser(args['targetfilename'])
-    # with open(fname, 'w') as f:
-    #     pickle.dump(v, f)
-    # logger.debug('Finished writing to file %s', fname)
+
+class LTEDLGenerator(SignalGenerator):
+    @staticmethod
+    def run(args):
+        run(args)
+    @staticmethod
+    def name():
+        return 'lte_dl'

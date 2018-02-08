@@ -20,14 +20,11 @@
 
 import json
 import jsonpickle
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-from ..labeling_tools import bounding_box
+import labeling_framework as lf
 from ..sig_format import stage_signal_data as ssa
-from ..core.LuigiSimulatorHandler import StageLuigiTask
-from ..utils import typesystem_utils as ts
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+logger = lf.DynamicLogger(__name__)
 
 def write_metadata_to_json(this_run_params):
     targetfile = this_run_params['targetfilename']
@@ -44,7 +41,7 @@ def write_metadata_to_json(this_run_params):
         jsident = json.dumps(json.loads(js), indent=2) # unfortunately i can't specify indent in jsonpickle
         f.write(jsident)
 
-class Labels2JsonTask(StageLuigiTask):
+class Labels2JsonTask(lf.StageLuigiTask):
     def __init__(self,*args,**kwargs):
         kwargs['output_fmt'] = '.json'
         super(Labels2JsonTask,self).__init__(*args,**kwargs)

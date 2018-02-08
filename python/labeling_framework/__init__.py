@@ -16,11 +16,23 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-# The presence of this file turns this directory into a Python package
+# Modules that are directly accessible
+from utils.logging_utils import DynamicLogger
+import session
+import session_settings
 
-#print 'importing labeling framework'
+# register tasks
+from core.LuigiSimulatorHandler import StageLuigiTask
+from waveform_generators.waveform_launcher import waveform
+from general_tasks.preRF_transformations import preRFTask
+from visualization.inspect_labels import Labels2JsonTask
+from visualization.visualization_modules import ImgSpectrogramBoundingBoxTask
+from core.LuigiSimulatorHandler import CmdSession
+from general_tasks.remove_IQsamples import RemoveIQSamples
+from data_representation.voc_annotations import VOCFormatTask
+from general_tasks.partition_signal import PartitionSignalTask
 
-#import waveform_generators
-#import labeling_tools
-#import sys
-#sys.path.append('../')
+# register waveforms
+from waveform_generators.waveform_launcher import SignalGenerator
+from waveform_generators.wifi_source import WifiGenerator
+from waveform_generators.psk_source import GenericModGenerator

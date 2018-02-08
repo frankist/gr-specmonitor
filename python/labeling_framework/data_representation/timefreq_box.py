@@ -21,9 +21,8 @@
 
 import numpy as np
 
-from ..labeling_tools import bounding_box as bndbox
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+import labeling_framework as lf
+logger = lf.DynamicLogger(__name__)
 
 '''
 Represents time through sample indices and freq through the normalized [-0.5,0.5] space

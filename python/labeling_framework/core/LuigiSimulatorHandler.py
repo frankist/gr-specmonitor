@@ -22,19 +22,14 @@
 import os
 import sys
 import luigi
-import itertools
-import importlib
-import pickle
 import logging
 
 # my package
-from . import session_settings
+import labeling_framework as lf
 from . import SessionParams as sp
-from . import StageParamData
 from ..utils.basic_utils import *
 from ..utils import luigi_utils
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+logger = lf.DynamicLogger(__name__)
 
 # This disables the spammy luigi logging except for the execution summary
 class DisableLuigiInfoSpam(logging.Filter):
@@ -125,7 +120,7 @@ class CmdSession(luigi.WrapperTask):
         return callers
 
     def get_stage_caller(self,stage_name):
-        return session_settings.retrieve_task_handler(stage_name)
+        return lf.session_settings.retrieve_task_handler(stage_name)
 
     # creates a list of callers respective to stage given as argument
     # each caller corresponds to a different iteration of stage parameters
@@ -192,7 +187,7 @@ class StageLuigiTask(luigi.Task):
         sessiondata = self.load_sessiondata()
         this_stage = self.my_task_name()
         parent_stage = sessiondata.stage_dependency_tree.get_stage_dependency(this_stage)
-        taskhandler = session_settings.retrieve_task_handler(parent_stage)
+        taskhandler = lf.session_settings.retrieve_task_handler(parent_stage)
         return taskhandler(self.session_args,self.stage_idxs[0:-1])
 
     def output(self):

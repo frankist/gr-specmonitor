@@ -25,9 +25,9 @@ from scipy import signal
 import sys
 import os
 
+import labeling_framework as lf
 from ..utils.basic_utils import *
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+logger = lf.DynamicLogger(__name__)
 
 class ImgBoundingBox(object):
     def __init__(self,rowmin,rowmax,colmin,colmax,img_size,label=None):

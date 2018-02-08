@@ -23,7 +23,7 @@ import importlib
 import pickle
 # import itertools
 
-import session_settings
+import labeling_framework as lf
 from . import StageParamData
 from . import StageDependencyTree as sdt
 from ..utils import ssh_utils
@@ -94,7 +94,7 @@ class SessionData:
         child_tasks = self.stage_dependency_tree.get_stage_childs(stage_name)
         l = {}
         for c in child_tasks:
-            taskhandler = session_settings.retrieve_task_handler(c)
+            taskhandler = lf.session_settings.retrieve_task_handler(c)
             if this_stage_idxs is None:
                 l[taskhandler] = [stage_idxs for stage_idxs in self.get_session_idx_tuples(c)]
             else:
@@ -119,7 +119,7 @@ class SessionData:
             logger.error(err_str)
             raise ImportError(err_str)
         # TODO: Parse the module to see if every variable is initialized
-        deptree = sdt.StageDependencyTree(session_settings.get_task_dependency_tree())#cfg_module.stage_dependency_tree)
+        deptree = sdt.StageDependencyTree(lf.session_settings.get_task_dependency_tree())#cfg_module.stage_dependency_tree)
         sp = StageParamData.TaggedMultiStageParams(cfg_module.tags,
                                                    deptree,
                                                    cfg_module.stage_params)
@@ -227,6 +227,6 @@ def setup_local_folders(sessiondata):
 
     # setup stage folders
     for stage in stage_names:
-        stage_task = session_settings.retrieve_task_handler(stage)
+        stage_task = lf.session_settings.retrieve_task_handler(stage)
         if stage_task.mkdir_flag() is True:
             try_mkdir(SessionPaths.stage_folder(sessiondata,stage))

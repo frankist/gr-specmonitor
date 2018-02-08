@@ -28,13 +28,9 @@ import cv2
 from pylab import cm
 import matplotlib.pyplot as plt
 
-from ..sig_format import pkl_sig_format as psf
-from ..labeling_tools import bounding_box
-from ..sig_format import sig_data_access as fdh
+import labeling_framework as lf
 from ..sig_format import stage_signal_data as ssa
-from ..core.LuigiSimulatorHandler import StageLuigiTask
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+logger = lf.DynamicLogger(__name__)
 
 def get_pixel_coordinates(imgbox):
     ud_l = [(e,imgbox.colmin) for e in range(imgbox.rowmin,imgbox.rowmax)]
@@ -125,7 +121,6 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     x = multi_stage_data.read_stage_samples()
     targetfile = this_run_params['targetfilename']
     sourcefile = this_run_params['sourcefilename']
-    # freader = psf.WaveformPklReader(sourcefile)
     spec_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
     num_sections = len(spec_metadata)
     is_framed = True if 'frame_params' in multi_stage_data.session_data else False
@@ -133,16 +128,13 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     # is_framed = sig_data.is_framed()
     # sig_data = freader.data()
     # x = freader.read_section()
-    # is_framed = fdh.is_framed(sig_data)
     if insync is False or is_framed is False:
         logger.error('I have to implement this functionality')
         print sig_data
         raise NotImplementedError('data has to be framed and in sync to be stored as an img with bounding boxes')
 
-    # spec_metadata = fdh.get_stage_derived_parameter(sig_data,'section_spectrogram_img_metadata')
     # num_sections = len(spec_metadata)
     assert num_sections==1 # TODO: Implement this for several subsections
-    # section_size = fdh.get_stage_derived_parameter(sig_data,'section_size')
     section_size = multi_stage_data.session_data['frame_params']['section_size']
 
     for i in range(num_sections):
@@ -172,7 +164,7 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
         im = concatenate_images([im_no_boxes,im])#[im_no_boxes,im])
         im.save(targetfile,'PNG')
 
-class ImgSpectrogramBoundingBoxTask(StageLuigiTask):
+class ImgSpectrogramBoundingBoxTask(lf.StageLuigiTask):
     def __init__(self,*args,**kwargs):
         kwargs['output_fmt'] = '.png'
         # new_args = args + ('.png',)

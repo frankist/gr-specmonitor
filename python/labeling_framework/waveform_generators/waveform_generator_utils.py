@@ -22,12 +22,12 @@
 import numpy as np
 import copy
 
+import labeling_framework as lf
 from ..sig_format import sig_data_access as sda
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
 from ..sig_format import stage_signal_data as ssa
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+logger = lf.DynamicLogger(__name__)
 
 def print_params(params,name):
     logger.debug('%s waveform generator starting',name)
@@ -88,7 +88,4 @@ def aggregate_independent_waveforms(multi_stage_data_list):
         combined_data = ssa.combine_multi_stage_data(combined_data,multi_stage_data_list[i])
     return combined_data
 
-class SignalGenerator(object):
-    @staticmethod
-    def run(params):
-        raise NotImplemented('This is an abstract method')
+

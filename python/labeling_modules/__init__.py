@@ -19,7 +19,11 @@
 # Boston, MA 02110-1301, USA.
 #
 
+# install waveform generators
+from waveform_generators.lte_ul_source import LTEULGenerator
+from waveform_generators.lte_source import LTEDLGenerator
 
+# install other stuff
 
 if __name__ == '__main__':
     pass

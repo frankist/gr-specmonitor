@@ -34,11 +34,10 @@ from gnuradio import digital
 import specmonitor
 
 # labeling_framework package
-from waveform_generator_utils import *
-from ..utils import typesystem_utils as ts
+import labeling_framework as lf
+import waveform_generator_utils as wav_utils
 from labeling_framework.labeling_tools.parametrization import random_generator
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+logger = lf.DynamicLogger(__name__)
 
 def make_constellation_object(params):
     gr_params = {}
@@ -161,7 +160,7 @@ def create_multiple_Txs(params):
 
 def run(args):
     d = args['parameters']
-    print_params(d,__name__)
+    wav_utils.print_params(d,__name__)
 
     # create general_mod block
     # tb = GeneralModFlowgraph.load_flowgraph(d)
@@ -177,14 +176,22 @@ def run(args):
             gen_data = np.array(tb.dst.data())
 
             try:
-                v = transform_IQ_to_sig_data(gen_data,args)
+                v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
             except RuntimeError, e:
                 logger.warning('Going to re-run radio')
                 continue
             waveform_data_list.append(v)
             break
-    v = aggregate_independent_waveforms(waveform_data_list)
+    v = wav_utils.aggregate_independent_waveforms(waveform_data_list)
 
     # aggregate everything
     v.save_pkl()
     # logger.debug('Finished writing to file %s', fname)
+
+class GenericModGenerator(lf.SignalGenerator):
+    @staticmethod
+    def run(args):
+        run(args)
+    @staticmethod
+    def name():
+        return 'generic_mod'

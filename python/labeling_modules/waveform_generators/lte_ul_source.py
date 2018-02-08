@@ -16,8 +16,9 @@ from gnuradio import filter
 from gnuradio.filter import firdes
 
 # labeling_framework package
+import labeling_framework as lf
 import specmonitor
-from labeling_framework.core import session_settings
+from labeling_framework import SignalGenerator
 from labeling_framework.waveform_generators.waveform_generator_utils import *
 from labeling_framework.labeling_tools import random_sequence
 from labeling_framework.data_representation import timefreq_box as tfbox

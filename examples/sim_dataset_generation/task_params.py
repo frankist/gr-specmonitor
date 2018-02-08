@@ -90,7 +90,7 @@ stage_params = {
     {
         'waveform':
         [
-            ('waveform',['lte']),
+            ('waveform',['lte_dl']),
             ('n_samples',wf_gen_samps),
             ('n_prbs',[50,100]),
             ('pad_interval',random_generator('randint',(100,200000))),#[('uniform',(100,200000))]),
@@ -107,7 +107,6 @@ stage_params = {
         'waveform':
         [
             ('waveform',['lte_ul']),
-            ('signal_generator',['LTEULGenerator']),
             ('n_samples',wf_gen_samps),
             ('pad_interval',random_generator('randint',(100,200000))),#[('uniform',(100,200000))]),
             ('signal_representation',[spectrogram_representation]),

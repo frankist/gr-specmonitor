@@ -2,9 +2,9 @@
 def init():
     """ Initialize global variables """
     global registered_tasks
-    registered_tasks = {}
+    registered_tasks = {} # We register here all the types of concrete tasks
     global task_dependency_tree
-    task_tree = {}
+    task_tree = {} # We register here the dependency tree graph
     global global_settings
     global_settings = {}
     global stage_settings

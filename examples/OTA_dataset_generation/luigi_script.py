@@ -1,28 +1,17 @@
-from labeling_framework import session
-from labeling_framework.waveform_generators.waveform_launcher import *
-from labeling_framework.core.LuigiSimulatorHandler import StageLuigiTask
-from labeling_framework.visualization.visualization_modules import ImgSpectrogramBoundingBoxTask
-from labeling_framework.visualization.inspect_labels import Labels2JsonTask
-from labeling_framework.RF import RF_scripts
-from labeling_framework.Tx import Tx_transformations
-from labeling_framework.data_representation import voc_annotations
-from labeling_framework.general_tasks import partition_signal
-from labeling_framework.general_tasks import remove_IQsamples
-from labeling_framework.utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+import sys
+sys.path.append('../../python')
 
-# register waveform generatos
-from labeling_modules.waveforms.lte_ul_source import LTEULGenerator
+import labeling_framework as lf
+import labeling_modules
+from lf.RF import RF_scripts
+logger = lf.DynamicLogger(__name__)
 
-class Tx(StageLuigiTask):
+class Tx(lf.preRFTask):
     @staticmethod
     def depends_on():
-        return waveform
-    def run(self):
-        this_run_params = self.get_run_parameters()
-        Tx_transformations.apply_framing_and_offsets(this_run_params)
+        return 'waveform'
 
-class RF(StageLuigiTask):
+class RF(lf.StageLuigiTask):
     @staticmethod
     def depends_on():
         return Tx
@@ -39,7 +28,7 @@ class RF(StageLuigiTask):
             counter += 1
             logger.trace('This is the try no. {}'.format(counter))
 
-class TxImg(ImgSpectrogramBoundingBoxTask):#StageLuigiTask):
+class TxImg(lf.ImgSpectrogramBoundingBoxTask):
     @staticmethod
     def depends_on():
         return Tx
@@ -47,57 +36,49 @@ class TxImg(ImgSpectrogramBoundingBoxTask):#StageLuigiTask):
     def requires(self):
         return Tx(self.session_args,self.stage_idxs[0:-1])
 
-class RFImg(ImgSpectrogramBoundingBoxTask):
+class RFImg(lf.ImgSpectrogramBoundingBoxTask):
     @staticmethod
     def depends_on():
         return RF
 
-class RFLabels(Labels2JsonTask):
+class RFLabels(lf.Labels2JsonTask):
     @staticmethod
     def depends_on():
         return RF
 
-class Rx(StageLuigiTask):
+class Rx(lf.PartitionSignalTask):
     @staticmethod
     def depends_on():
         return RF
 
-    def run(self):
-        this_run_params = self.get_run_parameters()
-        partition_signal.run(this_run_params)
-
-class RFVOCFormat(StageLuigiTask):
+class RFVOCFormat(lf.VOCFormatTask):
     @staticmethod
     def depends_on():
         return Rx
 
-    def run(self):
-        this_run_params = self.get_run_parameters()
-        voc_annotations.create_image_and_annotation(this_run_params)
-
-class waveformClean(remove_IQsamples.RemoveIQSamples):
+class waveformClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
         return 'waveform'
-class TxClean(remove_IQsamples.RemoveIQSamples):
+class TxClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
         return Tx
-class RFClean(remove_IQsamples.RemoveIQSamples):
+class RFClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
         return RF
-class RxClean(remove_IQsamples.RemoveIQSamples):
+class RxClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
         return Rx
-class RFVOCFormatClean(remove_IQsamples.RemoveIQSamples):
+class RFVOCFormatClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
         return RFVOCFormat
 
-class OTACmdSession(CmdSession):
+class OTACmdSession(lf.CmdSession):
     pass
 
 if __name__ == "__main__":
-    session.run(session=OTACmdSession)
+    lf.session.run(session=OTACmdSession)
