@@ -19,16 +19,17 @@
 # Boston, MA 02110-1301, USA.
 #
 
-import labeling_framework as lf
-from labeling_framework.core import LuigiSimulatorHandler as lsh
-logger = lf.DynamicLogger(__name__)
+from ..core import LuigiSimulatorHandler as lsh
+from .. import session_settings
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 class SignalGenerator(object):
     @staticmethod
     def run(params):
         raise NotImplemented('This is an abstract method')
 
-class waveform(lf.StageLuigiTask):
+class waveform(lsh.StageLuigiTask):
     """
     This task generates waveform files
     """
@@ -38,13 +39,13 @@ class waveform(lf.StageLuigiTask):
 
     @staticmethod
     def setup():
-        lf.session_settings.global_settings['waveform_types'] = {}
+        session_settings.global_settings['waveform_types'] = {}
         waveform_generators = SignalGenerator.__subclasses__()
         l = []
         for w in waveform_generators:
-            if w.name() in lf.session_settings.global_settings['waveform_types']:
+            if w.name() in session_settings.global_settings['waveform_types']:
                 raise AssertionError('The waveform with name {} is a duplicate.'.format(w.name()))
-            lf.session_settings.global_settings['waveform_types'][w.name()] = w
+            session_settings.global_settings['waveform_types'][w.name()] = w
             l.append(w.name())
         logger.info('These are the signal/waveform generators that were registered:{}'.format(l))
 
@@ -57,8 +58,8 @@ class waveform(lf.StageLuigiTask):
 
         # delegate to the correct waveform generator
         waveform_name = this_run_params['parameters']['waveform']
-        wav_generator = lf.session_settings.global_settings['waveform_types'].get(waveform_name,None)
+        wav_generator = session_settings.global_settings['waveform_types'].get(waveform_name,None)
         if wav_generator is not None:
             wav_generator.run(this_run_params)
         else:
-            raise ValueError('ERROR: Do not recognize this waveform')
+            raise ValueError('ERROR: Do not recognize the waveform {}. The registered waveforms are {}'.format(waveform_name, session_settings.global_settings['waveform_types']))

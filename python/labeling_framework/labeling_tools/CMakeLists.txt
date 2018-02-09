@@ -9,8 +9,11 @@ endif()
 ########################################################################
 # Install python sources
 ########################################################################
+file(GLOB LOCAL_PYTHON_FILES
+    "*.py"
+)
 GR_PYTHON_INSTALL(
     FILES
-    __init__.py
-    bounding_box.py DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/labeling_tools
+    ${LOCAL_PYTHON_FILES}
+    DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/labeling_tools
 )

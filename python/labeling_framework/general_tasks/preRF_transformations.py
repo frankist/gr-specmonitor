@@ -26,12 +26,13 @@ from gnuradio import blocks
 from gnuradio import analog
 from gnuradio import channels
 
-import labeling_framework as lf
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
 from ..labeling_tools import preamble_utils
-from ..sig_format import stage_signal_data as ssa
-logger = lf.DynamicLogger(__name__)
+from ..core import SignalDataFormat as ssa
+from ..core.LuigiSimulatorHandler import StageLuigiTask
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def generate_section_partitions(section_size,guard_band,num_sections):
     return ((i*section_size,(i+1)*section_size) for i in range(num_sections))
@@ -141,7 +142,7 @@ def apply_framing_and_offsets(args):
     multi_stage_data.set_stage_data(new_stage_data)
     multi_stage_data.save_pkl()
 
-class preRFTask(lf.StageLuigiTask):
+class preRFTask(StageLuigiTask):
     def run(self):
         this_run_params = self.get_run_parameters()
         apply_framing_and_offsets(this_run_params)

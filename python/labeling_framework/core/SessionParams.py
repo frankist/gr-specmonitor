@@ -21,14 +21,13 @@
 import os
 import importlib
 import pickle
-# import itertools
 
-import labeling_framework as lf
 from . import StageParamData
 from . import StageDependencyTree as sdt
+from .. import session_settings
 from ..utils import ssh_utils
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 # this class stores all the data necessary to setup a session instance
 # - It needs to specify our instance name (e.g. 'sim0')
@@ -94,7 +93,7 @@ class SessionData:
         child_tasks = self.stage_dependency_tree.get_stage_childs(stage_name)
         l = {}
         for c in child_tasks:
-            taskhandler = lf.session_settings.retrieve_task_handler(c)
+            taskhandler = session_settings.retrieve_task_handler(c)
             if this_stage_idxs is None:
                 l[taskhandler] = [stage_idxs for stage_idxs in self.get_session_idx_tuples(c)]
             else:
@@ -119,7 +118,7 @@ class SessionData:
             logger.error(err_str)
             raise ImportError(err_str)
         # TODO: Parse the module to see if every variable is initialized
-        deptree = sdt.StageDependencyTree(lf.session_settings.get_task_dependency_tree())#cfg_module.stage_dependency_tree)
+        deptree = sdt.StageDependencyTree(session_settings.get_task_dependency_tree())#cfg_module.stage_dependency_tree)
         sp = StageParamData.TaggedMultiStageParams(cfg_module.tags,
                                                    deptree,
                                                    cfg_module.stage_params)
@@ -165,9 +164,10 @@ class SessionPaths:
         return '~/{}'.format(SessionPaths.__session_args__(data).session_name)
 
 def session_clean(session_args):
-    import shutil
     session_folder = SessionPaths.session_folder(session_args)
-    shutil.rmtree(session_folder)
+    if os.path.exists(session_folder):
+        import shutil
+        shutil.rmtree(session_folder)
     # os.rmdir(session_folder)
 
 def load_session(session_args):
@@ -227,6 +227,6 @@ def setup_local_folders(sessiondata):
 
     # setup stage folders
     for stage in stage_names:
-        stage_task = lf.session_settings.retrieve_task_handler(stage)
+        stage_task = session_settings.retrieve_task_handler(stage)
         if stage_task.mkdir_flag() is True:
             try_mkdir(SessionPaths.stage_folder(sessiondata,stage))

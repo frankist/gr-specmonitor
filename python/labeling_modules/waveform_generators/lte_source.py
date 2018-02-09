@@ -16,15 +16,12 @@ from gnuradio import filter
 from gnuradio.filter import firdes
 
 # labeling_framework package
-import labeling_framework as lf
 import specmonitor
-from labeling_framework import SignalGenerator
-from labeling_framework.waveform_generators.waveform_generator_utils import *
-from labeling_framework.labeling_tools import random_sequence
-from labeling_framework.data_representation import timefreq_box as tfbox
-from labeling_framework.labeling_tools.parametrization import random_generator
-from labeling_framework.utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from specmonitor import labeling_framework as lf
+from specmonitor.labeling_framework.waveform_generators import waveform_generator_utils as wav_utils
+from specmonitor.labeling_framework import timefreq_box as tfbox
+from specmonitor.labeling_framework.labeling_tools import random_sequence
+logger = lf.DynamicLogger(__name__)
 
 prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
 fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
@@ -161,10 +158,10 @@ class GrLTETracesFlowgraph(gr.top_block):
                 raise NotImplementedError('I don\'t recognize this.')
         else:
             self.n_offset_samples = int(n_offset_samples)
-        randgen = random_generator.load_param(pad_interval)
+        randgen = lf.random_generator.load_param(pad_interval)
         # scale by sampling rate
         new_params = [int(v/self.resamp_ratio) for v in randgen.params]
-        randgen = random_generator.load_generator(pad_interval)
+        randgen = lf.random_generator.load_generator(pad_interval)
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
@@ -215,7 +212,7 @@ class GrLTETracesFlowgraph(gr.top_block):
 
 def run(args):
     d = args['parameters']
-    print_params(d,__name__)
+    # print_params(d,__name__)
 
     while True:
         # create general_mod block
@@ -228,7 +225,7 @@ def run(args):
         gen_data = np.array(tb.dst.data())
 
         try:
-            v = transform_IQ_to_sig_data(gen_data,args)
+            v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
 
             # merge boxes if broadcast channel is empty
             metadata = v.get_stage_derived_params('spectrogram_img')
@@ -247,7 +244,7 @@ def run(args):
     # save file
     v.save_pkl()
 
-class LTEDLGenerator(SignalGenerator):
+class LTEDLGenerator(lf.SignalGenerator):
     @staticmethod
     def run(args):
         run(args)

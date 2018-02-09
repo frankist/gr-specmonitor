@@ -16,20 +16,23 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-# Modules that are directly accessible
+# Modules that are directly accessible from outside the module
 from utils.logging_utils import DynamicLogger
-import session
-import session_settings
+from core.LuigiSimulatorHandler import StageLuigiTask
+from core.LuigiSimulatorHandler import CmdSession
+from core.SignalDataFormat import StageSignalData
+from core.SignalDataFormat import MultiStageSignalData
+from . import session
+from labeling_tools.parametrization import random_generator
+from data_representation import timefreq_box
 
 # register tasks
-from core.LuigiSimulatorHandler import StageLuigiTask
 from waveform_generators.waveform_launcher import waveform
 from general_tasks.preRF_transformations import preRFTask
-from visualization.inspect_labels import Labels2JsonTask
-from visualization.visualization_modules import ImgSpectrogramBoundingBoxTask
-from core.LuigiSimulatorHandler import CmdSession
+from general_tasks.inspect_labels import Labels2JsonTask
+from general_tasks.visualization_modules import ImgSpectrogramBoundingBoxTask
 from general_tasks.remove_IQsamples import RemoveIQSamples
-from data_representation.voc_annotations import VOCFormatTask
+from general_tasks.voc_annotations import VOCFormatTask
 from general_tasks.partition_signal import PartitionSignalTask
 
 # register waveforms

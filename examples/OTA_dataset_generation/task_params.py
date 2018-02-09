@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-from labeling_framework.labeling_tools.parametrization import random_generator
+from specmonitor.labeling_framework import random_generator
 
 num_sections = 1
 section_size = 550000 #500000#100000
@@ -62,7 +62,7 @@ stage_params = {
             ('sample_rate',20e6),
             ('encoding',[0]),
             ('pdu_length',[1500]),
-            ('pad_interval',[('uniform',(1000,200000))]),
+            ('pad_interval',[('uniform',(2000,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('repeats',range(n_repeats))
         ],
@@ -86,7 +86,7 @@ stage_params = {
             ('excess_bw',0.25),
             ('pre_diff_code',False),
             ('burst_len', 20000),#[('poisson',3000,1000)]),
-            ('zero_pad_len',random_generator('randint',(1000,200000))),
+            ('zero_pad_len',random_generator('randint',(2000,200000))),
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('multipleTx',(-0.325,-0.125,0.125,0.325))]),
             ('repeats',range(n_repeats))
@@ -104,7 +104,7 @@ stage_params = {
             ('sample_rate',20e6),
             ('n_samples',wf_gen_samps),
             ('n_prbs',[50,100]),
-            ('pad_interval',random_generator('randint',(100,200000))),
+            ('pad_interval',random_generator('randint',(2000,200000))),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
             ('runs',range(max(int(n_repeats/2),1)))
@@ -121,7 +121,7 @@ stage_params = {
             ('waveform',['lte_ul']),
             ('sample_rate',20e6),
             ('n_samples',wf_gen_samps),
-            ('pad_interval',random_generator('randint',(100,200000))),
+            ('pad_interval',random_generator('randint',(2000,200000))),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
             ('runs',range(n_repeats))

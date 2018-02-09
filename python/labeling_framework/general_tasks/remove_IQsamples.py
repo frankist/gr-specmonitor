@@ -21,12 +21,13 @@
 
 import luigi
 
-import labeling_framework as lf
+from ..core import SignalDataFormat as ssa
+from ..core.LuigiSimulatorHandler import StageLuigiTask
 from ..core import SessionParams as sp
-from ..sig_format import stage_signal_data as ssa
-logger = lf.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
-class RemoveIQSamples(lf.StageLuigiTask):
+class RemoveIQSamples(StageLuigiTask):
     completed = luigi.BoolParameter(significant=False,default=False)
 
     @staticmethod

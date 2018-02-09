@@ -15,12 +15,5 @@ file(GLOB LOCAL_PYTHON_FILES
 GR_PYTHON_INSTALL(
   FILES
   ${LOCAL_PYTHON_FILES}
-  DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework
+  DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/general_tasks
 )
-
-add_subdirectory(core)
-add_subdirectory(data_representation)
-add_subdirectory(utils)
-add_subdirectory(labeling_tools)
-add_subdirectory(waveform_generators)
-add_subdirectory(general_tasks)

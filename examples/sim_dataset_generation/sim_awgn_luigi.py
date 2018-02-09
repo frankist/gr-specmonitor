@@ -1,7 +1,7 @@
 import sys
 sys.path.append('../../python')
 
-import labeling_framework as lf
+from specmonitor import labeling_framework as lf
 import labeling_modules
 logger = lf.DynamicLogger(__name__)
 

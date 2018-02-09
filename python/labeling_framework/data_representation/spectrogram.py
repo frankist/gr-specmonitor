@@ -23,12 +23,12 @@ import numpy as np
 from scipy import signal
 import warnings
 
-import labeling_framework as lf
 from ..utils import basic_utils
 import image_representation as imgfmt
 import timefreq_box as tfbox
 from ..labeling_tools import bounding_box as bndbox
-logger = lf.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 ##### kind of private methods
 

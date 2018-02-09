@@ -1,9 +1,9 @@
 import sys
 sys.path.append('../../python')
 
-import labeling_framework as lf
+from specmonitor import labeling_framework as lf
 import labeling_modules
-from lf.RF import RF_scripts
+from specmonitor.labeling_framework.RF import RF_scripts
 logger = lf.DynamicLogger(__name__)
 
 class Tx(lf.preRFTask):

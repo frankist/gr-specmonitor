@@ -39,9 +39,10 @@ import pmt
 import specmonitor
 
 # labeling_framework package
-import labeling_framework as lf
 import waveform_generator_utils as wav_utils
-logger = lf.DynamicLogger(__name__)
+from waveform_launcher import SignalGenerator
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
     encoding_labels = [
@@ -170,7 +171,7 @@ def run(args):
 
     v.save_pkl()
 
-class WifiGenerator(lf.SignalGenerator):
+class WifiGenerator(SignalGenerator):
     @staticmethod
     def run(args):
         run(args)

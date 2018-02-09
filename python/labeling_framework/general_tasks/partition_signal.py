@@ -22,9 +22,10 @@
 import numpy as np
 import copy
 
-import labeling_framework as lf
-from ..sig_format import stage_signal_data as ssa
-logger = lf.DynamicLogger(__name__)
+from ..core.LuigiSimulatorHandler import StageLuigiTask
+from ..core import SignalDataFormat as ssa
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def time_average_Sxx_and_boxes(Sxx,tfreq_boxes,num_averages,step):
     # n_rows = int(np.floor((Sxx.shape[0]-(num_averages*overlap_ratio))/(num_averages*(1-overlap_ratio))))
@@ -65,7 +66,7 @@ def run(args):
     multi_stage_data.set_stage_data(new_stage_data)
     multi_stage_data.save_pkl()
 
-class PartitionSignalTask(lf.StageLuigiTask):
+class PartitionSignalTask(StageLuigiTask):
     def run(self):
         this_run_params = self.get_run_parameters()
         run(this_run_params)

@@ -34,10 +34,11 @@ from gnuradio import digital
 import specmonitor
 
 # labeling_framework package
-import labeling_framework as lf
 import waveform_generator_utils as wav_utils
-from labeling_framework.labeling_tools.parametrization import random_generator
-logger = lf.DynamicLogger(__name__)
+from ..labeling_tools.parametrization import random_generator
+from waveform_launcher import SignalGenerator
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def make_constellation_object(params):
     gr_params = {}
@@ -188,7 +189,7 @@ def run(args):
     v.save_pkl()
     # logger.debug('Finished writing to file %s', fname)
 
-class GenericModGenerator(lf.SignalGenerator):
+class GenericModGenerator(SignalGenerator):
     @staticmethod
     def run(args):
         run(args)

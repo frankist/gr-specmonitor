@@ -16,15 +16,12 @@ from gnuradio import filter
 from gnuradio.filter import firdes
 
 # labeling_framework package
-import labeling_framework as lf
-import specmonitor
-from labeling_framework import SignalGenerator
-from labeling_framework.waveform_generators.waveform_generator_utils import *
-from labeling_framework.labeling_tools import random_sequence
-from labeling_framework.data_representation import timefreq_box as tfbox
-from labeling_framework.labeling_tools.parametrization import random_generator
-from labeling_framework.utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from specmonitor import random_burst_shaper_cc
+from specmonitor import labeling_framework as lf
+from specmonitor.labeling_framework.waveform_generators import waveform_generator_utils as wav_utils
+from specmonitor.labeling_framework import timefreq_box as tfbox
+from specmonitor.labeling_framework.labeling_tools import random_sequence
+logger = lf.DynamicLogger(__name__)
 
 class GrLTEULTracesFlowgraph(gr.top_block):
     prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
@@ -39,7 +36,7 @@ class GrLTEULTracesFlowgraph(gr.top_block):
 
         # params
         self.n_samples = n_samples
-        self.n_offset_samples = int(random_generator.load_value(n_offset_samples))
+        self.n_offset_samples = int(lf.random_generator.load_value(n_offset_samples))
         self.linear_gain = linear_gain
         trace_number = 0
 
@@ -52,10 +49,10 @@ class GrLTEULTracesFlowgraph(gr.top_block):
         self.fname = os.path.expanduser(os.path.join('~/tmp/lte_frames/ul',self.fname))
         self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
         self.resamp_ratio = 20.0e6/self.samp_rate
-        randgen = random_generator.load_generator(pad_interval)
+        randgen = lf.random_generator.load_generator(pad_interval)
         # scale by sampling rate
         new_params = [int(v/self.resamp_ratio) for v in randgen.params]
-        randgen = random_generator(randgen.dist_name,new_params)
+        randgen = lf.random_generator(randgen.dist_name,new_params)
 
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
@@ -66,7 +63,7 @@ class GrLTEULTracesFlowgraph(gr.top_block):
         # blocks
         self.file_reader = blocks.file_source(gr.sizeof_gr_complex,self.fname,True)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.n_samples_per_frame,"packet_len")
-        self.burst_shaper = specmonitor.random_burst_shaper_cc(randgen.dynrandom(), 0, self.frequency_offset,"packet_len")
+        self.burst_shaper = random_burst_shaper_cc(randgen.dynrandom(), 0, self.frequency_offset,"packet_len")
         self.resampler = filter.fractional_resampler_cc(0,1/self.resamp_ratio)
         self.skiphead = blocks.skiphead(gr.sizeof_gr_complex,
                                         self.n_offset_samples)
@@ -105,7 +102,7 @@ class GrLTEULTracesFlowgraph(gr.top_block):
 
 def run(args):
     d = args['parameters']
-    print_params(d,__name__)
+    # print_params(d,__name__)
 
     while True:
         # create general_mod block
@@ -118,7 +115,7 @@ def run(args):
         gen_data = np.array(tb.dst.data())
 
         try:
-            v = transform_IQ_to_sig_data(gen_data,args)
+            v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
 
             # merge boxes if broadcast channel is empty
             metadata = v.get_stage_derived_params('spectrogram_img')
@@ -132,8 +129,8 @@ def run(args):
             tfreq_boxes,max_pwr = tfbox.normalize_boxes_pwr(new_tfreq_boxes,gen_data)
             metadata.tfreq_boxes = tfreq_boxes
             y=gen_data/np.sqrt(max_pwr)
-            this_stage_data = ssa.StageSignalData(args,{'spectrogram_img':metadata},y)
-            v = ssa.MultiStageSignalData()
+            this_stage_data = lf.StageSignalData(args,{'spectrogram_img':metadata},y)
+            v = lf.MultiStageSignalData()
             v.set_stage_data(this_stage_data)
         except RuntimeError, e:
             logger.warning('Going to re-run radio')
@@ -143,7 +140,7 @@ def run(args):
     # save file
     v.save_pkl()
 
-class LTEULGenerator(SignalGenerator):
+class LTEULGenerator(lf.SignalGenerator):
     @staticmethod
     def run(params):
         run(params)

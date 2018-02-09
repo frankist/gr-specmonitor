@@ -3,9 +3,10 @@ import luigi
 import logging
 import time
 
-import labeling_framework as lf
-from labeling_framework.core.LuigiSimulatorHandler import *
-from labeling_framework.utils import logging_utils
+# from labeling_framework.core.LuigiSimulatorHandler import *
+from . import session_settings
+from core.LuigiSimulatorHandler import StageLuigiTask
+from utils import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
 def find_declared_tasks(parent_task=StageLuigiTask):
@@ -20,7 +21,7 @@ def find_declared_tasks(parent_task=StageLuigiTask):
 
 def init():
     # define globals
-    lf.session_settings.init()
+    session_settings.init()
 
     # set up logging
     logging_utils.addLoggingLevel('TRACE',logging.WARNING-5)
@@ -28,20 +29,20 @@ def init():
     # register the declared tasks
     child_tasks = find_declared_tasks()
     for task in child_tasks:
-        lf.session_settings.register_task_handler(task.my_task_name(), task)
+        session_settings.register_task_handler(task.my_task_name(), task)
 
     # produce the Task Dependency Tree
     dtree = {}
-    for name,task in lf.session_settings.retrieve_task_handlers().items():
+    for name,task in session_settings.retrieve_task_handlers().items():
         dep = task.depends_on()
         if dep is not None:
             if isinstance(dep,basestring):
-                dep = lf.session_settings.retrieve_task_handler(dep)
+                dep = session_settings.retrieve_task_handler(dep)
             dtree[task.my_task_name()] = dep.my_task_name()
-    lf.session_settings.set_task_dependency_tree(dtree)
+    session_settings.set_task_dependency_tree(dtree)
 
     # call task setup for every task type
-    for name,task in lf.session_settings.retrieve_task_handlers().items():
+    for name,task in session_settings.retrieve_task_handlers().items():
         task.setup()
 
 def run(session):

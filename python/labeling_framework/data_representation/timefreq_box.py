@@ -21,8 +21,8 @@
 
 import numpy as np
 
-import labeling_framework as lf
-logger = lf.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 '''
 Represents time through sample indices and freq through the normalized [-0.5,0.5] space
