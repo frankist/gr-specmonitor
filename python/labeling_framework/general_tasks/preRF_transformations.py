@@ -18,8 +18,6 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 #
-import sys
-# import pickle
 import cPickle as pickle
 import numpy as np
 
@@ -31,9 +29,10 @@ from gnuradio import channels
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
 from ..labeling_tools import preamble_utils
-from ..sig_format import stage_signal_data as ssa
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..core import SignalDataFormat as ssa
+from ..core.LuigiSimulatorHandler import StageLuigiTask
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def generate_section_partitions(section_size,guard_band,num_sections):
     return ((i*section_size,(i+1)*section_size) for i in range(num_sections))
@@ -142,3 +141,8 @@ def apply_framing_and_offsets(args):
     new_stage_data = ssa.StageSignalData(args,{'spectrogram_img':l},y)
     multi_stage_data.set_stage_data(new_stage_data)
     multi_stage_data.save_pkl()
+
+class preRFTask(StageLuigiTask):
+    def run(self):
+        this_run_params = self.get_run_parameters()
+        apply_framing_and_offsets(this_run_params)

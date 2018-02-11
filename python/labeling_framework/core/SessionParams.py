@@ -21,14 +21,13 @@
 import os
 import importlib
 import pickle
-# import itertools
 
-import session_settings
 from . import StageParamData
 from . import StageDependencyTree as sdt
+from .. import session_settings
 from ..utils import ssh_utils
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 # this class stores all the data necessary to setup a session instance
 # - It needs to specify our instance name (e.g. 'sim0')
@@ -165,9 +164,10 @@ class SessionPaths:
         return '~/{}'.format(SessionPaths.__session_args__(data).session_name)
 
 def session_clean(session_args):
-    import shutil
     session_folder = SessionPaths.session_folder(session_args)
-    shutil.rmtree(session_folder)
+    if os.path.exists(session_folder):
+        import shutil
+        shutil.rmtree(session_folder)
     # os.rmdir(session_folder)
 
 def load_session(session_args):

@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
 import numpy as np
+from specmonitor.labeling_framework import random_generator
 
 num_sections = 1
 section_size = 550000
-toffset_range = [50,70,90]
+toffset_range = [50]#[50,70,90]
 frequency_offset = [0]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
+n_repeats = 1
 
-tags = ['wifi','psk','lte']
+tags = ['wifi','psk','lte','lte_ul']
 
 Tx_params = [
     ('frequency_offset',frequency_offset),
@@ -52,9 +54,9 @@ stage_params = {
             ('sample_rate',20e6),
             ('encoding',[0]),
             ('pdu_length',[1500]),
-            ('pad_interval',[('uniform',(1000,50000))]),
+            ('pad_interval',[('uniform',(2000,200000))]),
             ('signal_representation',[spectrogram_representation]),
-            ('runs',range(10))
+            ('runs',range(n_repeats))
         ],
         'Tx': Tx_params_wifi,
         'Rx': Rx_params,
@@ -75,10 +77,10 @@ stage_params = {
             ('excess_bw',0.25),
             ('pre_diff_code',False),
             ('burst_len', 20000),#[('poisson',3000,1000)]),
-            ('zero_pad_len',[('uniform',(1000,50000))]),
+            ('zero_pad_len',random_generator('randint',(2000,200000))),#[('uniform',(10000,200000))]),
             ('signal_representation',[spectrogram_representation]),
-            ('frequency_offset',[('uniform',(-0.325,-0.125,0.125,0.325))]),
-            ('runs',range(10))
+            ('frequency_offset',[('multipleTx',(-0.325,-0.125,0.125,0.325))]),
+            ('runs',range(n_repeats))
         ],
         'Tx': Tx_params,
         'Rx': Rx_params,
@@ -88,13 +90,28 @@ stage_params = {
     {
         'waveform':
         [
-            ('waveform',['lte']),
+            ('waveform',['lte_dl']),
             ('n_samples',wf_gen_samps),
             ('n_prbs',[50,100]),
-            ('pad_interval',[('uniform',(100,200000))]),
+            ('pad_interval',random_generator('randint',(2000,200000))),#[('uniform',(100,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
-            ('runs',range(5))
+            ('runs',range(max(int(n_repeats/2),1)))
+        ],
+        'Tx': Tx_params,
+        'Rx': Rx_params,
+        'RFVOCFormat': RFVOCFormat_params
+    },
+    'lte_ul':
+    {
+        'waveform':
+        [
+            ('waveform',['lte_ul']),
+            ('n_samples',wf_gen_samps),
+            ('pad_interval',random_generator('randint',(2000,200000))),#[('uniform',(100,200000))]),
+            ('signal_representation',[spectrogram_representation]),
+            ('n_offset_samples',[('uniform',(0,500000))]),
+            ('runs',range(n_repeats))
         ],
         'Tx': Tx_params,
         'Rx': Rx_params,

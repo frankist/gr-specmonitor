@@ -21,7 +21,8 @@
 
 import sys
 import os
-import pickle
+# import pickle
+import cPickle as pickle
 import json
 import numpy as np
 

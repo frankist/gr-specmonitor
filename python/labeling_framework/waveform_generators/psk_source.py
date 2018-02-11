@@ -21,7 +21,8 @@
 
 import numpy as np
 import os
-import pickle
+# import pickle
+import cPickle as pickle
 import time
 import types
 # import matplotlib.pyplot as plt
@@ -33,10 +34,11 @@ from gnuradio import digital
 import specmonitor
 
 # labeling_framework package
-from waveform_generator_utils import *
-from ..utils import typesystem_utils as ts
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+import waveform_generator_utils as wav_utils
+from ..labeling_tools.parametrization import random_generator
+from waveform_launcher import SignalGenerator
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def make_constellation_object(params):
     gr_params = {}
@@ -82,12 +84,13 @@ class GeneralModFlowgraph(gr.top_block):
         self.linear_gain = float(linear_gain)
         self.burst_len = burst_len
         # TODO: make burst_len also variable
-        if isinstance(zero_pad_len,tuple):
-            self.zero_pad_len = zero_pad_len[1]
-            self.pad_dist = zero_pad_len[0]
-        else:
-            self.zero_pad_len = [zero_pad_len]
-            self.pad_dist = 'constant'
+        randgen = random_generator.load_param(zero_pad_len)
+        # if isinstance(zero_pad_len,tuple):
+        #     self.zero_pad_len = zero_pad_len[1]
+        #     self.pad_dist = zero_pad_len[0]
+        # else:
+        #     self.zero_pad_len = [zero_pad_len]
+        #     self.pad_dist = 'constant'
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
@@ -106,7 +109,7 @@ class GeneralModFlowgraph(gr.top_block):
                                        excess_bw=self.excess_bw)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.burst_len,"packet_len")
         # self.burst_shaper = digital.burst_shaper_cc((1+0*1j,),100,self.zero_pad_len,False)
-        self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist,self.zero_pad_len,0,self.frequency_offset,"packet_len")
+        self.burst_shaper = specmonitor.random_burst_shaper_cc(randgen.dynrandom(),0,self.frequency_offset,"packet_len")
         self.skiphead = blocks.skiphead(gr.sizeof_gr_complex, self.n_offset_samples)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
         self.dst = blocks.vector_sink_c()
@@ -153,12 +156,12 @@ def create_multiple_Txs(params):
             params2['frequency_offset'] = freq
             tb_list.append(GeneralModFlowgraph.load_flowgraph(params2))
     else:
-        tb_list.append(GeneralModFlowgraph.load_flowgraph(d))
+        tb_list.append(GeneralModFlowgraph.load_flowgraph(params))
     return tb_list
 
 def run(args):
     d = args['parameters']
-    print_params(d,__name__)
+    wav_utils.print_params(d,__name__)
 
     # create general_mod block
     # tb = GeneralModFlowgraph.load_flowgraph(d)
@@ -174,14 +177,22 @@ def run(args):
             gen_data = np.array(tb.dst.data())
 
             try:
-                v = transform_IQ_to_sig_data(gen_data,args)
+                v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
             except RuntimeError, e:
                 logger.warning('Going to re-run radio')
                 continue
             waveform_data_list.append(v)
             break
-    v = aggregate_independent_waveforms(waveform_data_list)
+    v = wav_utils.aggregate_independent_waveforms(waveform_data_list)
 
     # aggregate everything
     v.save_pkl()
     # logger.debug('Finished writing to file %s', fname)
+
+class GenericModGenerator(SignalGenerator):
+    @staticmethod
+    def run(args):
+        run(args)
+    @staticmethod
+    def name():
+        return 'generic_mod'

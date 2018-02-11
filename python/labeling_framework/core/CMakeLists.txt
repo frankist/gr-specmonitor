@@ -9,12 +9,11 @@ endif()
 ########################################################################
 # Install python sources
 ########################################################################
-file(GLOB all_python_files
-  "*.py"
+file(GLOB LOCAL_PYTHON_FILES
+    "*.py"
 )
-
 GR_PYTHON_INSTALL(
-    FILES
-    ${all_python_files}
-    DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/utils
+  FILES
+  ${LOCAL_PYTHON_FILES}
+  DESTINATION ${GR_PYTHON_DIR}/specmonitor/labeling_framework/core
 )

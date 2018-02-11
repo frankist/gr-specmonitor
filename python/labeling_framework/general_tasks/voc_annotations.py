@@ -24,15 +24,13 @@ import numpy as np
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from PIL import Image
-import pickle
+import cPickle as pickle
 import cv2
 
-from ..sig_format import stage_signal_data as ssa
-import image_representation as imrep
-import timefreq_box as tfbox
-from ..labeling_tools import bounding_box as bbox
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..core import SignalDataFormat as ssa
+from ..core.LuigiSimulatorHandler import StageLuigiTask
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def prettify_xml(elem):
     """Return a pretty-printed XML string for the Element.
@@ -154,3 +152,7 @@ def create_image_and_annotation(args):
     multi_stage_data.set_stage_data(new_stage_data)
     multi_stage_data.save_pkl()
 
+class VOCFormatTask(StageLuigiTask):
+    def run(self):
+        this_run_params = self.get_run_parameters()
+        create_image_and_annotation(this_run_params)

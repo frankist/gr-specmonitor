@@ -24,10 +24,11 @@
 
 #include <specmonitor/api.h>
 #include <gnuradio/block.h>
+#include "DynRandom.h"
 
 namespace gr {
   namespace specmonitor {
-
+    class SPECMONITOR_API DynRandom; // NOTE: I need to define API for swig to find it
     /*!
      * \brief <+description of block+>
      * \ingroup specmonitor
@@ -46,8 +47,7 @@ namespace gr {
        * class. specmonitor::random_burst_shaper_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(std::string dist,
-                       const std::vector<float>& params,
+      static sptr make(DynRandom time_dist,
                        int pre_padding = 0,
                        const std::vector<float>& freq_offset_values = std::vector<float>(1,0),
                        const std::string &length_tag_name = "packet_len");

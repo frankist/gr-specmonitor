@@ -22,6 +22,9 @@ from collections import Iterable
 import numpy as np
 import inspect
 import copy
+import cPickle as pickle
+
+from ..labeling_tools.parametrization import random_generator
 from . import logging_utils
 logger = logging_utils.DynamicLogger(__name__)
 
@@ -57,9 +60,12 @@ def np_to_native(v):
         if issubclass(v.__class__,ValueGenerator): # create an instance
             ret = v.generate()
         else:
-            ret = copy.deepcopy(v)
-            for member,val in vars(ret).items():
-                setattr(ret,member,np_to_native(val))
+            if issubclass(v.__class__,random_generator):
+                ret = copy.deepcopy(v)#pickle.loads(pickle.dumps(v))
+            else:
+                ret = copy.deepcopy(v)
+                for member,val in vars(ret).items():
+                    setattr(ret,member,np_to_native(val))
     elif not isinstance(v,Iterable) or isinstance(v,basestring): # it is POD type or string
         ret = v # it is already a native
     elif isinstance(v,list):

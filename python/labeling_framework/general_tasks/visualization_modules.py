@@ -24,16 +24,14 @@ import numpy as np
 from scipy import signal
 from scipy import misc
 from PIL import Image
+import cv2
 from pylab import cm
 import matplotlib.pyplot as plt
 
-from ..sig_format import pkl_sig_format as psf
-from ..labeling_tools import bounding_box
-from ..sig_format import sig_data_access as fdh
-from ..sig_format import stage_signal_data as ssa
+from ..core import SignalDataFormat as ssa
 from ..core.LuigiSimulatorHandler import StageLuigiTask
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def get_pixel_coordinates(imgbox):
     ud_l = [(e,imgbox.colmin) for e in range(imgbox.rowmin,imgbox.rowmax)]
@@ -49,8 +47,13 @@ def get_pixel_coordinates(imgbox):
 def paint_box(im,bbox):
     if bbox.rowmin < 0:
         return False # bounding box was too close to the border. Not gonna draw it
-    pixel_list = get_pixel_coordinates(bbox)
-    paint_box_pixels(im,pixel_list)
+    thick = int(min(im.shape[0],im.shape[1]) // 150)
+    color = (255,130,255,255)#colors[max_indx]
+    cv2.rectangle(im,(bbox.colmin,bbox.rowmin),
+                  (bbox.colmax,bbox.rowmax),
+                  color, thick)
+    # pixel_list = get_pixel_coordinates(bbox)
+    # paint_box_pixels(im,pixel_list)
     return True
 
 def concatenate_images(img_list):
@@ -119,7 +122,6 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     x = multi_stage_data.read_stage_samples()
     targetfile = this_run_params['targetfilename']
     sourcefile = this_run_params['sourcefilename']
-    # freader = psf.WaveformPklReader(sourcefile)
     spec_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
     num_sections = len(spec_metadata)
     is_framed = True if 'frame_params' in multi_stage_data.session_data else False
@@ -127,33 +129,40 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     # is_framed = sig_data.is_framed()
     # sig_data = freader.data()
     # x = freader.read_section()
-    # is_framed = fdh.is_framed(sig_data)
     if insync is False or is_framed is False:
         logger.error('I have to implement this functionality')
         print sig_data
         raise NotImplementedError('data has to be framed and in sync to be stored as an img with bounding boxes')
 
-    # spec_metadata = fdh.get_stage_derived_parameter(sig_data,'section_spectrogram_img_metadata')
     # num_sections = len(spec_metadata)
     assert num_sections==1 # TODO: Implement this for several subsections
-    # section_size = fdh.get_stage_derived_parameter(sig_data,'section_size')
     section_size = multi_stage_data.session_data['frame_params']['section_size']
 
     for i in range(num_sections):
         # get the image bounding boxes
         imgboxes = spec_metadata[i].generate_img_bounding_boxes() if mark_boxes==True else []
-        Sxx = spec_metadata[i].image_data(x)
+        Sxx = spec_metadata[i].image_data(x)#,nan_val=np.nan)
+
+        # desired dims
+        orig_dims = Sxx.shape
+        img_width = 300
+        final_dims = (img_width,img_width*2)#(min(Sxx.shape)*4,min(Sxx.shape)*4)
 
         # convert image data to img format
-        im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))
-        im_no_boxes = im.copy()
+        # im = Image.fromarray(np.uint8(cm.gist_earth(Sxx)*255))
+        # im_no_boxes = im.copy()
+        imnp = np.uint8(cm.gist_earth(Sxx)*255)
+        im_no_boxes = Image.fromarray(cv2.resize(imnp,final_dims)).copy()
+        imnp = cv2.resize(imnp,final_dims)
 
         # paint the bounding boxes in the image
         for b in imgboxes:
-            paint_box(im,b)
+            bnew = b.resized_box((final_dims[1],final_dims[0]))
+            paint_box(imnp,bnew)
 
         # put images side by side
-        im = concatenate_images([im_no_boxes,im])
+        im = Image.fromarray(cv2.resize(imnp,final_dims))
+        im = concatenate_images([im_no_boxes,im])#[im_no_boxes,im])
         im.save(targetfile,'PNG')
 
 class ImgSpectrogramBoundingBoxTask(StageLuigiTask):

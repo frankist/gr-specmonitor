@@ -21,7 +21,7 @@
 
 import numpy as np
 import os
-import pickle
+import cPickle as pickle
 import time
 
 import sys
@@ -37,12 +37,12 @@ import foo
 import ieee802_11
 import pmt
 import specmonitor
-# import gr_qtgui_utils
 
 # labeling_framework package
-from waveform_generator_utils import *
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+import waveform_generator_utils as wav_utils
+from waveform_launcher import SignalGenerator
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
     encoding_labels = [
@@ -151,7 +151,7 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
 def run(args):
     d = args['parameters']
-    # print_params(d,__name__)
+    # wav_utils.print_params(d,__name__)
 
     # create Wifi block
     tb = GrWifiFlowgraph(
@@ -167,14 +167,17 @@ def run(args):
 
     gen_data = np.array(tb.dst.data())
 
-    v = transform_IQ_to_sig_data(gen_data,args)
+    v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
 
     v.save_pkl()
-    # fname = os.path.expanduser(args['targetfilename'])
-    # with open(fname, 'w') as f:
-    #     pickle.dump(v, f)
-    # logger.debug('Finished writing to file %s', fname)
 
+class WifiGenerator(SignalGenerator):
+    @staticmethod
+    def run(args):
+        run(args)
+    @staticmethod
+    def name():
+        return 'wifi'
 
 if __name__ == '__main__':
     logger.basicConfig(level='DEBUG')

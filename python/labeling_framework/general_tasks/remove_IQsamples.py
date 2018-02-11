@@ -19,32 +19,32 @@
 # Boston, MA 02110-1301, USA.
 #
 
-import numpy as np
-import pickle
-import os
 import luigi
 
-from ..core import session_settings
-from ..core import LuigiSimulatorHandler as lsh
+from ..core import SignalDataFormat as ssa
+from ..core.LuigiSimulatorHandler import StageLuigiTask
 from ..core import SessionParams as sp
-from ..sig_format import stage_signal_data as ssa
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
-class RemoveIQSamples(lsh.StageLuigiTask):
+class RemoveIQSamples(StageLuigiTask):
     completed = luigi.BoolParameter(significant=False,default=False)
 
     @staticmethod
     def mkdir_flag():
         return False
 
+    def stage2clean(self):
+        if isinstance(self.depends_on(),basestring):
+            return self.depends_on()
+        self.depends_on().my_task_name()
+
     def requires(self):
-        stage2clean = self.depends_on().my_task_name()
         ret = super(RemoveIQSamples,self).requires()
         if not isinstance(ret,list):
             ret = [ret]
         sessiondata = self.load_sessiondata()
-        resulttasktuples = sessiondata.child_stage_idxs(stage2clean,self.stage_idxs[0:-1])
+        resulttasktuples = sessiondata.child_stage_idxs(self.stage2clean(),self.stage_idxs[0:-1])
         for taskhandler,child_stage_idx_list in resulttasktuples.items():
             if taskhandler.__name__ == self.my_task_name():
                 continue
@@ -54,9 +54,8 @@ class RemoveIQSamples(lsh.StageLuigiTask):
         return ret
 
     def stage2clean_output(self):
-        stage2clean = self.depends_on().my_task_name()
         outfilename = sp.SessionPaths.stage_outputfile(self.session_args['session_path'],
-                                         stage2clean,
+                                         self.stage2clean(),
                                          self.stage_idxs[0:-1],self.output_fmt)
         return outfilename
 

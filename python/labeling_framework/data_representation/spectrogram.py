@@ -21,13 +21,14 @@
 
 import numpy as np
 from scipy import signal
+import warnings
 
 from ..utils import basic_utils
 import image_representation as imgfmt
 import timefreq_box as tfbox
 from ..labeling_tools import bounding_box as bndbox
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 ##### kind of private methods
 
@@ -108,8 +109,8 @@ def compute_freq_col_bounds(Sxx_norm, row_bounds = None, thresdB = -15):
         l.append(interv)
     return l
 
-def normalize_spectrogram(Sxx):
-    return imgfmt.normalize_image_data(Sxx)
+def normalize_spectrogram(Sxx,nan_val=0):
+    return imgfmt.normalize_image_data(Sxx,nan_val=nan_val)
 
 def cancel_spectrogram_DCoffset(Sxx):
     # pwr_min = np.min(Sxx)
@@ -186,15 +187,17 @@ class SectionSpectrogramMetadata(object):
     def section_duration(self):
         return self.section_bounds[1]-self.section_bounds[0]
 
-    def image_data(self,x):
+    def image_data(self,x,nan_val=0):
         section = x[self.section_bounds[0]:self.section_bounds[1]]
         Sxx = compute_spectrogram(section, self.input_params['fftsize'])
         Sxx = time_average_Sxx(Sxx,self.num_fft_avgs,self.num_fft_step)
         if self.input_params.get('cancel_DC_offset',False)==True:
             Sxx = cancel_spectrogram_DCoffset(Sxx)
         if self.input_params.get('dB',True)==True:
-            Sxx = 10*np.log10(Sxx)
-        Sxx = normalize_spectrogram(Sxx)
+            with warnings.catch_warnings(): # ignore log10(zero) warning
+                warnings.simplefilter("ignore")
+                Sxx = 10*np.log10(Sxx)
+        Sxx = normalize_spectrogram(Sxx,nan_val)
         if Sxx.shape!=self.img_size():
             logger.error('These were the shapes:{},{}'.format(Sxx.shape,self.img_size()))
             raise AssertionError('Mismatch in spectrogram dimensions: {}!={}. Your section had a duration of {} although it should have {}.'.format(Sxx.shape,self.img_size(),section.size,self.section_duration()))

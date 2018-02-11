@@ -29,5 +29,6 @@ install(FILES
     spectrogram_img_c.h
     random_burst_shaper_cc.h
     hier_preamble_detector.h
-    foo_random_burst_shaper_cc.h DESTINATION include/specmonitor
+    foo_random_burst_shaper_cc.h
+    DynRandom.h DESTINATION include/specmonitor
 )

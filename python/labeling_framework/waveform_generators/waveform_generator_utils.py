@@ -22,31 +22,31 @@
 import numpy as np
 import copy
 
-from ..sig_format import sig_data_access as sda
 from ..data_representation import image_representation as imgrep
 from ..data_representation import timefreq_box as tfbox
-from ..sig_format import stage_signal_data as ssa
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..core import SignalDataFormat as ssa
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def print_params(params,name):
     logger.debug('%s waveform generator starting',name)
     for k, v in params.iteritems():
         logger.debug('%s: %s (type=%s)', k, v, type(v))
 
-def create_new_sigdata(args):
-    logger.debug('Going to fill the stage data structure')
-    # generate a sig object/dict
-    v = sda.init_metadata()
+# def create_new_sigdata(args):
+#     logger.debug('Going to fill the stage data structure')
+#     # generate a sig object/dict
+#     v = sda.init_metadata()
 
-    # add the stage parameters that were passed to the waveform generator
-    sda.set_stage_parameters(v, args['stage_name'], args['parameters'])
+#     # add the stage parameters that were passed to the waveform generator
+#     sda.set_stage_parameters(v, args['stage_name'], args['parameters'])
 
-    return v
+#     return v
 
-def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
+def set_derived_sigdata(x,args,fail_at_noTx):
     sig2img_params = args['parameters']['signal_representation']
     signalimgmetadata = imgrep.signal_to_img_converter_factory(sig2img_params)
+
     box_label = args['parameters'][sig2img_params['boxlabel']]
 
     section_bounds = [0,x.size]
@@ -60,10 +60,6 @@ def set_derived_sigdata(stage_data,x,args,fail_at_noTx):
     sigmetadata.tfreq_boxes = tfreq_boxes
     y = x/np.sqrt(max_pwr)
 
-    # # fill sigdata
-    # stage_data['IQsamples'] = y
-    # sda.set_stage_derived_parameter(stage_data, args['stage_name'], 'spectrogram_img_metadata', sigmetadata)
-
     return ssa.StageSignalData(args,{'spectrogram_img':sigmetadata},y)
 
 def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
@@ -72,8 +68,8 @@ def transform_IQ_to_sig_data(x,args,fail_at_noTx=True):
     stage parameters that were passed, and the derived bounding_boxes
     """
     try:
-        v = create_new_sigdata(args)
-        this_stage_data = set_derived_sigdata(v,x,args,fail_at_noTx)
+        # v = create_new_sigdata(args)
+        this_stage_data = set_derived_sigdata(x,args,fail_at_noTx)
         v2 = ssa.MultiStageSignalData()
         v2.set_stage_data(this_stage_data)
     except KeyError, e:
@@ -90,3 +86,5 @@ def aggregate_independent_waveforms(multi_stage_data_list):
     for i in range(1,len(multi_stage_data_list)):
         combined_data = ssa.combine_multi_stage_data(combined_data,multi_stage_data_list[i])
     return combined_data
+
+

@@ -33,32 +33,29 @@ namespace gr {
   namespace specmonitor {
 
     random_burst_shaper_cc::sptr
-    random_burst_shaper_cc::make(std::string dist,
-                                 const std::vector<float>& params,
+    random_burst_shaper_cc::make(DynRandom time_dist,
                                  int pre_padding,
                                  const std::vector<float>& freq_offset_values,
                                  const std::string &length_tag_name)
     {
       return gnuradio::get_initial_sptr
-        (new random_burst_shaper_cc_impl(dist, params, pre_padding, freq_offset_values, length_tag_name));
+        (new random_burst_shaper_cc_impl(time_dist, pre_padding, freq_offset_values, length_tag_name));
     }
 
     /*
      * The private constructor
      */
-    random_burst_shaper_cc_impl::random_burst_shaper_cc_impl(std::string dist,
-                                                             const std::vector<float>& params,
+    random_burst_shaper_cc_impl::random_burst_shaper_cc_impl(DynRandom time_dist,
                                                              int pre_padding,
                                                              const std::vector<float>& freq_offset_values,
                                                              const std::string &length_tag_name)
       : gr::block("random_burst_shaper_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
                   gr::io_signature::make(1, 1, sizeof(gr_complex))),
-      d_distname(dist),
-      d_params(params),
       d_nprepad(pre_padding),
       d_freq_offset_values(freq_offset_values),
-      d_dist(NULL),
+      // d_dist(NULL),
+      // d_dist2(NULL),
       d_freq_dist(0,freq_offset_values.size()-1),
       d_length_tag_key(pmt::string_to_symbol(length_tag_name)),
       d_ncopy(0),
@@ -72,41 +69,7 @@ namespace gr {
       d_rng(static_cast<unsigned int>(std::time(0)))
     {
       int param_idx = 0;
-      if(d_distname=="poisson") {
-        switch(d_params.size()) {
-        case 1:
-          d_dist = new PoissonDist(d_params[param_idx++]);
-          break;
-        case 2:
-          d_dist = new PoissonDist(d_params[param_idx++],d_params[param_idx++]);
-          break;
-        case 3:
-          d_dist = new PoissonDist(d_params[param_idx++],d_params[param_idx++],d_params[param_idx++]);
-          break;
-        default:
-          std::stringstream ss;
-          ss << "Invalid number of parameters (";
-          ss << d_params.size();
-          ss << ") for the distribution";
-          throw std::invalid_argument(ss.str());
-        }
-      }
-      else if(d_distname=="uniform") {
-        if(d_params.size()!=2)
-          throw std::invalid_argument("Invalid number of parameters for the distribution");
-        d_dist = new UniformIntDist(d_params[0],d_params[1]);
-        param_idx+=2;
-      }
-      else if(d_distname=="constant") {
-        if (d_params.size()!=1)
-          throw std::invalid_argument("Invalid number of parameters for the distribution");
-        d_dist = new ConstantValue(d_params[0]);
-        param_idx++;
-      }
-      else {
-        std::string errmsg = "I do not recognise the distribution \"" + d_distname + "\n";
-        throw std::invalid_argument(errmsg);
-      }
+      d_dist = new DynRandom(time_dist);
 
       d_cur_freq_offset = d_freq_dist(d_rng);
 
@@ -119,7 +82,6 @@ namespace gr {
      */
     random_burst_shaper_cc_impl::~random_burst_shaper_cc_impl()
     {
-      // std::cout << "Going to auto destruct" << std::endl;
       if(d_dist!=NULL)
         delete d_dist;
       d_dist = NULL;
@@ -209,8 +171,10 @@ namespace gr {
 
         case(STATE_PREPAD):
           write_padding(&xout[nwritten], nwritten, nspace);
-          if(d_index == d_limit)
+          if(d_index == d_limit) {
             enter_copy();
+            d_burst_list.push_back(nitems_written(0)+nwritten);
+          }
           break;
 
         case(STATE_COPY):
@@ -253,7 +217,7 @@ namespace gr {
 
     void random_burst_shaper_cc_impl::update_npostpad()
     {
-      d_npostpad = d_dist->gen();
+      d_npostpad = d_dist->generate();
     }
 
     void random_burst_shaper_cc_impl::write_padding(gr_complex *dst, int &nwritten, int nspace)

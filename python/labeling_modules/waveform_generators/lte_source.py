@@ -2,7 +2,8 @@
 
 import numpy as np
 import os
-import pickle
+# import pickle
+import cPickle as pickle
 import time
 import sys
 import matplotlib.pyplot as plt
@@ -16,12 +17,11 @@ from gnuradio.filter import firdes
 
 # labeling_framework package
 import specmonitor
-from waveform_generator_utils import *
-from ..sig_format import sig_data_access as sda
-from ..labeling_tools import random_sequence
-from ..data_representation import timefreq_box as tfbox
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from specmonitor import labeling_framework as lf
+from specmonitor.labeling_framework.waveform_generators import waveform_generator_utils as wav_utils
+from specmonitor.labeling_framework import timefreq_box as tfbox
+from specmonitor.labeling_framework.labeling_tools import random_sequence
+logger = lf.DynamicLogger(__name__)
 
 prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
 fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
@@ -158,12 +158,10 @@ class GrLTETracesFlowgraph(gr.top_block):
                 raise NotImplementedError('I don\'t recognize this.')
         else:
             self.n_offset_samples = int(n_offset_samples)
-        if isinstance(pad_interval,tuple):
-            self.pad_interval = [int(p/self.resamp_ratio) for p in pad_interval[1]]
-            self.pad_dist = pad_interval[0]
-        else:
-            self.pad_interval = [int(pad_interval/self.resamp_ratio)]
-            self.pad_dist = 'constant'
+        randgen = lf.random_generator.load_param(pad_interval)
+        # scale by sampling rate
+        new_params = [int(v/self.resamp_ratio) for v in randgen.params]
+        randgen = lf.random_generator.load_generator(pad_interval)
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
@@ -173,7 +171,7 @@ class GrLTETracesFlowgraph(gr.top_block):
         # blocks
         self.file_reader = blocks.file_source(gr.sizeof_gr_complex,fname,True)
         self.tagger = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex,1,self.n_samples_per_frame,"packet_len")
-        self.burst_shaper = specmonitor.random_burst_shaper_cc(self.pad_dist, self.pad_interval, 0, self.frequency_offset,"packet_len")
+        self.burst_shaper = specmonitor.random_burst_shaper_cc(randgen.dynrandom(), 0, self.frequency_offset,"packet_len")
         # self.resampler = filter.rational_resampler_base_ccc(interp,decim,taps)
         self.resampler = filter.fractional_resampler_cc(0,1/self.resamp_ratio)
         self.skiphead = blocks.skiphead(gr.sizeof_gr_complex,
@@ -214,7 +212,7 @@ class GrLTETracesFlowgraph(gr.top_block):
 
 def run(args):
     d = args['parameters']
-    print_params(d,__name__)
+    # print_params(d,__name__)
 
     while True:
         # create general_mod block
@@ -227,7 +225,7 @@ def run(args):
         gen_data = np.array(tb.dst.data())
 
         try:
-            v = transform_IQ_to_sig_data(gen_data,args)
+            v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
 
             # merge boxes if broadcast channel is empty
             metadata = v.get_stage_derived_params('spectrogram_img')
@@ -245,7 +243,11 @@ def run(args):
 
     # save file
     v.save_pkl()
-    # fname = os.path.expanduser(args['targetfilename'])
-    # with open(fname, 'w') as f:
-    #     pickle.dump(v, f)
-    # logger.debug('Finished writing to file %s', fname)
+
+class LTEDLGenerator(lf.SignalGenerator):
+    @staticmethod
+    def run(args):
+        run(args)
+    @staticmethod
+    def name():
+        return 'lte_dl'

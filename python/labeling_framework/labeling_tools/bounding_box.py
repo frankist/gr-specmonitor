@@ -26,8 +26,8 @@ import sys
 import os
 
 from ..utils.basic_utils import *
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 class ImgBoundingBox(object):
     def __init__(self,rowmin,rowmax,colmin,colmax,img_size,label=None):
@@ -60,9 +60,18 @@ class ImgBoundingBox(object):
         if test == False:
             logger.error('The provided bounding box dimensions are not valid. \
             box upper left: {}, box lower right: {}, \
-            img size: {}'.format((self.rowmin,self.self.colmin),(self.rowmax,self.colmax),
-                                 self.img_shape))
+            img size: {}'.format((self.rowmin,self.colmin),(self.rowmax,self.colmax),
+                                 self.img_size))
             raise AssertionError()
+
+    def resized_box(self,new_dims):
+        newrowmin = int(round(self.rowmin*new_dims[0]/float(self.img_size[0])))
+        newrowmax = int(round(self.rowmax*new_dims[0]/float(self.img_size[0])))
+        newcolmin = int(round(self.colmin*new_dims[1]/float(self.img_size[1])))
+        newcolmax = int(round(self.colmax*new_dims[1]/float(self.img_size[1])))
+        o = ImgBoundingBox(newrowmin,newrowmax,newcolmin,newcolmax,new_dims)
+        o.params = dict(self.params)
+        return o
 
 # fftsize = 64 # I have to define this somewhere later
 
