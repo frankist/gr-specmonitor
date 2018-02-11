@@ -10,6 +10,18 @@ from darkflow.net.build import TFNet
 import voc_tools
 import darknet_scripts
 
+def current_train_step(backup_folder):
+    checkpoint_fname = os.path.join(backup_folder,'checkpoint')
+    if not os.path.isfile(checkpoint_fname):
+        return -1
+    with open(os.path.join(backup_folder,'checkpoint'), 'r') as f:
+        last = f.readlines()[-1].strip()
+        load_point = last.split(' ')[1]
+        load_point = load_point.split('"')[1]
+        load_point = load_point.split('-')[-1]
+        load_number = int(load_point)
+    return load_number
+
 def setup_darkflow_files(cfg_obj):
     """
     Setup the basic files for running darkflow. These include:
@@ -45,19 +57,83 @@ def darkflow_parse_config(cfg_obj):
         'train': False
     }
     cfg_train = cfg_obj.model_params()['train']
-    add_optional(yaml_options,cfg_train,'epoch')
-    if 'gpu' in cfg_train:
-        yaml_options['gpu'] = float(cfg_train['gpu'])
+
+    # parse darkflow args directly
+    for k,v in cfg_obj.cfg_params['darkflow'].items():
+        yaml_options[k] = v
+
     return yaml_options
 
-def train_darkflow_model(cfg_obj,load_ckpt):
-    options = darkflow_parse_config(cfg_obj)
-    options['train'] = True
-    if load_ckpt is not None:
-        options['load'] = int(load_ckpt)
+class DarkflowTrainer:
+    def __init__(self,yaml_cfg,args):
+        self.current_epoch = 0
+        # parse the YAML
+        self.yaml_cfg = yaml_cfg
+        self.base_options = darkflow_parse_config(self.yaml_cfg)
+        self.base_options['train'] = True
+        self.batch_size = self.base_options.get('batch',16)
 
-    tfnet = TFNet(options)
-    tfnet.train()
+        # get dataset info
+        from darkflow.utils.pascal_voc_clean_xml import pascal_voc_clean_xml
+        dumps = pascal_voc_clean_xml(self.base_options['annotation'], self.base_options['labels'], False)
+        #tfnet = TFNet(self.base_options)
+        #self.dataset_size = len(tfnet.framework.parse())
+        self.dataset_size = len(dumps)
+        self.steps_per_epoch = self.dataset_size/self.batch_size
+
+        # parse the args
+        if args.trainer is not None:
+            self.base_options['trainer'] = args.trainer
+        self.load_ckpt = args.load
+        current_step = 0
+        if self.load_ckpt is not None:
+            current_step = int(self.load_ckpt)
+            self.base_options['load'] = current_step
+            if current_step < 0:
+                current_step = current_train_step(self.base_options['backup'])
+        self.current_epoch = current_step/self.steps_per_epoch
+
+        # configure the trainer
+        self.cfg_train = yaml_cfg.model_params()['train']
+        self.total_epochs = self.cfg_train['total_epochs']
+        self.train_steps = self.cfg_train.get('epoch_steps',[0])
+        if 'lr' in self.base_options:
+            self.lr_steps = [float(self.base_options['lr'])]
+        else:
+            self.lr_steps = [float(i) for i in self.cfg_train.get('lr',[1.0e-5])]
+        assert len(self.lr_steps)==len(self.train_steps)
+        #self.momentum_steps = [float(i) for i in self.cfg_train.get('momentum',[0.0]*len(self.train_steps))]
+
+    def train_phase(self):
+        phase_idx = [i for i in range(len(self.train_steps)) if self.train_steps[i]<=self.current_epoch][-1]
+        lr = self.lr_steps[phase_idx]
+        upper_epoch = self.train_steps[phase_idx+1] if phase_idx<len(self.train_steps)-1 else self.total_epochs
+        number_of_epochs = upper_epoch - self.current_epoch
+
+        print("====== Start of a new training phase ======")
+        print("Learning Rate: {}".format(lr))
+        print("Number of epochs: {}".format(number_of_epochs))
+        #print("Momentum: {}".format(self.momentum_steps[phase_idx]))
+        print("===========================================")
+
+        # set args for new phase
+        options = dict(self.base_options)
+        if self.current_epoch>0:
+            options['load'] = -1
+        options['lr'] = lr
+        #options['momentum'] = self.momentum_steps[phase_idx]
+        options['epoch'] = number_of_epochs
+
+        # train
+        tfnet = TFNet(options)
+        tfnet.train()
+        self.current_epoch += number_of_epochs
+
+    def train(self):
+        print('These are the learning rates that I am gonna use.',self.lr_steps)
+        print('We are at the epoch {} of a total of {}'.format(self.current_epoch,self.total_epochs))
+        while self.current_epoch < self.total_epochs:
+            self.train_phase()
 
 def predict_darkflow_model(cfg_obj,args):
     options = darkflow_parse_config(cfg_obj)
@@ -95,7 +171,8 @@ if __name__=='__main__':
                         default=None)
     parser.add_argument('--threshold', 
                         help='detection threshold', 
-                        default=None)
+                        default=0.6)
+    parser.add_argument('--trainer',help='trainer time (e.g. adam)', default=None)
     # parser.add_argument('--verbose', 
     #                     help='detection threshold', 
     #                     default=False)
@@ -115,7 +192,8 @@ if __name__=='__main__':
     # from darkflow.net.build import TFNet
 
     if args.mode=='train':
-        train_darkflow_model(cfg_obj,args.load)
+        trainer = DarkflowTrainer(cfg_obj,args)
+        trainer.train()
     elif args.mode=='predict':
         predict_darkflow_model(cfg_obj,args)
     elif args.mode=='savepb':
