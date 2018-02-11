@@ -1,3 +1,4 @@
+
 import shutil
 import os
 import yaml
@@ -66,7 +67,7 @@ def save_ckpt_model():
     most_recent_ckpt = []
     max_n = -1
     for f in os.listdir(ckpt_folder):
-        if not f.find('yolo_{}-'.format(model_name)): # could be checkpoint
+        if not f.find('yolo_{}-'.format(model_name))>=0: # could be checkpoint
             continue
         dot_pos = f[number_pos::].find('.')
         n = int(f[number_pos:(number_pos+dot_pos)])
@@ -75,7 +76,7 @@ def save_ckpt_model():
             most_recent_ckpt = [f]
         elif n==max_n:
             most_recent_ckpt.append(f)
-    print('Most recent ckpt number is {}. Going to save it'.format(n))
+    print('Most recent ckpt number is {}. Going to save it'.format(max_n))
     assert(len(most_recent_ckpt)==4)
 
     # compress files into a zip
