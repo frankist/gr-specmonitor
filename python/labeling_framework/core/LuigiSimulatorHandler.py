@@ -155,6 +155,21 @@ class StageLuigiTask(luigi.Task):
     stage_idxs = luigi.ListParameter()
     output_fmt = luigi.Parameter(significant=False,default='.pkl')
 
+    @property
+    def priority(self):
+        # sessiondata = self.load_sessiondata()
+        # path2root = sessiondata.stage_dependency_tree.path_to_root(self.my_task_name())
+        # tag = self.stage_idxs[0]
+        # tag_idx = sessiondata.stage_params.tag_names.index(tag)
+        # stage_len_list = sessiondata.slice_stage_lengths(stages=path2root,tags=tag)
+        # logger.info('I am {} with stage_idxs {}/{} of a total of {}'.format(self.my_task_name(),tag_idx,self.stage_idxs[1::],stage_len_list))
+        # l = [tag_idx]+self.stage_idxs[1::]
+        # prior = sum([(1000.0/(i+1))*(stage_len_list[i]-v) for i,v in enumerate(l)])
+
+        prior = sum([1000.0/(i+1)/(float(v)+1) for i,v in enumerate(self.stage_idxs[1::])])
+        logger.info('I am {} with stage_idxs {} and my priority is {}'.format(self.my_task_name(),self.stage_idxs,prior))
+        return prior
+
     def load_sessiondata(self):
         return sp.load_session(self.session_args)
 

@@ -14,7 +14,7 @@ class Tx(lf.preRFTask):
 class RF(lf.StageLuigiTask):
     @staticmethod
     def depends_on():
-        return Tx
+        return 'Tx'
 
     def requires(self):
         return [RF_scripts.RemoteSetup(self.session_args),Tx(self.session_args,self.stage_idxs[0:-1])]
