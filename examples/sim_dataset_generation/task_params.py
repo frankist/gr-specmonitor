@@ -27,7 +27,7 @@ for i,e in enumerate(Tx_params_wifi):
         Tx_params_wifi[i] = ('frequency_offset',0)
 
 Rx_params = [
-    ('n_fft_averages',50),
+    ('n_fft_averages',100),
     ('img_row_offset',[0]),
     ('img_n_rows',104),
 ]

@@ -19,7 +19,6 @@
 # Boston, MA 02110-1301, USA.
 #
 
-# import pickle
 import cPickle as pickle
 import numpy as np
 import os

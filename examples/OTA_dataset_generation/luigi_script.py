@@ -33,9 +33,6 @@ class TxImg(lf.ImgSpectrogramBoundingBoxTask):
     def depends_on():
         return Tx
 
-    def requires(self):
-        return Tx(self.session_args,self.stage_idxs[0:-1])
-
 class RFImg(lf.ImgSpectrogramBoundingBoxTask):
     @staticmethod
     def depends_on():
@@ -54,7 +51,7 @@ class Rx(lf.PartitionSignalTask):
 class RFVOCFormat(lf.VOCFormatTask):
     @staticmethod
     def depends_on():
-        return Rx
+        return 'Rx'
 
 class waveformClean(lf.RemoveIQSamples):
     @staticmethod
@@ -63,19 +60,19 @@ class waveformClean(lf.RemoveIQSamples):
 class TxClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
-        return Tx
+        return 'Tx'
 class RFClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
-        return RF
+        return 'RF'
 class RxClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
-        return Rx
+        return 'Rx'
 class RFVOCFormatClean(lf.RemoveIQSamples):
     @staticmethod
     def depends_on():
-        return RFVOCFormat
+        return 'RFVOCFormat'
 
 class OTACmdSession(lf.CmdSession):
     pass
