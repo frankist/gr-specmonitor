@@ -111,33 +111,9 @@ class RemoveIQSamples(StageLuigiTask):
 
     def run(self):
         this_run_params = self.get_run_parameters()
-        logger.info('Going to clean IQ samples of {}'.format(this_run_params['sourcefilename']))
+        # logger.info('Going to clean IQ samples of {}'.format(this_run_params['sourcefilename']))
         clean_IQ(this_run_params)
         self.completed = True
-
-# def IQcleaner_task_factory(classname,stage2clean):
-#     new_class = type(classname, # name of the new class
-#                      (RemoveIQSamples,), # base class
-#                      {"stage2clean": lambda self: stage2clean})
-#     return new_class
-
-# def register_IQcleaner_task_handler(stage2clean):
-#     class_name = '{}CleanIQ'.format(stage2clean)
-#     task = IQcleaner_task_factory(class_name,stage2clean)
-#     session_settings.register_task_handler(class_name,task)
-
-# # def ClassFactory(name, argnames, BaseClass=BaseClass):
-# #     def __init__(self, **kwargs):
-# #         for key, value in kwargs.items():
-# #             # here, the argnames variable is the one passed to the
-# #             # ClassFactory call
-# #             if key not in argnames:
-# #                 raise TypeError("Argument %s not valid for %s" 
-# #                     % (key, self.__class__.__name__))
-# #             setattr(self, key, value)
-# #         BaseClass.__init__(self, name[:-len("Class")])
-# #     newclass = type(name, (BaseClass,),{"__init__": __init__})
-# #     return newclass
 
 def clean_IQ(args):
     # targetfilename = args['targetfilename']

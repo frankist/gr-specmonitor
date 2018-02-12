@@ -3,6 +3,8 @@ import os
 import pickle
 import copy
 import numpy as np
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 class StageSignalData:
     def __init__(self,stage_arguments,derived_params,samples = None):
@@ -15,6 +17,8 @@ class StageSignalData:
         StageSignalData.assert_params_validity(self.args)
 
     def clear_samples(self):
+        if self.samples is not None:
+            logger.info('IQ samples of {} were erased'.format(self.targetfilename))
         self.samples = None
 
     # def is_framed(self):
