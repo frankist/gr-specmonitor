@@ -99,7 +99,7 @@ class CmdSession(luigi.WrapperTask):
         # NOTE: This was originally a DictParameter()
         # but it is a pain to define dicts in the command line
         # since luigi removes the ""
-        return {'session_path':self.session_path,'cfg_file':self.cfg_file}
+        return {'session_path':os.path.expanduser(self.session_path),'cfg_file':self.cfg_file}
 
     def requires(self):
         if self.first_run==True:
