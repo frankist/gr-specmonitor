@@ -4,12 +4,12 @@ import numpy as np
 from specmonitor.labeling_framework import random_generator
 
 num_sections = 1
-section_size = 550000
+section_size = 1550000
 toffset_range = [50]#[50,70,90]
 frequency_offset = [0]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
-n_repeats = 1
+n_repeats = 10
 
 tags = ['wifi','psk','lte','lte_ul']
 

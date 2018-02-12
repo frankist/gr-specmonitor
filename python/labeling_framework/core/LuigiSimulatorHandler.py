@@ -157,17 +157,22 @@ class StageLuigiTask(luigi.Task):
 
     @property
     def priority(self):
-        # sessiondata = self.load_sessiondata()
-        # path2root = sessiondata.stage_dependency_tree.path_to_root(self.my_task_name())
-        # tag = self.stage_idxs[0]
-        # tag_idx = sessiondata.stage_params.tag_names.index(tag)
-        # stage_len_list = sessiondata.slice_stage_lengths(stages=path2root,tags=tag)
-        # logger.info('I am {} with stage_idxs {}/{} of a total of {}'.format(self.my_task_name(),tag_idx,self.stage_idxs[1::],stage_len_list))
-        # l = [tag_idx]+self.stage_idxs[1::]
-        # prior = sum([(1000.0/(i+1))*(stage_len_list[i]-v) for i,v in enumerate(l)])
+        sessiondata = self.load_sessiondata()
+        path2root = sessiondata.stage_dependency_tree.path_to_root(self.my_task_name())
+        tag = self.stage_idxs[0]
+        tag_idx = sessiondata.stage_params.tag_names.index(tag)
+        stage_len_list = sessiondata.stage_params.slice_stage_lengths(stages=path2root,tags=tag)
 
-        prior = sum([1000.0/(i+1)/(float(v)+1) for i,v in enumerate(self.stage_idxs[1::])])
-        logger.info('I am {} with stage_idxs {} and my priority is {}'.format(self.my_task_name(),self.stage_idxs,prior))
+        # lengths [tag_idx : waveform : ...]
+        len_list = stage_len_list.tolist()[0] + [len(sessiondata.stage_params.tag_names)]
+        len_list = len_list[-1::-1] # reverse the order
+        idx_list = [tag_idx]+list(self.stage_idxs[1::])
+        diff_list = [len_list[i]-idx_list[i] for i in range(len(len_list))]
+        assert len([e for e in diff_list if e>=0])==len(diff_list) # all non negative
+        # prior = sum([sum(len_list[i+1::])*e for i,e in enumerate(diff_list)])
+        prior = sum([(1000000.0/(i+1))*e for i,e in enumerate(diff_list)])
+        # FIXME: the way you compute the priority should be depedent on the "total" idx of the task
+        # logger.info('I am {} with stage_idxs {} and my priority is {}'.format(self.my_task_name(),self.stage_idxs,prior))
         return prior
 
     def load_sessiondata(self):
