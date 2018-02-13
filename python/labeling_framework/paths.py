@@ -12,7 +12,7 @@ def stage_dir(stage_name):
     return os.path.join(session_dir(),stage_name)
 
 def tmp_dir():
-    retrun os.path.join(session_dir(),'tmp')
+    return os.path.join(session_dir(),'tmp')
 
 def session_pkl():
     return os.path.join(session_dir(),'param_cfg2.pkl')

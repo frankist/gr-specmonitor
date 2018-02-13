@@ -93,6 +93,24 @@ namespace gr {
       }
     };
 
+    // Uniform Float Random
+    class UniformRealDist : public DistInterface {
+      boost::random::mt19937 d_rng;
+      boost::random::uniform_real_distribution<float> d_dist;
+    public:
+      UniformRealDist(float l, float r) :
+        d_rng(micro_local_time()), // NOTE: This gives more precision
+        d_dist(l,r) {
+      }
+      virtual float generate() {
+        return d_dist(d_rng);
+      }
+      static DistInterface* pymake(const std::vector<float>& params) {
+        call_exception_args(params.size(),2);
+        return new UniformRealDist(params[0],params[1]);
+      }
+    };
+
     class RegisteredDists {
     private:
       std::map<std::string,factory_type> dist_map;
@@ -129,6 +147,7 @@ namespace gr {
       // register known distributions
       register_dist("randint",&RandIntDist::pymake);
       register_dist("constant",&ConstantDist::pymake);
+      register_dist("uniform",&UniformRealDist::pymake);
     }
   }
 }

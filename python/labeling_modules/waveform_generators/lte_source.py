@@ -6,7 +6,7 @@ import os
 import cPickle as pickle
 import time
 import sys
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import scipy
 import copy
 
@@ -97,25 +97,34 @@ def merge_boxes_within_same_lte_frame(x,tfreq_boxes_x,fft_size):
         if len(frame_boxes)==0:
             continue
         maxpwr = np.max([b.params['power'] for b in frame_boxes])
-        mintstamp = np.min([b.time_bounds[0] for b in frame_boxes])
-        maxtstamp = np.max([b.time_bounds[1] for b in frame_boxes])
+        mintstamp = int(max(np.min([b.time_bounds[0] for b in frame_boxes]),0))
+        maxtstamp = int(min(np.max([b.time_bounds[1] for b in frame_boxes]),len(x)))
         minfreq = np.min([b.freq_bounds[0] for b in frame_boxes])
         maxfreq = np.max([b.freq_bounds[1] for b in frame_boxes])
         # caches the measured BW. If we capture a box that does not fit this BW
         # (CC may have smaller BW), we correct it
-        if np.abs(maxfreq+minfreq)>0.01:#1e-5: # I do not expect CFO here
-            raise AssertionError('I do not expect CFO here. However, I got ({},{})'.format(minfreq,maxfreq))
+
+        # if np.abs(maxfreq+minfreq)>0.01:#1e-5: # I do not expect CFO here
+        #     raise AssertionError('I do not expect CFO here. However, I got ({},{})'.format(minfreq,maxfreq))
+
         if fft_size not in bw_cached or (maxfreq-minfreq)>(bw_cached[fft_size][1]-bw_cached[fft_size][0]):
             bw_cached[fft_size] = (minfreq,maxfreq)
         minfreq,maxfreq = bw_cached[fft_size]
         if tframe!=begin_truncate:
-            maxtstamp = max(maxtstamp,tframe[1])
+            maxtstamp = int(min(max(maxtstamp,tframe[1]),len(x)))
         if tframe!=end_truncate:
-            mintstamp = min(mintstamp,tframe[0])
+            mintstamp = int(max(min(mintstamp,tframe[0]),0))
+
+        # create Box that represents a whole LTE frame
         new_box = tfbox.TimeFreqBox((mintstamp,maxtstamp),(minfreq,maxfreq),'lte')
         new_box.params['power'] = maxpwr
         new_tfreq_boxes.append(new_box)
         tfreq_boxes = [b for b in tfreq_boxes if b.time_intersection(tframe)==None]
+
+    # sort based on time
+    sortidxs = np.argsort([b.time_bounds[0] for b in new_tfreq_boxes])
+    new_tfreq_boxes = [new_tfreq_boxes[i] for i in sortidxs]
+
     return new_tfreq_boxes
 
 class GrLTETracesFlowgraph(gr.top_block):
@@ -151,17 +160,11 @@ class GrLTETracesFlowgraph(gr.top_block):
         self.expected_bw = GrLTETracesFlowgraph.fftsize_mapping[self.fft_size]
         self.resamp_ratio = 20.0e6/self.samp_rate
         self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
-        if isinstance(n_offset_samples,tuple):
-            if n_offset_samples[0]=='uniform':
-                self.n_offset_samples = np.random.randint(*n_offset_samples[1])
-            else:
-                raise NotImplementedError('I don\'t recognize this.')
-        else:
-            self.n_offset_samples = int(n_offset_samples)
-        randgen = lf.random_generator.load_param(pad_interval)
-        # scale by sampling rate
-        new_params = [int(v/self.resamp_ratio) for v in randgen.params]
+        self.n_offset_samples = int(lf.random_generator.load_value(n_offset_samples))
         randgen = lf.random_generator.load_generator(pad_interval)
+        # scale by sampling rate
+        new_params = tuple([int(v/self.resamp_ratio) for v in randgen.params])
+        randgen.params = new_params
         if isinstance(frequency_offset,tuple):
             assert frequency_offset[0]=='uniform'
             self.frequency_offset = frequency_offset[1]
@@ -214,40 +217,52 @@ def run(args):
     d = args['parameters']
     # print_params(d,__name__)
 
-    while True:
-        # create general_mod block
-        tb = GrLTETracesFlowgraph.load_flowgraph(d)
+    # create general_mod block
+    tb = GrLTETracesFlowgraph.load_flowgraph(d)
 
-        logger.info('Starting GR waveform generator script for LTE')
-        tb.run()
-        logger.info('GR script finished')
+    logger.info('Starting GR waveform generator script for LTE')
+    tb.run()
+    logger.info('GR script finished')
 
-        gen_data = np.array(tb.dst.data())
+    # output signal
+    x = np.array(tb.dst.data())
 
-        try:
-            v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
+    # create a StageSignalData structure
+    stage_data = wav_utils.set_derived_sigdata(x,args,True)
+    metadata = stage_data.derived_params['spectrogram_img']
+    tfreq_boxes = metadata.tfreq_boxes
+    tfbox.set_boxes_mag2(x,tfreq_boxes)
 
-            # merge boxes if broadcast channel is empty
-            metadata = v.get_stage_derived_params('spectrogram_img')
-            # metadata = sda.get_stage_derived_parameter(v, 'spectrogram_img_metadata', args['stage_name'])
-            tfreq_boxes = copy.deepcopy(metadata.tfreq_boxes)
-            new_tfreq_boxes = merge_boxes_within_same_lte_frame(gen_data,
-                tfreq_boxes,tb.fft_size)
-            metadata.tfreq_boxes = new_tfreq_boxes
-            # NOTE: being a Ptr, it should be stored in the multi_stage_data
-            # sda.set_stage_derived_parameter(v, args['stage_name'], 'spectrogram_img_metadata', metadata)
-        except RuntimeError, e:
-            logger.warning('Going to re-run radio')
-            continue
-        break
+    # merge boxes even if broadcast channel is empty
+    tfreq_boxes = merge_boxes_within_same_lte_frame(x,tfreq_boxes,tb.fft_size)
 
-    # save file
+    # randomly scale and normalize boxes magnitude
+    frame_mag2_gen = lf.random_generator.load_generator(args['parameters'].get('frame_mag2',1))
+    tfreq_boxes = wav_utils.random_scale_mag2(tfreq_boxes,frame_mag2_gen)
+    tfreq_boxes = wav_utils.normalize_mag2(tfreq_boxes)
+    y = wav_utils.set_signal_mag2(x,tfreq_boxes)
+    metadata.tfreq_boxes = tfreq_boxes
+    stage_data.samples = y
+
+    # create a MultiStageSignalData structure and save it
+    v = lf.MultiStageSignalData()
+    v.set_stage_data(stage_data)
     v.save_pkl()
 
 class LTEDLGenerator(lf.SignalGenerator):
     @staticmethod
     def run(args):
-        run(args)
+        while True:
+            try:
+                run(args)
+            except RuntimeError, e:
+                logger.warning('Failed to generate the waveform data for WiFi. Going to rerun. Arguments: {}'.format(args))
+                continue
+            except KeyError, e:
+                logger.error('The input arguments do not seem valid. They were {}'.format(args))
+                raise
+            break
+
     @staticmethod
     def name():
         return 'lte_dl'

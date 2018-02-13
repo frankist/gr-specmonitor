@@ -4,14 +4,20 @@ from specmonitor import DynRandom
 import numpy as np
 
 class random_generator(object):
-    table_map = {'uniform':'randint','randint':'randint','constant':'constant'}
+    table_map = {'randint':'randint',
+                 'uniformint':'randint',
+                 'constant':'constant',
+                 'uniform':'uniform'}
     def __init__(self,dist_name,params):
         self.dist_name = random_generator.table_map[dist_name]
         self.params = params
 
-    def generate(self):
+    def generate(self,number=1):
         gen = self.dynrandom()
-        return gen.generate()
+        if number==1:
+            return gen.generate()
+        else:
+            return [gen.generate() for i in range(number)]
 
     def dynrandom(self):
         return DynRandom(self.dist_name,self.params)

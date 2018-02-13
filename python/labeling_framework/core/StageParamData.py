@@ -29,9 +29,9 @@ from ..utils.basic_utils import *
 # This object stores the label and possible values of a parameter
 class LabeledParamValues:
     def __init__(self,label,value):
-        if type(label) is not str:
+        if not isinstance(label,basestring):
             raise ValueError('ERROR: expected a string as parameter name. Got {}'.format(label))
-        self.__val__ = (label,ts.convert2list(value))
+        self.__val__ = (str(label),ts.convert2list(value))
     def label(self):
         return self.__val__[0]
     def values(self):
@@ -48,7 +48,12 @@ class LabeledParamValues:
 # this is a list of (param,possible_values) pairs stored as "LabeledParamValues"
 class StageParams:
     def __init__(self,param_list):
-        self.labeled_params = [LabeledParamValues(pair[0],pair[1]) for pair in param_list]
+        if isinstance(param_list,list):
+            self.labeled_params = [LabeledParamValues(pair[0],pair[1]) for pair in param_list]
+        elif isinstance(param_list,dict):
+            self.labeled_params = [LabeledParamValues(k,v) for k,v in param_list.items()]
+        else:
+            raise TypeError('The session stage parameters must be in dictionary or list of tuples format')
         self.__product_size__ = 1
         if len(self.labeled_params)!=0:
             self.__product_size__ = np.cumprod([v.length() for v in self.labeled_params])[-1]

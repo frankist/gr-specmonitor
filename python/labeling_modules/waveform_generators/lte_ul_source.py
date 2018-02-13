@@ -104,46 +104,55 @@ def run(args):
     d = args['parameters']
     # print_params(d,__name__)
 
-    while True:
-        # create general_mod block
-        tb = GrLTEULTracesFlowgraph.load_flowgraph(d)
+    # create general_mod block
+    tb = GrLTEULTracesFlowgraph.load_flowgraph(d)
 
-        logger.info('Starting GR waveform generator script for LTE')
-        tb.run()
-        logger.info('GR script finished')
+    logger.info('Starting GR waveform generator script for LTE')
+    tb.run()
+    logger.info('GR script finished')
 
-        gen_data = np.array(tb.dst.data())
+    # output signal
+    x = np.array(tb.dst.data())
 
-        try:
-            v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
+    # create a StageSignalData structure
+    stage_data = wav_utils.set_derived_sigdata(x,args,True)
+    metadata = stage_data.derived_params['spectrogram_img']
+    tfreq_boxes = metadata.tfreq_boxes
+    tfbox.set_boxes_mag2(x,tfreq_boxes)
 
-            # merge boxes if broadcast channel is empty
-            metadata = v.get_stage_derived_params('spectrogram_img')
-            tfreq_boxes = copy.deepcopy(metadata.tfreq_boxes)
-            frac_bw = tb.expected_bw/20.0e6
-            freq_tuple = (-frac_bw/2,frac_bw/2)
-            new_tfreq_boxes = []
-            for b in tfreq_boxes:
-                bnew = tfbox.TimeFreqBox(b.time_bounds,freq_tuple,'lte_ul')
-                new_tfreq_boxes.append(bnew)
-            tfreq_boxes,max_pwr = tfbox.normalize_boxes_pwr(new_tfreq_boxes,gen_data)
-            metadata.tfreq_boxes = tfreq_boxes
-            y=gen_data/np.sqrt(max_pwr)
-            this_stage_data = lf.StageSignalData(args,{'spectrogram_img':metadata},y)
-            v = lf.MultiStageSignalData()
-            v.set_stage_data(this_stage_data)
-        except RuntimeError, e:
-            logger.warning('Going to re-run radio')
-            continue
-        break
+    # set static/pre-defined bandwidth
+    frac_bw = tb.expected_bw/20.0e6
+    freq_tuple = (-frac_bw/2,frac_bw/2)
+    for b in tfreq_boxes:
+        tfreq_boxes[i].freq_bounds = freq_tuple
 
-    # save file
+    # randomly scale and normalize boxes magnitude
+    frame_mag2_gen = lf.random_generator.load_generator(args['parameters'].get('frame_mag2',1))
+    tfreq_boxes = wav_utils.random_scale_mag2(tfreq_boxes,frame_mag2_gen)
+    tfreq_boxes = wav_utils.normalize_mag2(tfreq_boxes)
+    y = wav_utils.set_signal_mag2(x,tfreq_boxes)
+    metadata.tfreq_boxes = tfreq_boxes
+    stage_data.samples = y
+
+    # create a MultiStageSignalData structure and save it
+    v = lf.MultiStageSignalData()
+    v.set_stage_data(stage_data)
     v.save_pkl()
 
 class LTEULGenerator(lf.SignalGenerator):
     @staticmethod
     def run(params):
-        run(params)
+        while True:
+            try:
+                run(params)
+            except RuntimeError, e:
+                logger.warning('Failed to generate the waveform data for WiFi. Going to rerun. Arguments: {}'.format(args))
+                continue
+            except KeyError, e:
+                logger.error('The input arguments do not seem valid. They were {}'.format(args))
+                raise
+            break
+
     @staticmethod
     def name():
         return 'lte_ul'
