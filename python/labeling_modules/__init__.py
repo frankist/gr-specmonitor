@@ -22,6 +22,7 @@
 # install waveform generators
 from waveform_generators.lte_ul_source import LTEULGenerator
 from waveform_generators.lte_source import LTEDLGenerator
+from waveform_generators.null_source import NullSourceGenerator
 
 # install other stuff
 
