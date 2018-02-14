@@ -14,7 +14,7 @@ def run(args):
     x = np.zeros(d['n_samples'])
 
     # create a StageSignalData structure
-    stage_data = wav_utils.set_derived_sigdata(x,args,True)
+    stage_data = wav_utils.set_derived_sigdata(x,args,False)
     metadata = stage_data.derived_params['spectrogram_img']
     tfreq_boxes = metadata.tfreq_boxes
     assert len(tfreq_boxes)==0

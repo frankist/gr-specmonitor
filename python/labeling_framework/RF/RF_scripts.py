@@ -167,7 +167,7 @@ class RemoteSetup(SessionLuigiTask):
 
             def find_script_path(script_name):  # TODO: make this better
                 import importlib
-                modu = importlib.import_module('labeling_framework.RF.'+script_name)
+                modu = importlib.import_module('specmonitor.labeling_framework.RF.'+script_name)
                 base = os.path.splitext(os.path.basename(
                     modu.__file__))[0]  # take the pyc out
                 absp = os.path.splitext(os.path.abspath(
