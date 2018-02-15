@@ -21,20 +21,16 @@
 
 import sys
 import os
-# import pickle
 import cPickle as pickle
 import json
 import numpy as np
 
-# from ..labeling_tools.bounding_box import *
 from ..labeling_tools import preamble_utils
-from ..sig_format import stage_signal_data as ssa
-from ..sig_format import pkl_sig_format
-# from ..sig_format import sig_data_access as filedata
+from ..core import SignalDataFormat as ssa
 from ..utils import ssh_utils
 from ..core import SessionParams
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 def get_recording_params(Nsettle,Nsuperframe,frame_period):
     n_skip_samples = max(Nsettle-frame_period,0)
@@ -96,7 +92,7 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
     i = 0
     nread = 0
     while True:
-        samples = pkl_sig_format.read_fc32_file(sourcefilename,i*block_size,block_size)
+        samples = read_fc32_file(sourcefilename,i*block_size,block_size)
         if len(samples)==0:
             break
         pdetec.work(samples)
@@ -114,7 +110,7 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
 
     tstart = selected_peaks[0].tidx-fparams.awgn_len
     assert tstart>=0
-    y = pkl_sig_format.read_fc32_file(sourcefilename,tstart,Nsuperframe)
+    y = read_fc32_file(sourcefilename,tstart,Nsuperframe)
     if len(y)!=Nsuperframe:
         err_msg = 'I was expecting {} samples. Got {} instead.'.format(Nsuperframe,len(y))
         logger.exception(err_msg)
@@ -181,3 +177,11 @@ def setup_remote_rx(sessiondata,hostnames,params_to_send):
     os.remove(tmp_params_file)
 
     return (remote_cmd,params_to_send['outputfile'],clear_cmd)
+
+def read_fc32_file(fname,sample_offset=0,num_samples=-1):
+    f = open(fname, "rb")
+    with f:
+        byte_idx = sample_offset*8
+        f.seek(byte_idx, os.SEEK_SET)
+        samples = np.fromfile(f, dtype=np.complex64, count=num_samples)
+    return samples

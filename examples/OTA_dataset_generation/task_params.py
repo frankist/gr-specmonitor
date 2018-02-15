@@ -4,12 +4,13 @@ import numpy as np
 from specmonitor.labeling_framework import random_generator
 
 num_sections = 1
-section_size = 550000 #500000#100000
+section_size = 1100000 #500000#100000
 toffset_range = [50]#[int(i) for i in np.linspace(50,10000,10)]
 frequency_offset = [0]#[('uniform',(-0.325,-0.125,0.125,0.325))] #[-0.5,0.5]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
-n_repeats = 1
+n_repeats = 10
+min_frame_interval = 20000
 
 tags = ['wifi','psk','lte','lte_ul']
 ssh_hosts = ['USRPRx']
@@ -35,7 +36,7 @@ RF_params = [
 ]
 
 Rx_params = [
-    ('n_fft_averages',50),
+    ('n_fft_averages',100),
     ('img_row_offset',[0]),
     ('img_n_rows',104),
 ]
@@ -62,7 +63,7 @@ stage_params = {
             ('sample_rate',20e6),
             ('encoding',[0]),
             ('pdu_length',[1500]),
-            ('pad_interval',[('uniform',(2000,200000))]),
+            ('pad_interval',[('uniform',(min_frame_interval,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('repeats',range(n_repeats))
         ],
@@ -86,7 +87,7 @@ stage_params = {
             ('excess_bw',0.25),
             ('pre_diff_code',False),
             ('burst_len', 20000),#[('poisson',3000,1000)]),
-            ('zero_pad_len',random_generator('randint',(2000,200000))),
+            ('zero_pad_len',random_generator('randint',(min_frame_interval,200000))),
             ('signal_representation',[spectrogram_representation]),
             ('frequency_offset',[('multipleTx',(-0.325,-0.125,0.125,0.325))]),
             ('repeats',range(n_repeats))
@@ -104,7 +105,7 @@ stage_params = {
             ('sample_rate',20e6),
             ('n_samples',wf_gen_samps),
             ('n_prbs',[50,100]),
-            ('pad_interval',random_generator('randint',(2000,200000))),
+            ('pad_interval',random_generator('randint',(min_frame_interval,400000))),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
             ('runs',range(max(int(n_repeats/2),1)))
@@ -121,7 +122,7 @@ stage_params = {
             ('waveform',['lte_ul']),
             ('sample_rate',20e6),
             ('n_samples',wf_gen_samps),
-            ('pad_interval',random_generator('randint',(2000,200000))),
+            ('pad_interval',random_generator('randint',(min_frame_interval,400000))),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
             ('runs',range(n_repeats))

@@ -31,16 +31,14 @@ from gnuradio import blocks
 from gnuradio import channels
 from gnuradio import uhd
 
-# from ..labeling_tools.bounding_box import *
 from ..labeling_tools import preamble_utils
-from ..sig_format import stage_signal_data as ssa
-# import filedata_handling as filedata
-from ..RF import RF_sync_utils
+from ..core import SignalDataFormat as ssa
+from . import RF_sync_utils
 from ..utils import ssh_utils
 from ..core import SessionParams
 from ..core.LuigiSimulatorHandler import SessionLuigiTask
-from ..utils import logging_utils
-logger = logging_utils.DynamicLogger(__name__)
+from ..utils.logging_utils import DynamicLogger
+logger = DynamicLogger(__name__)
 
 
 def setup_RF_Tx_on_repeat(framed_signal, params, fparams, sample_rate):
@@ -169,7 +167,7 @@ class RemoteSetup(SessionLuigiTask):
 
             def find_script_path(script_name):  # TODO: make this better
                 import importlib
-                modu = importlib.import_module('labeling_framework.RF.'+script_name)
+                modu = importlib.import_module('specmonitor.labeling_framework.RF.'+script_name)
                 base = os.path.splitext(os.path.basename(
                     modu.__file__))[0]  # take the pyc out
                 absp = os.path.splitext(os.path.abspath(

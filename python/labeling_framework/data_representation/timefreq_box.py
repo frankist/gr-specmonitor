@@ -171,6 +171,12 @@ def scale_time_range_to_image_rows(trange,nrows,section_size):
 
 ######## Helper functions to handle signals ###########
 
+def set_boxes_mag2(x,box_list):
+    for i in range(len(box_list)):
+        twindow = (box_list[i].time_bounds[0],box_list[i].time_bounds[1])
+        v = float(np.mean(np.abs(x[twindow[0]:twindow[1]])**2))
+        box_list[i].params['power'] = v
+
 def compute_boxes_pwr(x, box_list):
     # NOTE: I convert to float bc I want the json of the labels to look nice
     return [float(np.mean(np.abs(x[b.time_bounds[0]:b.time_bounds[1]])**2)) for b in box_list]

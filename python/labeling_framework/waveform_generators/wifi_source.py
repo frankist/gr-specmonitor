@@ -41,6 +41,9 @@ import specmonitor
 # labeling_framework package
 import waveform_generator_utils as wav_utils
 from waveform_launcher import SignalGenerator
+from ..labeling_tools.parametrization import random_generator
+from ..data_representation import timefreq_box
+from ..core import SignalDataFormat as sdf
 from ..utils.logging_utils import DynamicLogger
 logger = DynamicLogger(__name__)
 
@@ -165,16 +168,42 @@ def run(args):
     tb.run()
     logger.debug('GR script finished')
 
-    gen_data = np.array(tb.dst.data())
+    # output signal
+    x = np.array(tb.dst.data())
 
-    v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
+    # create a StageSignalData structure
+    stage_data = wav_utils.set_derived_sigdata(x,args,True)
+    metadata = stage_data.derived_params['spectrogram_img']
+    tfreq_boxes = metadata.tfreq_boxes
+    timefreq_box.set_boxes_mag2(x,tfreq_boxes)
 
+    # randomly scale and normalize boxes magnitude
+    frame_mag2_gen = random_generator.load_generator(args['parameters'].get('frame_mag2',1))
+    tfreq_boxes = wav_utils.random_scale_mag2(tfreq_boxes,frame_mag2_gen)
+    tfreq_boxes = wav_utils.normalize_mag2(tfreq_boxes)
+    y = wav_utils.set_signal_mag2(x,tfreq_boxes)
+    metadata.tfreq_boxes = tfreq_boxes
+    stage_data.samples = y
+
+    # create a MultiStageSignalData structure and save it
+    v = sdf.MultiStageSignalData()
+    v.set_stage_data(stage_data)
     v.save_pkl()
 
 class WifiGenerator(SignalGenerator):
     @staticmethod
     def run(args):
-        run(args)
+        while True:
+            try:
+                run(args)
+            except RuntimeError, e:
+                logger.warning('Failed to generate the waveform data for WiFi. Going to rerun. Arguments: {}'.format(args))
+                continue
+            except KeyError, e:
+                logger.error('The input arguments do not seem valid. They were {}'.format(args))
+                raise
+            break
+
     @staticmethod
     def name():
         return 'wifi'

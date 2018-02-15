@@ -41,6 +41,7 @@ GR_PYTHON_INSTALL(
 ########################################################################
 add_subdirectory(darkflow_tools)
 add_subdirectory(labeling_framework)
+add_subdirectory(labeling_modules)
 
 ########################################################################
 # Handle the unit tests

@@ -27,8 +27,41 @@ from ..core import SessionParams as sp
 from ..utils.logging_utils import DynamicLogger
 logger = DynamicLogger(__name__)
 
+# import os
+# import numpy as np
+# def get_folder_size(folder):
+#     total_size = os.path.getsize(folder)
+#     for item in os.listdir(folder):
+#         itempath = os.path.join(folder, item)
+#         if os.path.isfile(itempath):
+#             total_size += os.path.getsize(itempath)
+#         elif os.path.isdir(itempath):
+#             total_size += get_folder_size(itempath)
+#     return total_size
+
 class RemoveIQSamples(StageLuigiTask):
     completed = luigi.BoolParameter(significant=False,default=False)
+    # @property
+    # def priority(self):
+    #     req = super(RemoveIQSamples,self).requires()
+    #     logger.info('My requirement is {}. Is it complete? {}'.format(req,req.complete()))
+    #     if req.complete():
+    #         return 1000
+    #     return 0
+    #     # session_path = os.path.abspath(sp.SessionPaths.session_folder(self.session_args))
+    #     # stage_dirs = [f for f in os.listdir(session_path) if os.path.isdir(os.path.join(session_path,f)) and f!='tmp']
+    #     # logger.info('These are the stage dirs:{}'.format(stage_dirs))
+    #     # if len(stage_dirs)==0:
+    #     #     return 0
+    #     # # logger.info('These are the folders: {}'.format(stage_dirs))
+    #     # folder_sizes = [get_folder_size(os.path.join(session_path,d)) for d in stage_dirs]
+    #     # logger.info('These are the folder sizes: {}'.format(folder_sizes))
+    #     # max_idx = np.argmax(folder_sizes)
+    #     # logger.info('I am {}'.format(self.depends_on()))
+    #     # if self.depends_on()==stage_dirs[max_idx]:
+    #     #     logger.info('I am {} cleaner and this is the folder with max size of {}.'.format(self.depends_on(),folder_sizes[max_idx]))
+    #     #     return 1000
+    #     # return 0
 
     @staticmethod
     def mkdir_flag():
@@ -37,7 +70,7 @@ class RemoveIQSamples(StageLuigiTask):
     def stage2clean(self):
         if isinstance(self.depends_on(),basestring):
             return self.depends_on()
-        self.depends_on().my_task_name()
+        return self.depends_on().my_task_name()
 
     def requires(self):
         ret = super(RemoveIQSamples,self).requires()
@@ -78,32 +111,9 @@ class RemoveIQSamples(StageLuigiTask):
 
     def run(self):
         this_run_params = self.get_run_parameters()
+        # logger.info('Going to clean IQ samples of {}'.format(this_run_params['sourcefilename']))
         clean_IQ(this_run_params)
         self.completed = True
-
-# def IQcleaner_task_factory(classname,stage2clean):
-#     new_class = type(classname, # name of the new class
-#                      (RemoveIQSamples,), # base class
-#                      {"stage2clean": lambda self: stage2clean})
-#     return new_class
-
-# def register_IQcleaner_task_handler(stage2clean):
-#     class_name = '{}CleanIQ'.format(stage2clean)
-#     task = IQcleaner_task_factory(class_name,stage2clean)
-#     session_settings.register_task_handler(class_name,task)
-
-# # def ClassFactory(name, argnames, BaseClass=BaseClass):
-# #     def __init__(self, **kwargs):
-# #         for key, value in kwargs.items():
-# #             # here, the argnames variable is the one passed to the
-# #             # ClassFactory call
-# #             if key not in argnames:
-# #                 raise TypeError("Argument %s not valid for %s" 
-# #                     % (key, self.__class__.__name__))
-# #             setattr(self, key, value)
-# #         BaseClass.__init__(self, name[:-len("Class")])
-# #     newclass = type(name, (BaseClass,),{"__init__": __init__})
-# #     return newclass
 
 def clean_IQ(args):
     # targetfilename = args['targetfilename']

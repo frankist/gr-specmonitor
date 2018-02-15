@@ -37,6 +37,8 @@ import specmonitor
 import waveform_generator_utils as wav_utils
 from ..labeling_tools.parametrization import random_generator
 from waveform_launcher import SignalGenerator
+from ..data_representation import timefreq_box as tfbox
+from ..core import SignalDataFormat as sdf
 from ..utils.logging_utils import DynamicLogger
 logger = DynamicLogger(__name__)
 
@@ -169,30 +171,52 @@ def run(args):
 
     waveform_data_list = []
     for tb in tb_list:
-        while True:
-            logger.info('Starting GR waveform generator script for PSK')
-            tb.run()
-            logger.info('GR script finished')
+        logger.info('Starting GR waveform generator script for PSK')
+        tb.run()
+        logger.info('GR script finished')
 
-            gen_data = np.array(tb.dst.data())
+        # output signal
+        x = np.array(tb.dst.data())
 
-            try:
-                v = wav_utils.transform_IQ_to_sig_data(gen_data,args)
-            except RuntimeError, e:
-                logger.warning('Going to re-run radio')
-                continue
-            waveform_data_list.append(v)
-            break
+        # create a StageSignalData structure
+        stage_data = wav_utils.set_derived_sigdata(x,args,True)
+        metadata = stage_data.derived_params['spectrogram_img']
+        tfreq_boxes = metadata.tfreq_boxes
+        tfbox.set_boxes_mag2(x,tfreq_boxes)
+
+        # randomly scale and normalize boxes magnitude
+        frame_mag2_gen = random_generator.load_generator(args['parameters'].get('frame_mag2',1))
+        tfreq_boxes = wav_utils.random_scale_mag2(tfreq_boxes,frame_mag2_gen)
+        tfreq_boxes = wav_utils.normalize_mag2(tfreq_boxes)
+        y = wav_utils.set_signal_mag2(x,tfreq_boxes)
+        metadata.tfreq_boxes = tfreq_boxes
+        stage_data.samples = y
+
+        # create a MultiStageSignalData structure and save it
+        v = sdf.MultiStageSignalData()
+        v.set_stage_data(stage_data)
+
+        # append to other independent waveforms
+        waveform_data_list.append(v)
+
+    # create a union of the waveforms
     v = wav_utils.aggregate_independent_waveforms(waveform_data_list)
-
-    # aggregate everything
     v.save_pkl()
-    # logger.debug('Finished writing to file %s', fname)
 
 class GenericModGenerator(SignalGenerator):
     @staticmethod
     def run(args):
-        run(args)
+        while True:
+            try:
+                run(args)
+            except RuntimeError, e:
+                logger.warning('Failed to generate the waveform data for WiFi. Going to rerun. Arguments: {}'.format(args))
+                continue
+            except KeyError, e:
+                logger.error('The input arguments do not seem valid. They were {}'.format(args))
+                raise
+            break
+
     @staticmethod
     def name():
         return 'generic_mod'

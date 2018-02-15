@@ -26,6 +26,7 @@ import logging
 
 # my package
 from .. import session_settings
+# from .. import paths
 from . import SessionParams as sp
 from ..utils.basic_utils import *
 from ..utils import luigi_utils
@@ -98,7 +99,7 @@ class CmdSession(luigi.WrapperTask):
         # NOTE: This was originally a DictParameter()
         # but it is a pain to define dicts in the command line
         # since luigi removes the ""
-        return {'session_path':self.session_path,'cfg_file':self.cfg_file}
+        return {'session_path':os.path.expanduser(self.session_path),'cfg_file':self.cfg_file}
 
     def requires(self):
         if self.first_run==True:
@@ -107,6 +108,7 @@ class CmdSession(luigi.WrapperTask):
             luigilogger.addFilter(DisableLuigiInfoSpam())
             if self.clean_first=='True':
                 sp.session_clean(self.session_args())
+            session_settings.set_session_args(**self.session_args())
             # run the session config setup as a sub-pipeline
             prerequisite = SessionInit(self.session_args())
             luigi.build([prerequisite], local_scheduler=True)
@@ -154,6 +156,27 @@ class StageLuigiTask(luigi.Task):
     session_args = luigi.DictParameter()
     stage_idxs = luigi.ListParameter()
     output_fmt = luigi.Parameter(significant=False,default='.pkl')
+
+    @property
+    def priority(self):
+        sessiondata = self.load_sessiondata()
+        path2root = sessiondata.stage_dependency_tree.path_to_root(self.my_task_name())
+        tag = self.stage_idxs[0]
+        tag_idx = sessiondata.stage_params.tag_names.index(tag)
+        stage_len_list = sessiondata.stage_params.slice_stage_lengths(stages=path2root,tags=tag)
+
+        # lengths [tag_idx : waveform : ...]
+        len_list = stage_len_list.tolist()[0] + [len(sessiondata.stage_params.tag_names)]
+        len_list = len_list[-1::-1] # reverse the order
+        idx_list = [tag_idx]+list(self.stage_idxs[1::])
+        diff_list = [len_list[i]-idx_list[i] for i in range(len(len_list))]
+        assert len([e for e in diff_list if e>=0])==len(diff_list) # all non negative
+        # prior = sum([sum(len_list[i+1::])*e for i,e in enumerate(diff_list)])
+        # prior = sum([(1000000.0/(i+1))*e for i,e in enumerate(diff_list)])
+        prior = sum([(10**16/1000**(i))*e for i,e in enumerate(diff_list)])
+        # FIXME: the way you compute the priority should be depedent on the "total" idx of the task
+        # logger.info('I am {} with stage_idxs {} and my priority is {}'.format(self.my_task_name(),self.stage_idxs,prior))
+        return prior
 
     def load_sessiondata(self):
         return sp.load_session(self.session_args)
