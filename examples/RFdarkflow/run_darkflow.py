@@ -81,16 +81,27 @@ class DarkflowTrainer:
         self.dataset_size = len(dumps)
         self.steps_per_epoch = self.dataset_size/self.batch_size
 
-        # parse the args
-        if args.trainer is not None:
-            self.base_options['trainer'] = args.trainer
+        # parse the ckpt
         self.load_ckpt = args.load
         current_step = 0
         if self.load_ckpt is not None:
-            current_step = int(self.load_ckpt)
-            self.base_options['load'] = current_step
-            if current_step < 0:
-                current_step = current_train_step(self.base_options['backup'])
+            self.base_options['load'] = args.load
+            if self.load_ckpt == 'best':
+                # load the best result so far.
+                from darkflow.net.flow import BestModelStats
+                backup_path = yaml_cfg.backup_path()
+                model_name = os.path.basename(os.path.splitext(self.base_options['model'])[0]) + '-best_stats.yaml'
+                yaml_fname = os.path.join(backup_path, model_name)
+                model_stats = BestModelStats.load(yaml_fname)
+                current_step = model_stats.point_min[0]
+                if current_step<0:
+                    AssertionError('There is no best model yet stored.')
+            else:
+                # loads a specified number or last (-1)
+                self.base_options['load'] = int(self.base_options['load'])
+                current_step = int(self.load_ckpt)
+                if current_step < 0:
+                    current_step = current_train_step(self.base_options['backup'])
         self.current_epoch = current_step/self.steps_per_epoch
 
         # configure the trainer
@@ -103,6 +114,12 @@ class DarkflowTrainer:
             self.lr_steps = [float(i) for i in self.cfg_train.get('lr',[1.0e-5])]
         assert len(self.lr_steps)==len(self.train_steps)
         #self.momentum_steps = [float(i) for i in self.cfg_train.get('momentum',[0.0]*len(self.train_steps))]
+
+        # parse the args
+        if args.trainer is not None:
+            self.base_options['trainer'] = args.trainer
+        if args.gpu is not None:
+            self.base_options['gpu'] = float(args.gpu)
 
     def train_phase(self):
         phase_idx = [i for i in range(len(self.train_steps)) if self.train_steps[i]<=self.current_epoch][-1]
@@ -119,7 +136,7 @@ class DarkflowTrainer:
         # set args for new phase
         options = dict(self.base_options)
         if self.current_epoch>0:
-            options['load'] = -1
+            assert 'load' in options
         options['lr'] = lr
         #options['momentum'] = self.momentum_steps[phase_idx]
         options['epoch'] = number_of_epochs
@@ -137,11 +154,26 @@ class DarkflowTrainer:
 
 def predict_darkflow_model(cfg_obj,args):
     options = darkflow_parse_config(cfg_obj)
+    
+    # erase previous predictions
+    imgdir_path = options['imgdir']
+    out_dir = os.path.join(imgdir_path,'out')
+    for the_file in os.listdir(out_dir):
+        file_path = os.path.join(out_dir, the_file)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            print(e)
+
+    # load args
     if args.load is None:
         raise AssertionError('Please provide a ckpt number to load from.')
-    options['load'] = int(args.load)
+    options['load'] = args.load if args.load=='best' else int(args.load)
     if args.threshold is not None:
         options['threshold'] = float(args.threshold)
+    if args.gpu is not None:
+        options['gpu'] = float(args.gpu)
 
     tfnet = TFNet(options)
     tfnet.predict()
@@ -173,6 +205,7 @@ if __name__=='__main__':
                         help='detection threshold', 
                         default=0.6)
     parser.add_argument('--trainer',help='trainer time (e.g. adam)', default=None)
+    parser.add_argument('--gpu',help='use GPU', default=None)
     # parser.add_argument('--verbose', 
     #                     help='detection threshold', 
     #                     default=False)

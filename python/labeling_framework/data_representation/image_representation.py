@@ -30,6 +30,10 @@ logger = logging_utils.DynamicLogger(__name__)
 def normalize_image_data(img_data,strict_bounds=False,nan_val=0):
     val_range = (np.nanmin(img_data),np.nanmax(img_data))
     test = np.all([np.isfinite(v) for v in val_range])
+    if val_range[0]==val_range[1]:
+        if val_range[0]>0:
+            return np.ones(img_data.shape)
+        return np.zeros(img_data.shape)
     if test==False and strict_bounds==False:
         # there were np.inf or -np.inf
         # convert the np.inf to np.nan, and try normalizing again
@@ -38,7 +42,8 @@ def normalize_image_data(img_data,strict_bounds=False,nan_val=0):
         A[np.isinf(A)] = np.nan
         img_data = A
         val_range = (np.nanmin(img_data),np.nanmax(img_data))
-        assert np.all([np.isfinite(v) for v in val_range])
+        if not np.all([np.isfinite(v) for v in val_range]):
+            raise AssertionError('Could not normalize image data. The amplitude limits are {}'.format(val_range))
 
     # compute normalized image
     data_norm = (img_data-val_range[0])/(val_range[1]-val_range[0])
