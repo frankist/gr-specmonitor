@@ -87,6 +87,8 @@ def aggregate_independent_waveforms(multi_stage_data_list):
 
 def random_scale_mag2(tboxes,randgen):
     scale_values = randgen.generate(len(tboxes))
+    if isinstance(scale_values,float):
+        scale_values = [scale_values]
     for i in range(len(tboxes)):
         tboxes[i].params['power'] *= scale_values[i]
     return tboxes

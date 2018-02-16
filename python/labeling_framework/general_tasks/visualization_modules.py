@@ -131,7 +131,7 @@ def generate_spectrogram_imgs(this_run_params, insync, mark_boxes):
     # x = freader.read_section()
     if insync is False or is_framed is False:
         logger.error('I have to implement this functionality')
-        print sig_data
+        # print sig_data
         raise NotImplementedError('data has to be framed and in sync to be stored as an img with bounding boxes')
 
     # num_sections = len(spec_metadata)
