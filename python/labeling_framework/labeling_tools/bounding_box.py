@@ -55,14 +55,13 @@ class ImgBoundingBox(object):
         test &= self.rowmax>=0 and self.rowmax<=self.img_size[0]
         test &= self.colmin>=0 and self.colmin<=self.img_size[1]
         test &= self.colmax>=0 and self.colmax<=self.img_size[1]
-        test &= self.rowmax>self.rowmin
+        test &= self.rowmax>=self.rowmin
         test &= self.colmax>self.colmin
         if test == False:
-            logger.error('The provided bounding box dimensions are not valid. \
+            raise AssertionError('The provided bounding box dimensions are not valid. \
             box upper left: {}, box lower right: {}, \
             img size: {}'.format((self.rowmin,self.colmin),(self.rowmax,self.colmax),
                                  self.img_size))
-            raise AssertionError()
 
     def resized_box(self,new_dims):
         newrowmin = int(round(self.rowmin*new_dims[0]/float(self.img_size[0])))

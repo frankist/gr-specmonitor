@@ -11,8 +11,8 @@ def read_32fc_file(fname,sample_offset=0,num_samples=-1):
     return samples
 
 def save_32fc_file(fname,array):
+    a = np.array(array,np.complex64)
     with open(fname,'wb') as f:
-        # np.save(f,array)
         array.tofile(f)
 
 if __name__=='__main__':

@@ -14,8 +14,8 @@ def run(args):
     ### get dependency file, and create a new stage_data object
     multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
     section = multi_stage_data.read_stage_samples()
-    assert isinstance(section[0],np.complex64)
 
+    logger.info('Writing file {}'.format(targetfilename))
     futils.save_32fc_file(targetfilename,section)
 
 class Convert32fcTask(StageLuigiTask):
