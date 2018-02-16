@@ -19,6 +19,8 @@
 # Boston, MA 02110-1301, USA.
 # 
 
+import os
+import shutil
 import numpy as np
 from gnuradio import gr
 import pmt
@@ -46,6 +48,7 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.imgcv = np.zeros((self.nrows,self.ncols,3),np.uint8)
         self.last_result = []
 
+        # set up radio
         gr.basic_block.__init__(self,
             name="darkflow_ckpt_classifier_msg",
             in_sig=None,
@@ -54,13 +57,11 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.set_msg_handler(pmt.intern("gray_img"), self.run_darkflow)
         self.message_port_register_out(pmt.intern('darkflow_out'))
 
-        # tmp FIXME
+        # statistics of the channel
         self.stats = darkflow_statistics_collector()
-        self.tstamp = time.time()
-        self.num_img_writes = 0
-        self.save_period = 5
-        self.write_im_results = False
 
+        # save output for visualization
+        self.output_saver = ClassifierOutputSaver(2)
 
     def run_darkflow(self, msg):
         # convert message to numpy array
@@ -71,16 +72,10 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.imgcv[:,0:self.fftsize:,2] = u8img
         detected_boxes = self.classifier.classify(self.imgcv)
         self.last_result = detected_boxes
-        # print 'new classification'
-        # self.imgnp[:] = 0
-        if self.write_im_results and (time.time()-self.tstamp)>self.save_period and np.any([box['label']=='wifi' for box in detected_boxes]):
-            fname = '/home/francisco/gr-specmonitor/tmp/recorded_files/tmp{}.png'.format(self.num_img_writes)
-            newim,boxes=self.classifier.classify2(self.imgcv,True,True)
-            print 'boxes:',boxes
-            print('Gonna save image to file {}'.format(fname))
-            cv2.imwrite(fname, newim)
-            self.num_img_writes += 1
-            self.tstamp = time.time()
+
+        # write a file with boxes output
+        if self.output_saver is not None:
+            self.output_saver.save_output(self.classifier,self.imgcv)
 
         for box in detected_boxes:
             d = pmt.make_dict()
@@ -104,3 +99,23 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
             self.stats.process_darkflow_results(d)
             self.message_port_pub(pmt.intern('darkflow_out'),d)
 
+class ClassifierOutputSaver(object):
+    def __init__(self,period=2):
+        self.last_save_tstamp = time.time()
+        self.period = period
+        self.num_img_writes = 0
+        self.save_folder = os.path.expanduser('~/tmp/classifier_output')
+        if os.path.exists(self.save_folder):
+            shutil.rmtree(self.save_folder)
+        os.mkdir(self.save_folder)
+
+    def save_output(self,classifier,imgcv):
+        if (time.time()-self.last_save_tstamp)>self.period:
+            # enough time has passed
+            fname = os.path.join(self.save_folder,'record_tmp{}.png'.format(self.num_img_writes))
+            newim,boxes=classifier.classify2(imgcv,True,True)
+            print 'boxes:',boxes
+            print('Gonna save image to file {}'.format(fname))
+            cv2.imwrite(fname, newim)
+            self.num_img_writes += 1
+            self.last_save_tstamp = time.time()
