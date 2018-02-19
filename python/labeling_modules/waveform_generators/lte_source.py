@@ -27,6 +27,7 @@ prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
 fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
 ZC_cached = {}
 bw_cached = {}
+frames_path = os.path.expanduser('~/Dropbox/tmp/lte_frames/nogaps')
 
 def compute_LTE_ZC(fft_size):
     if fft_size in ZC_cached:
@@ -153,7 +154,6 @@ class GrLTETracesFlowgraph(gr.top_block):
         # derived params
         self.fft_size = GrLTETracesFlowgraph.prb_mapping[self.n_prbs]
         self.samp_rate = float(self.fft_size*self.subcarrier_spacing)
-        frames_path = os.path.expanduser('~/tmp/lte_frames')
         n_prbs_str = "%02d" % (self.n_prbs,)
         mcs_str = "%02d" % (self.mcs)
         fname = '{}/lte_dump_prb_{}_mcs_{}.32fc'.format(frames_path,n_prbs_str,mcs_str)
