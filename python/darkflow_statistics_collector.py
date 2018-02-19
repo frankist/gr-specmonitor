@@ -28,15 +28,15 @@ class darkflow_statistics_collector(gr.basic_block):
     """
     docstring for block darkflow_statistics_collector
     """
-    def __init__(self):
+    def __init__(self,period_print_sec = 10):
         gr.basic_block.__init__(self,
-            name="darkflow_ckpt_classifier_msg",
-            in_sig=None,
-            out_sig=None)
+                                name="darkflow_ckpt_classifier_msg",
+                                in_sig=None,
+                                out_sig=None)
         self.message_port_register_in(pmt.intern('msg_in'))
         self.set_msg_handler(pmt.intern('msg_in'), self.process_darkflow_results)
         self.stats = {}
-        self.print_period_sec = 10
+        self.print_period_sec = period_print_sec
         self.last_print_tstamp = time.time()-self.print_period_sec
 
     def process_darkflow_results(self,msg):
@@ -49,7 +49,7 @@ class darkflow_statistics_collector(gr.basic_block):
         if (time.time()-self.last_print_tstamp)>self.print_period_sec:
             print 'stats:',self.stats
             kmax = self.label_mode()
-            print 'STATUS: The channel contains',kmax,'signals'
+            print 'STATUS: The channel contains mostly',kmax,'signals'
             self.last_print_tstamp = time.time()
 
     def label_mode(self):

@@ -58,12 +58,16 @@ class darkflow_ckpt_classifier_msg(gr.basic_block):
         self.message_port_register_out(pmt.intern('darkflow_out'))
 
         # statistics of the channel
-        self.stats = darkflow_statistics_collector()
+        self.stats = darkflow_statistics_collector(period_print_sec=5)
 
         # save output for visualization
         self.output_saver = ClassifierOutputSaver(2)
+        self.count_predictions = 0
 
     def run_darkflow(self, msg):
+        self.count_predictions += 1
+        if np.mod(self.count_predictions,5)!=0: # skip
+            return
         # convert message to numpy array
         u8img = pmt.pmt_to_python.uvector_to_numpy(msg).reshape(self.nrows,self.fftsize)
 

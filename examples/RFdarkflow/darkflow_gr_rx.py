@@ -43,6 +43,7 @@ class DarkflowFlowGraph(gr.top_block):
         centre_freq = 2.35e9#3.5e9
         gaindB = 10#30
         fftsize = 104
+        n_avgs = 80
 
         # flowgraph blocks
         self.usrp_source = uhd.usrp_source(
@@ -57,7 +58,7 @@ class DarkflowFlowGraph(gr.top_block):
         self.usrp_source.set_gain(gaindB,0)
         self.toparallel = blocks.stream_to_vector(gr.sizeof_gr_complex, fftsize)
         self.fftblock = fft.fft_vcc(fftsize,True,signal.get_window(('tukey',0.25),fftsize),True)
-        self.spectroblock = spectrogram_img_c(fftsize,104,104,50,True)
+        self.spectroblock = spectrogram_img_c(fftsize,104,104,n_avgs,True)
         self.classifier = darkflow_ckpt_classifier_msg(self.yaml_config, fftsize, 0.6)
 
         # make flowgraph
