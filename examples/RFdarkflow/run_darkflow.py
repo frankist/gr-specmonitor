@@ -1,14 +1,15 @@
 import sys
-sys.path.append('../../python/darkflow_tools')
+#sys.path.append('../../python/darkflow_tools')
 import argparse
 import os
 import subprocess
 import cv2
 
-import parse_yolo_cfg as yolocfg
+from specmonitor.darkflow_tools import parse_yolo_cfg as yolocfg
+#import parse_yolo_cfg as yolocfg
 from darkflow.net.build import TFNet
-import voc_tools
-import darknet_scripts
+from specmonitor.darkflow_tools import voc_tools
+from specmonitor.darkflow_tools import darknet_scripts
 
 def current_train_step(backup_folder):
     checkpoint_fname = os.path.join(backup_folder,'checkpoint')

@@ -20,7 +20,16 @@ class DarkflowArgs(object): # to replace YOLOCfgPaths in the future
                     'trainer':str,
                     'threshold':float,
                     'momentum':float,
-                    'dataset':str}
+                    'dataset':str,
+                    'load':None,
+                    'model':str,
+                    'dataset':str,
+                    'annotation':str,
+                    'imgdir':str,
+                    'labels':str,
+                    'backup':str,
+                    'bin':str,
+                    'summary':str}
     img_foldername = 'Images'#'JPEGImages'
     annotations_foldername = 'Annotations'
     def __init__(self):
@@ -34,27 +43,32 @@ class DarkflowArgs(object): # to replace YOLOCfgPaths in the future
         self.momentum = 0.9
         self.train = False
 
-    def try_setattr(self,name,value,type_cast=None):
+    def try_setattr(self,name,value,type_cast=None,must_exist=True):
         if value is not None: # overwrites if specified.
             if type_cast is None:
                 if name in DarkflowArgs.option_types:
-                    setattr(self, name, DarkflowArgs.option_types[name](value)) # cast
-                else:
-                    setattr(self, name, value) # no cast
+                    if DarkflowArgs.option_types[name] is None:
+                        setattr(self,name,value)
+                    else:
+                        setattr(self, name, DarkflowArgs.option_types[name](value)) # cast
+                elif must_exist:
+                    raise AttributeError('The argument {} is not supported'.format(name)) 
+                #    #setattr(self, name, value) # no cast
             else:
                 setattr(self, name, type_cast(value)) # specified cast
 
-    def read_yaml(self,yaml_file):
+    def parse_yaml(self,yaml_path,yaml_dict):
         # real file
-        with open(yaml_file,'r') as f:
-            yaml_dict = yaml.load(f)
-        yaml_path = os.path.basename(yaml_file)
+        #if isinstance(yaml_file,str):
+        #    with open(yaml_file,'r') as f:
+        #        yaml_dict = yaml.load(f)
+        #    yaml_path = os.path.dirname(os.path.abspath(yaml_file))
 
         def abspath(relative_path):
             return os.path.normpath(os.path.join(yaml_path,relative_path))
 
         # set paths
-        dataset_path = abspath(yaml_dict['dataset']['dataset'])
+        dataset_path = abspath(yaml_dict['dataset']['dataset_folder'])
         tmp_path = abspath(yaml_dict['dataset']['tmp_folder'])
         model_path = abspath(yaml_dict['model']['model_path'])
         self.set_paths(model_path,dataset_path,tmp_path)
@@ -64,7 +78,7 @@ class DarkflowArgs(object): # to replace YOLOCfgPaths in the future
         for k,v in darkflow_args.items():
             self.try_setattr(k,v,DarkflowArgs.option_types[k])
         
-    def set_paths(self,model_path,dataset_path,tmp_path):
+    def set_paths(self,model_path,dataset_dir,tmp_dir):
         model_path = os.path.abspath(os.path.expanduser(model_path))
         self.try_setattr('model',model_path)
         # dataset folder
@@ -86,22 +100,25 @@ class DarkflowArgs(object): # to replace YOLOCfgPaths in the future
         summary_path = os.path.join(tmp_path,'summary')
         self.try_setattr('summary',summary_path)
         
-    def parse_cmdline(self,cmd_args,type_cast):
-        options = vars(cmd_args)
+    def parse_cmdline(self,cmd_args):
+        if not isinstance(cmd_args,dict):
+            options = vars(cmd_args)
+        else:
+            options = cmd_args
         for name,value in options.items():
             if name.startswith('__') or name=='mode': # it is private #FIXME
                 continue
-            self.try_setattr(name,value,DarkflowArgs.option_types[name])
+            self.try_setattr(name,value,must_exist=False)
         
-    def generate_args(self):
-        assert_paths_exist(self)
+    def generate_args(self,assert_train_paths=True):
+        assert_paths_exist(self,assert_train_paths)
         options = vars(self)
         for k,v in options.items():
             if v is None: # Remove any None
                 del options[k]
         return options
 
-def assert_paths_exist(cfg_obj):
+def assert_paths_exist(cfg_obj,assert_train_paths=True):
     def assert_path_exists(path,check_file=False):
         test = not os.path.exists(path)
         test |= check_file and not os.path.isfile(path)
@@ -109,18 +126,30 @@ def assert_paths_exist(cfg_obj):
             raise AssertionError('Path {} does not exist.'.format(path))
     # assert all paths exist
     assert_path_exists(cfg_obj.model)
-    assert_path_exists(cfg_obj.dataset)
-    assert_path_exists(cfg_obj.annotation)
-    assert_path_exists(cfg_obj.imgdir)
     assert_path_exists(cfg_obj.labels)
-    assert_path_exists(cfg_obj.backup)
-    assert_path_exists(cfg_obj.bin)
-    assert_path_exists(cfg_obj.summary)
+    if assert_train_paths:
+        assert_path_exists(cfg_obj.dataset)
+        assert_path_exists(cfg_obj.annotation)
+        assert_path_exists(cfg_obj.imgdir)
+        assert_path_exists(cfg_obj.backup)
+        assert_path_exists(cfg_obj.bin)
+        assert_path_exists(cfg_obj.summary)
 
 class DarkflowConfig(object):
     darknet_annotations_foldername = 'darknet_annotations'
     def __init__(self):
+        self.yaml_params = {}
+        self.yaml_file = ''
         self.args = None
+    
+    def setup(self,yaml_file,cmdline_args):
+        with open(yaml_file,'r') as f:
+            self.yaml_params = yaml.load(f)
+        self.yaml_file = os.path.abspath(yaml_file)
+        self.args = DarkflowArgs()
+        self.args.parse_yaml(os.path.dirname(self.yaml_file),self.yaml_params)
+        self.args.parse_cmdline(cmdline_args)
+        self.setup_paths()
         
     def tmp_path(self):
         return os.path.basename(self.args.backup)
@@ -135,6 +164,9 @@ class DarkflowConfig(object):
         try_mkdir(self.args.backup)
         # make out dir inside images
         try_mkdir(os.path.join(self.args.imgdir,'out'))
+    
+    def generate_args(self,assert_train_paths=True):
+        return self.args.generate_args(assert_train_paths)
 
 def assert_config_correctness():
     # assert param correctness

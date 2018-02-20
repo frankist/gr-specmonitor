@@ -16,8 +16,10 @@ class DarkflowCkptClassifier:
         assert self.tfnet.FLAGS.threshold>=0
 
     def classify(self,imgcv):
-        result = self.tfnet.return_predict(imgcv)
-        return result
+        if isinstance(imgcv,np.ndarray):
+            return self.tfnet.return_predict(imgcv)
+        else:
+            return self.tfnet.return_predict_batch(imgcv)
 
     def classify2(self,imgcv,generate_img=True,generate_boxes=True):
         assert isinstance(imgcv, np.ndarray), \

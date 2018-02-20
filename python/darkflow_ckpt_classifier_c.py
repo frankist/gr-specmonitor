@@ -26,7 +26,7 @@ import cv2
 import sys
 import os
 
-from darkflow_tools.darkflow_ckpt_classifier import *
+from darkflow_tools.darkflow_ckpt_classifier import DarkflowCkptClassifier
 from labeling_framework.data_representation import spectrogram
 
 class darkflow_ckpt_classifier_c(gr.sync_block):
