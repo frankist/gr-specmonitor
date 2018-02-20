@@ -122,7 +122,6 @@ def apply_framing_and_offsets(args):
     # print 'these are the boxes divided by section:',[[b.__str__() for b in s] for s in section_boxes]
 
     # fill new file
-    # stage_data['IQsamples'] = y # overwrites the generated samples
     l = []
     sig2img_params = multi_stage_data.get_stage_args('signal_representation')
     signalimgmetadata = imgrep.get_signal_to_img_converter(sig2img_params)

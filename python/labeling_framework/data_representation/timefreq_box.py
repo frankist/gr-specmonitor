@@ -148,13 +148,13 @@ def scale_time_bounds(old_sample_bounds,new_section_size,old_section_size):
     """
     You can use this function to convert from sample idx to Spectrogram row
     """
+    assert np.min(old_sample_bounds)<=old_section_size
     tmin = scale_time(old_sample_bounds[0],new_section_size,old_section_size)
     tmax = scale_time(old_sample_bounds[1]-1,new_section_size,old_section_size)+1
-    assert tmax>=tmin+1 and tmin>=0
     tmax = min(tmax,new_section_size)
+    assert tmax>=tmin+1 and tmin>=0 and tmin<new_section_size
     if max(tmin,tmax)>new_section_size:
-        logger.error('Time window mismatch with the image dimensions. tlims: {},new window size:{},old sample_bounds:{},old section size:{}'.format((tmin,tmax),new_section_size,old_sample_bounds,old_section_size))
-        raise AssertionError('The scaling of the time bounds failed')
+        raise AssertionError('Time window mismatch with the image dimensions. tlims: {},new window size:{},old sample_bounds:{},old section size:{}'.format((tmin,tmax),new_section_size,old_sample_bounds,old_section_size))
     return (tmin,tmax)
 
 # Utils to convert bounding box to image bounding box

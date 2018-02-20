@@ -34,6 +34,7 @@ from general_tasks.visualization_modules import ImgSpectrogramBoundingBoxTask
 from general_tasks.remove_IQsamples import RemoveIQSamples
 from general_tasks.voc_annotations import VOCFormatTask
 from general_tasks.partition_signal import PartitionSignalTask
+from general_tasks.convert_to_32fc import Convert32fcTask
 
 # register waveforms
 from waveform_generators.waveform_launcher import SignalGenerator
