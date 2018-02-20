@@ -11,7 +11,7 @@ class DarkflowCkptClassifier:
 
         self.options = yolocfg.generate_darkflow_args(self.cfg_obj)
         self.options['threshold'] = threshold
-        self.options['load'] = -1 # picks the last one
+        self.options['load'] = 'best'#-1 # picks the last one
         self.tfnet = TFNet(self.options)
         assert self.tfnet.FLAGS.threshold>=0
 
@@ -34,7 +34,7 @@ class DarkflowCkptClassifier:
         newim = None
         if generate_img:
             outcopy = out.copy()
-            newim = self.tfnet.framework.postprocess(outcopy,imgcv,save=False,put_text=False)
+            newim = self.tfnet.framework.postprocess(outcopy,imgcv,save=False,putText=False)
 
         boxesInfo = list()
         if generate_boxes:
