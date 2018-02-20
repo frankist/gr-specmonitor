@@ -13,11 +13,11 @@ def read_32fc_file(fname,sample_offset=0,num_samples=-1):
 def save_32fc_file(fname,array):
     a = np.array(array,np.complex64)
     with open(fname,'wb') as f:
-        array.tofile(f)
+        a.tofile(f)
 
 if __name__=='__main__':
     fname = 'format_test_tmp.32fc'
-    a = np.array(np.arange(10),np.complex64)
+    a = np.array(np.arange(10),np.complex128) # see if it casts properly
     save_32fc_file(fname,a)
     b = read_32fc_file(fname)
     assert np.array_equal(a,b)
@@ -29,3 +29,4 @@ if __name__=='__main__':
         # print s
 
     os.remove(fname)
+    print 'success'

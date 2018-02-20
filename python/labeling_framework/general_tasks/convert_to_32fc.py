@@ -15,8 +15,15 @@ def run(args):
     multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
     section = multi_stage_data.read_stage_samples()
 
-    logger.info('Writing file {}'.format(targetfilename))
+    logger.warning('These are the limits: {}/{}'.format(np.nanmax(section),np.max(section)))
+
+    logger.info('Writing to file {}'.format(targetfilename))
     futils.save_32fc_file(targetfilename,section)
+
+    # section2 = futils.read_32fc_file(targetfilename)
+    # print 'section sizes:',section2.size,section.size
+    # print 'section max:',np.max(section2),np.max(section)
+    # assert np.array_equal(section2,section)
 
 class Convert32fcTask(StageLuigiTask):
     def __init__(self,*args,**kwargs):
