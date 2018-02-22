@@ -29,5 +29,6 @@ install(FILES
     specmonitor_darkflow_statistics_collector.xml
     specmonitor_hier_preamble_detector.xml
     specmonitor_foo_random_burst_shaper_cc.xml
-    specmonitor_DynRandom.xml DESTINATION share/gnuradio/grc/blocks
+    specmonitor_DynRandom.xml
+    specmonitor_darkflow_tcp_client.xml DESTINATION share/gnuradio/grc/blocks
 )

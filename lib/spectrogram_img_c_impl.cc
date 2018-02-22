@@ -91,15 +91,17 @@ namespace gr {
       // unsigned int input_data_size = input_signature()->sizeof_stream_item (0);
       // std::cout << "This is the input size:" << input_data_size << std::endl;
 
+      // apply |.|^2
       volk_32fc_magnitude_squared_32f(&d_mag2[0], &in[0], d_fftsize*noutput_items);
 
       for(int nblock = 0; nblock < noutput_items; ++nblock) {
-        // TODO: check if this works
+        // Compute the line averaging
         volk_32f_x2_add_32f(&d_mag2_sum[d_idx_offset], &d_mag2[nblock*d_fftsize], &d_mag2_sum[d_idx_offset], d_fftsize);
 
         d_avg_count++;
         if(d_avg_count==d_n_avgs) {
           d_avg_count=0;
+          // to compute the minimum value across the whole spectrogram
           d_fft_pwr[d_idx_offset/d_fftsize] = std::accumulate(&d_mag2_sum[d_idx_offset],
                                                               &d_mag2_sum[d_idx_offset+d_fftsize],
                                                               0.0f)/d_fftsize;
@@ -115,42 +117,24 @@ namespace gr {
                 d_mag2_sum[i] = pwr_min;
             }
 
+            // convert to dB
+            for(int i = 0; i < d_img_size; ++i) {
+              d_mag2_sum[i] = 10*log10(d_mag2_sum[i]/d_n_avgs);
+            }
+
             // normalize spectrogram
             float min_val = *std::min_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
             float max_val = *std::max_element(&d_mag2_sum[0], &d_mag2_sum[d_img_size]);
+            for(int i = 0; i < d_img_size; ++i)
+              d_mag2_byte[i] = (d_mag2_sum[i]-min_val)*255/(max_val-min_val);
             // unsigned int max_i;
             // volk_32f_index_max_16u(&max_i, &d_mag2_sum[0], d_mag2_sum.size());
-            max_val = 10*log10(max_val);
-            min_val = 10*log10(min_val);
-            for(int i = 0; i < d_img_size; ++i)
-              d_mag2_byte[i] = (10*log10(d_mag2_sum[i]) - min_val)*255/(max_val-min_val);
+            // max_val = 10*log10(max_val);
+            // min_val = 10*log10(min_val);
+            // for(int i = 0; i < d_img_size; ++i)
+            //   d_mag2_byte[i] = (10*log10(d_mag2_sum[i]) - min_val)*255/(max_val-min_val);
 
-            // create an opencv byte image with number of channels=3
-            // d_img_mat = cv::Mat::zeros(d_nrows,d_ncols,cv::CV_8UC3);//CV_8U); // it has 3 channels
-            // for(int i = 0; i < d_nrows; ++i)
-            //   for(int j = 0; j < d_fftsize; ++j) {
-            //     unsigned char val = (d_mag2_sum[i] - min_val)*255/(max_val-min_val);
-            //     d_img_mat.at(i,j,0) = val;
-            //     d_img_mat.at(i,j,1) = val;
-            //     d_img_mat.at(i,j,2) = val;
-            //   }
-            // std::vector<cv::Mat> images(3);
-            // images.at(0) = blue;
-            // images.at(1) = green;
-            // images.at(2) = red;
-            // cv::Mat color;
-            // cv::merge(images, color);
-
-            // NOTE: Inspired by https://github.com/gnuradio/gnuradio/blob/master/gr-blocks/lib/tagged_stream_to_pdu_impl.cc
-            // move image created to pmt message buffer
-            // d_pdu_vector = pdu::make_pdu_vector(d_type, d_img_mat.begin(), d_mag2_sum.size()*3);
-            // pmt::pmt_t msg = pmt::cons(d_pdu_meta, d_pdu_vector);
-
-            // d_pdu_vector = make_pdu_vector(byte_t, &d_mag2_byte[0], d_img_size);
-            // std::cout << "vec: [";
-            // for(int k = 0; k < d_img_size; ++k)
-            //   std::cout << (int)d_mag2_byte[k] << ",";
-            // std::cout << "]" << std::endl;
+            // pass message with the image
             d_pdu_vector = pmt::init_u8vector(d_img_size, &d_mag2_byte[0]);
             message_port_pub(pmt::mp("imgcv"), d_pdu_vector);
 
