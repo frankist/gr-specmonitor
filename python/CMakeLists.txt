@@ -33,7 +33,8 @@ GR_PYTHON_INSTALL(
     __init__.py
     #darkflow_ckpt_classifier_c.py
     darkflow_ckpt_classifier_msg.py
-    darkflow_statistics_collector.py DESTINATION ${GR_PYTHON_DIR}/specmonitor
+    darkflow_statistics_collector.py
+    darkflow_tcp_client.py DESTINATION ${GR_PYTHON_DIR}/specmonitor
 )
 
 ########################################################################
@@ -63,3 +64,4 @@ GR_ADD_TEST(qa_random_burst_shaper_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURC
 GR_ADD_TEST(qa_darkflow_statistics_collector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_statistics_collector.py)
 add_test(qa_hier_preamble_detector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_hier_preamble_detector.py)
 GR_ADD_TEST(qa_foo_random_burst_shaper_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_foo_random_burst_shaper_cc.py)
+GR_ADD_TEST(qa_darkflow_tcp_client ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_darkflow_tcp_client.py)
