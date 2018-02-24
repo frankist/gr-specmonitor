@@ -93,7 +93,7 @@ def run_RF_channel(args):
 
     ### Read previous stage data and sets the parameters of the new stage
     multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
-    x = np.array(multi_stage_data.read_stage_samples(),np.complex64)
+    x = np.array(multi_stage_data.read_stage_samples(),np.complex128)
     sample_rate = multi_stage_data.get_stage_args('sample_rate')
 
     # # set 25MS/s
