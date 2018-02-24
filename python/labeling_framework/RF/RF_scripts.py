@@ -93,23 +93,21 @@ def run_RF_channel(args):
 
     ### Read previous stage data and sets the parameters of the new stage
     multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
-    # freader = pkl_sig_format.WaveformPklReader(sourcefilename)
-    # stage_data = freader.data()
-    # filedata.set_stage_parameters(stage_data, stage_name, params)
-    # x = np.array(freader.read_section(), np.complex128)
-    x = np.array(multi_stage_data.read_stage_samples(),np.complex128)
+    x = np.array(multi_stage_data.read_stage_samples(),np.complex64)
+    sample_rate = multi_stage_data.get_stage_args('sample_rate')
+
+    # # set 25MS/s
+    # if RF_sync_utils.allow_rolloff is False:
+    #     xtmp = x
+    #     xsamp_rate = sample_rate
+    #     sample_rate = 25.0e6
+    #     x = RF_sync_utils.resample_signal(xtmp,sample_rate/xsamp_rate)
 
     # get parameters from other stages
     fparams = preamble_utils.get_session_frame_params(multi_stage_data)
-    # fparams = filedata.get_frame_params(stage_data)
     n_sections = multi_stage_data.session_data['frame_params']['num_sections']
     Nsuperframe = preamble_utils.get_num_samples_with_framing(fparams,n_sections)
-    # n_sections = filedata.get_stage_parameter(stage_data, 'num_sections')
-    # Nsuperframe = filedata.get_num_samples_with_framing(
-        # stage_data)  # it is basically frame_period*num_frames
     assert x.size >= Nsuperframe
-    # sample_rate = filedata.get_stage_parameter(stage_data, 'sample_rate')
-    sample_rate = multi_stage_data.get_stage_args('sample_rate')
     Nsettle = int(settle_time * sample_rate)
     n_skip_samples, n_rx_samples, _ = RF_sync_utils.get_recording_params(
         Nsettle, Nsuperframe, fparams.frame_period)
@@ -145,7 +143,7 @@ def run_RF_channel(args):
 
     # save the results
     success = RF_sync_utils.post_process_rx_file_and_save(
-        multi_stage_data, tmp_file, args, fparams, n_sections, Nsuperframe, Nsettle)
+        multi_stage_data, tmp_file, args, fparams, n_sections, Nsuperframe, Nsettle)#,{'xsamp_rate':xsamp_rate,'sample_rate':sample_rate})
     if success is True:
         logger.debug('Finished writing to file %s',targetfilename)
     else:
@@ -188,20 +186,3 @@ class RemoteSetup(SessionLuigiTask):
         with open(self.output().path, 'w') as f:
             pickle.dump(scp_out, f)
 
-            # def find_script_path(script_name): # TODO: make this better
-            #     modu = importlib.import_module(script_name)
-            #     base = os.path.splitext(os.path.basename(modu.__file__))[0] # take the pyc out
-            #     absp = os.path.splitext(os.path.abspath(modu.__file__))[0] # take the pyc out
-            #     return (base,absp+'.py')
-            # remote_folder = SessionParams.SessionPaths.remote_session_folder(self.sessiondata)
-            # # find path of files to transfer
-            # #import inspect
-            # import os
-            # import ssh_utils
-            # scripts = ['remote_RF_script']
-            # script_paths = [find_script_path(s) for s in scripts]
-            # for h in self.sessiondata.hosts():
-            #     for tup in script_paths:
-            #         remote_path = remote_folder+'/scripts/'+tup[0]+'.py'
-            #         print 'Going to transfer script {} to remote {}'.format(tup[1],h)
-            #         ssh_utils.scp_send(h,tup[1],remote_path)
