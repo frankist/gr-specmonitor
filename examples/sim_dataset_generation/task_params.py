@@ -9,7 +9,7 @@ toffset_range = [50]#[50,70,90]
 frequency_offset = [0]
 skip_samps = 0
 wf_gen_samps = section_size*num_sections + toffset_range[-1] + skip_samps + 50
-n_repeats = 10
+n_repeats = 1
 
 tags = ['wifi','psk','lte','lte_ul']
 
@@ -108,10 +108,11 @@ stage_params = {
         [
             ('waveform',['lte_ul']),
             ('n_samples',wf_gen_samps),
+            ('n_prbs',[50,100]),
             ('pad_interval',random_generator('randint',(2000,200000))),#[('uniform',(100,200000))]),
             ('signal_representation',[spectrogram_representation]),
             ('n_offset_samples',[('uniform',(0,500000))]),
-            ('runs',range(n_repeats))
+            ('runs',range(max(int(n_repeats/2),1)))
         ],
         'Tx': Tx_params,
         'Rx': Rx_params,
