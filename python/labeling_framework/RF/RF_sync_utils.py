@@ -32,6 +32,14 @@ from ..core import SessionParams
 from ..utils.logging_utils import DynamicLogger
 logger = DynamicLogger(__name__)
 
+# allow_rolloff = True
+# import scipy.signal
+# def resample_signal(x,ratio):
+#     lenx = len(x)
+#     leny = int(ratio*lenx)
+#     y = scipy.signal.resample(x,leny)
+#     return y
+
 def get_recording_params(Nsettle,Nsuperframe,frame_period):
     n_skip_samples = max(Nsettle-frame_period,0)
     n_settle_tmp = Nsettle-n_skip_samples # not making this skipped samples is important to fill the history of the pdetec
@@ -121,7 +129,7 @@ def read_file_and_framesync(sourcefilename,targetfilename,fparams,n_sections,Nsu
     return (tstart, selected_peaks, y)
 
 # post-processing the tmp file and update the metadata file
-def post_process_rx_file_and_save(multi_stage_data,rawfile,args,fparams,n_sections,Nsuperframe,Nsettle):
+def post_process_rx_file_and_save(multi_stage_data,rawfile,args,fparams,n_sections,Nsuperframe,Nsettle):#,rolloff_args):
     targetfilename = args['targetfilename']
     stage_name = args['stage_name']
 
@@ -134,6 +142,10 @@ def post_process_rx_file_and_save(multi_stage_data,rawfile,args,fparams,n_sectio
         peak_list = ret[1]
         y = ret[2]
 
+        # if allow_rolloff==False:
+        #     ratio = rolloff_args['xsamp_rate']/rolloff_args['sample_rate']
+        #     y = resample_signal(y,ratio)
+
         # assert section_bounds do not go over superframe size
         spec_metadata = multi_stage_data.get_stage_derived_params('spectrogram_img')
         # spec_metadata = filedata.get_stage_derived_parameter(stage_data,'section_spectrogram_img_metadata')
@@ -145,10 +157,6 @@ def post_process_rx_file_and_save(multi_stage_data,rawfile,args,fparams,n_sectio
         new_stage_data = ssa.StageSignalData(args,{'spectrogram_img':spec_metadata,'detected_preambles':peak_list},y)
         multi_stage_data.set_stage_data(new_stage_data)
         multi_stage_data.save_pkl()
-        # stage_data['IQsamples'] = y
-        # filedata.set_stage_derived_parameter(stage_data,stage_name,'detected_preambles',peak_list)
-        # with open(targetfilename,'w') as f:
-        #     pickle.dump(stage_data,f)
         return True
     return False
 
