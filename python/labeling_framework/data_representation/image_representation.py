@@ -81,7 +81,7 @@ def get_signal_to_img_converter(params):
     if format_name not in __format_types__:
         logger.info('Going to import the input representation {}'.format(format_name))
         # this adds to the known img formats the one we need
-        filename = 'labeling_framework.data_representation.'+format_name#+'.py'
+        filename = 'specmonitor.labeling_framework.data_representation.'+format_name#+'.py'
         importlib.import_module(filename)
 
     # delegate

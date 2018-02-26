@@ -19,19 +19,11 @@ def send_message(clientsocket,msg):
     buf = struct.pack('h',msglen)+msg
     clientsocket.sendall(buf)
 
-# metadata to send
-radio_id_data = {
-    'frequency': 2.3e9,
-    'ncols':104,
-    'nrows':104,
-    'navgs':80
-}
-
 class darkflow_tcp_client(gr.basic_block):
     """
     This block passes an image to a TCP socket for remote processing
     """
-    def __init__(self,yaml_cfg_file,addr=('127.0.0.1',9999)):
+    def __init__(self,yaml_cfg_file,addr=('127.0.0.1',9999),radio_metadata={}):
         # params
         self.yaml_file = yaml_cfg_file
 
@@ -44,14 +36,14 @@ class darkflow_tcp_client(gr.basic_block):
         self.set_msg_handler(pmt.intern("gray_img"), self.tcp_send)
 
         # parse yaml configuration file
-        self.ncols = 104
-        self.nrows = 104
+        self.ncols = radio_metadata['ncols']
+        self.nrows = radio_metadata['nrows']
 
         # setup connection
         self.soc = connect_client(addr)
 
         # send metadata
-        buf = struct.pack('h',0) + pickle.dumps(radio_id_data)
+        buf = struct.pack('h',0) + pickle.dumps(radio_metadata)
         send_message(self.soc,buf)
         self.counter_img = 0
 

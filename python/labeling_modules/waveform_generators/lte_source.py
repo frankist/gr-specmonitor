@@ -27,7 +27,7 @@ prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
 fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
 ZC_cached = {}
 bw_cached = {}
-frames_path = os.path.expanduser('~/Dropbox/tmp/lte_frames/nogaps')
+frames_path = os.path.expanduser('~/tmp/lte_frames/nogaps')
 
 def compute_LTE_ZC(fft_size):
     if fft_size in ZC_cached:

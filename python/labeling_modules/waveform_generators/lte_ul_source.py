@@ -26,9 +26,11 @@ logger = lf.DynamicLogger(__name__)
 class GrLTEULTracesFlowgraph(gr.top_block):
     prb_mapping = {6: 128, 15: 256, 25: 384, 50: 768, 75: 1024, 100: 1536}
     fftsize_mapping = {128: 1.4e6, 256: 3e6, 384: 5.0e6, 768: 10.0e6, 1024: 15.0e6, 1536: 20.0e6}
-    lte_up_filenames = ['ul_p_50_d_1.32fc', 'ul_p_50_d_2.32fc', 'ul_p_50_d_3.32fc', 'ul_p_50_d_6.32fc']
+    # lte_up_filenames = ['ul_p_50_d_1.32fc', 'ul_p_50_d_2.32fc', 'ul_p_50_d_3.32fc', 'ul_p_50_d_6.32fc']
+    lte_up_filenames = ['ul_p_100_d_1.32fc', 'ul_p_100_d_2.32fc', 'ul_p_100_d_3.32fc']
     def __init__(self,n_samples,
                  n_offset_samples,
+                 n_prbs,
                  linear_gain,
                  pad_interval,
                  frequency_offset):
@@ -42,7 +44,7 @@ class GrLTEULTracesFlowgraph(gr.top_block):
 
         #derived
         subcarrier_spacing = 15000
-        fftsize = GrLTEULTracesFlowgraph.prb_mapping[50]
+        fftsize = GrLTEULTracesFlowgraph.prb_mapping[n_prbs]#50]
         self.samp_rate = float(fftsize*subcarrier_spacing)
         self.expected_bw = GrLTEULTracesFlowgraph.fftsize_mapping[fftsize]
         self.fname = GrLTEULTracesFlowgraph.lte_up_filenames[trace_number]
@@ -95,10 +97,11 @@ class GrLTEULTracesFlowgraph(gr.top_block):
     def load_flowgraph(cls,params):
         n_samples = int(params['n_samples'])
         n_offset_samples = params.get('n_offset_samples',0)
+        n_prbs = params.get('n_prbs',100)
         linear_gain = float(params.get('linear_gain',1.0))
         pad_interval = params['pad_interval']
         frequency_offset = params.get('frequency_offset',0.0)
-        return cls(n_samples, n_offset_samples, linear_gain, pad_interval, frequency_offset)
+        return cls(n_samples, n_offset_samples, n_prbs, linear_gain, pad_interval, frequency_offset)
 
 def run(args):
     d = args['parameters']
@@ -123,7 +126,7 @@ def run(args):
     # set static/pre-defined bandwidth
     frac_bw = tb.expected_bw/20.0e6
     freq_tuple = (-frac_bw/2,frac_bw/2)
-    for b in tfreq_boxes:
+    for i in range(len(tfreq_boxes)):
         tfreq_boxes[i].freq_bounds = freq_tuple
 
     # randomly scale and normalize boxes magnitude
@@ -146,7 +149,7 @@ class LTEULGenerator(lf.SignalGenerator):
             try:
                 run(params)
             except RuntimeError, e:
-                logger.warning('Failed to generate the waveform data for WiFi. Going to rerun. Arguments: {}'.format(args))
+                logger.warning('Failed to generate the waveform data for LTE-UL. Going to rerun. Arguments: {}'.format(params))
                 continue
             except KeyError, e:
                 logger.error('The input arguments do not seem valid. They were {}'.format(args))
