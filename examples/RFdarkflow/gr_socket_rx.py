@@ -19,13 +19,14 @@ radio_metadata = {
 }
 
 class DarkflowClientFlowGraph(gr.top_block):
-    def __init__(self,yaml_config=''):
+    def __init__(self,yaml_config='',freq=None):
         super(DarkflowClientFlowGraph, self).__init__()
 
         # params
+        radio_metadata['frequency'] = freq
         self.yaml_config = yaml_config
         sample_rate = 20.0e6
-        centre_freq = 2.3e9
+        centre_freq = freq
         gaindB = 21#30
         fftsize = 104
         n_avgs = radio_metadata['n_avgs']
@@ -63,5 +64,5 @@ if __name__=='__main__':
                         help='Rx frequency [Hz]', required=True)
     args = parser.parse_args()
 
-    tb = DarkflowClientFlowGraph(args.config)
+    tb = DarkflowClientFlowGraph(args.config,args.freq)
     tb.run()
