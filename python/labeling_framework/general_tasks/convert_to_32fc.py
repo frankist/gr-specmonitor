@@ -15,7 +15,7 @@ def run(args):
     multi_stage_data = ssa.MultiStageSignalData.load_pkl(args)
     section = multi_stage_data.read_stage_samples()
 
-    logger.warning('These are the limits: {}/{}'.format(np.nanmax(section),np.max(section)))
+    #logger.warning('These are the limits: {}/{}'.format(np.nanmax(section),np.max(section)))
 
     logger.info('Writing to file {}'.format(targetfilename))
     futils.save_32fc_file(targetfilename,section)

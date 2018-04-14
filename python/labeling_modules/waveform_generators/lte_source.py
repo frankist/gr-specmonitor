@@ -29,19 +29,19 @@ ZC_cached = {}
 bw_cached = {}
 frames_path = os.path.expanduser('~/tmp/lte_frames/nogaps')
 
-def compute_LTE_ZC(fft_size):
+def compute_LTE_ZC(fft_size,out_samp_rate):
     if fft_size in ZC_cached:
         return ZC_cached[fft_size]
     subcarrier_spacing=15000
     LTE_samp_rate = float(fft_size*subcarrier_spacing)
-    resamp_ratio = 20.0e6/LTE_samp_rate
+    resamp_ratio = out_samp_rate/LTE_samp_rate
     zc = random_sequence.zadoffchu_freq_noDC_sequence(63,25,0,fft_size)
     zc_resampled = scipy.signal.resample(zc,int(len(zc)*resamp_ratio))
     ZC_cached[fft_size] = zc_resampled
     return zc_resampled
 
-def find_zc_peaks(x,fft_size):
-    zc = compute_LTE_ZC(fft_size)
+def find_zc_peaks(x,fft_size,out_samp_rate):
+    zc = compute_LTE_ZC(fft_size,out_samp_rate)
     xcorr = np.correlate(x,zc)
     xcorrabs = np.abs(xcorr)/np.max(np.abs(xcorr))
     peaks = np.where(xcorrabs>0.8)[0]
@@ -58,32 +58,32 @@ def lte_frame_window(peak,samp_rate):
     pss_offset = int(np.round(406.9e-6*samp_rate))
     return (peak-pss_offset,peak+frame_dur-pss_offset)
 
-def find_lte_frame_windows(x,fft_size):
+def find_lte_frame_windows(x,fft_size,out_samp_rate):
     l = []
-    half_frame_dur=5.0e-3*20.0e6+1
-    peaks = find_zc_peaks(x,fft_size)
+    half_frame_dur=5.0e-3*out_samp_rate+1
+    peaks = find_zc_peaks(x,fft_size,out_samp_rate)
     peaks_remaining = np.copy(peaks)
     while len(peaks_remaining)>0:
         p = peaks_remaining[0]
         p2_list = np.where(np.abs(p+half_frame_dur-peaks_remaining[1::])<2)[0]
         if len(p2_list)>0: # we found the second peak
             assert len(p2_list)==1
-            l.append(lte_frame_window(p,20.0e6))#samp_rate
+            l.append(lte_frame_window(p,out_samp_rate))#samp_rate
             peaks_remaining = np.delete(peaks_remaining,[0,1+p2_list[0]])
         else:
             if p>=len(x)-half_frame_dur: # at the right border. the frame was not complete
-                l.append(lte_frame_window(p,20.0e6))
+                l.append(lte_frame_window(p,out_samp_rate))
                 peaks_remaining = np.delete(peaks_remaining,[0])
             elif p<=half_frame_dur: # at the left border. we missed the start of the frame
-                l.append(lte_frame_window(p-int(20.0e6*5.0e-3),20.0e6))
+                l.append(lte_frame_window(p-int(out_samp_rate*5.0e-3),out_samp_rate))
                 peaks_remaining = np.delete(peaks_remaining,[0])
             else:
                 raise RuntimeError('Couldnt find the second PSSS peak of the LTE frame')
     return l
 
-def merge_boxes_within_same_lte_frame(x,tfreq_boxes_x,fft_size):
+def merge_boxes_within_same_lte_frame(x,tfreq_boxes_x,fft_size,sample_rate):
     tfreq_boxes = copy.deepcopy(tfreq_boxes_x)
-    frame_win_list = find_lte_frame_windows(x,fft_size)
+    frame_win_list = find_lte_frame_windows(x,fft_size,sample_rate)
     if len(frame_win_list)==0:
         raise RuntimeError('Couldnt find any ZC peak')
     new_tfreq_boxes = []
@@ -141,7 +141,8 @@ class GrLTETracesFlowgraph(gr.top_block):
                  linear_gain,
                  pad_interval,
                  mcs,
-                 frequency_offset):
+                 frequency_offset,
+                 out_sample_rate):
         super(GrLTETracesFlowgraph, self).__init__()
         self.subcarrier_spacing = 15000
 
@@ -158,7 +159,7 @@ class GrLTETracesFlowgraph(gr.top_block):
         mcs_str = "%02d" % (self.mcs)
         fname = '{}/lte_dump_prb_{}_mcs_{}.32fc'.format(frames_path,n_prbs_str,mcs_str)
         self.expected_bw = GrLTETracesFlowgraph.fftsize_mapping[self.fft_size]
-        self.resamp_ratio = 20.0e6/self.samp_rate
+        self.resamp_ratio = out_sample_rate/self.samp_rate
         self.n_samples_per_frame = int(10.0e-3*self.samp_rate)
         self.n_offset_samples = int(lf.random_generator.load_value(n_offset_samples))
         randgen = lf.random_generator.load_generator(pad_interval)
@@ -211,7 +212,8 @@ class GrLTETracesFlowgraph(gr.top_block):
         pad_interval = params['pad_interval']
         mcs = np.random.randint(0,28)
         frequency_offset = params.get('frequency_offset',0.0)
-        return cls(n_samples, n_offset_samples, n_prbs, linear_gain, pad_interval, mcs, frequency_offset)
+        sample_rate = params.get('sample_rate',20.0e6)
+        return cls(n_samples, n_offset_samples, n_prbs, linear_gain, pad_interval, mcs, frequency_offset, sample_rate)
 
 def run(args):
     d = args['parameters']
@@ -227,6 +229,9 @@ def run(args):
     # output signal
     x = np.array(tb.dst.data())
 
+    # plt.plot(np.abs(x))
+    # plt.show()
+
     # create a StageSignalData structure
     stage_data = wav_utils.set_derived_sigdata(x,args,True)
     metadata = stage_data.derived_params['spectrogram_img']
@@ -234,7 +239,7 @@ def run(args):
     tfbox.set_boxes_mag2(x,tfreq_boxes)
 
     # merge boxes even if broadcast channel is empty
-    tfreq_boxes = merge_boxes_within_same_lte_frame(x,tfreq_boxes,tb.fft_size)
+    tfreq_boxes = merge_boxes_within_same_lte_frame(x,tfreq_boxes,tb.fft_size,d['sample_rate'])
 
     # randomly scale and normalize boxes magnitude
     frame_mag2_gen = lf.random_generator.load_generator(args['parameters'].get('frame_mag2',1))

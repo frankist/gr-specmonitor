@@ -31,7 +31,7 @@ from waveform_generators.waveform_launcher import waveform
 from general_tasks.preRF_transformations import preRFTask
 from general_tasks.inspect_labels import Labels2JsonTask
 from general_tasks.visualization_modules import ImgSpectrogramBoundingBoxTask
-from general_tasks.psd_visualization import PSDPlotTask
+#from general_tasks.psd_visualization import PSDPlotTask
 from general_tasks.remove_IQsamples import RemoveIQSamples
 from general_tasks.voc_annotations import VOCFormatTask
 from general_tasks.partition_signal import PartitionSignalTask
