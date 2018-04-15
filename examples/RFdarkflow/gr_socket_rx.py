@@ -65,5 +65,5 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     addr = (args.host,9999)
-    tb = DarkflowClientFlowGraph(args.config,addr,freq)
+    tb = DarkflowClientFlowGraph(args.config,addr,args.freq)
     tb.run()

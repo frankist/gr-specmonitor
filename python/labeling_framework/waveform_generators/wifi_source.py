@@ -31,6 +31,7 @@ from gnuradio import gr
 from gnuradio import blocks
 from gnuradio import analog
 from gnuradio.eng_option import eng_option
+from gnuradio import filter
 from gnuradio.filter import firdes
 from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
 import foo
@@ -59,7 +60,8 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
                  encoding=0,
                  pdu_length=500,
                  pad_interval=1000,
-                 linear_gain=1.0):
+                 linear_gain=1.0,
+                 out_sample_rate=20e6):
         super(GrWifiFlowgraph, self).__init__()
 
         # params
@@ -75,6 +77,10 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         else:
             self.distname = 'constant'
             self.pad_interval = tuple(pad_interval)
+        self.out_sample_rate = out_sample_rate
+
+        # derived
+        self.resamp_factor = 20.0e6/self.out_sample_rate
 
         # phy
         self.wifi_phy_hier = wifi_phy_hier(
@@ -105,6 +111,8 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
         self.blocks_null_source = blocks.null_source(gr.sizeof_gr_complex * 1)
         self.skiphead = blocks.skiphead(gr.sizeof_gr_complex, self.n_offset_samples)
         self.head = blocks.head(gr.sizeof_gr_complex, self.n_written_samples)
+        if self.resamp_factor != 1.0:
+            self.resampler = filter.fractional_resampler_cc(0,self.resamp_factor)
         self.dst = blocks.vector_sink_c()
         # dst = blocks.file_sink(gr.sizeof_gr_complex,args['targetfolder']+'/tmp.bin')
 
@@ -139,7 +147,11 @@ class GrWifiFlowgraph(gr.top_block):#gr_qtgui_utils.QtTopBlock):
 
         self.connect((self.wifi_phy_hier, 0), self.packet_pad)
         # self.connect((self.wifi_phy_hier, 0), self.time_plot)
-        self.connect(self.packet_pad, self.skiphead)
+        if self.resamp_factor==1.0:
+            self.connect(self.packet_pad, self.skiphead)
+        else:
+            self.connect(self.packet_pad, self.resampler)
+            self.connect(self.resampler, self.skiphead)
         self.connect(self.skiphead, self.head)
         self.connect(self.head, self.dst)
 
@@ -162,7 +174,8 @@ def run(args):
         d.get('number_offset_samples',None),
         encoding=d['encoding'],
         pdu_length=d['pdu_length'],
-        pad_interval=d['pad_interval'])
+        pad_interval=d['pad_interval'],
+        out_sample_rate=d['sample_rate'])
 
     logger.info('Starting GR waveform generator script for Wifi')
     tb.run()
